@@ -376,9 +376,9 @@ Backend Cranelift generando binarios nativos x86_64.
 | Aspecto | Estado |
 |---------|--------|
 | Release build (6.4 MB, LTO) | ✅ `cargo build --release` produce `falcato.exe` |
-| Dependencias DLL | ⚠️ Requiere `VCRUNTIME140.dll` (no en Windows limpio) |
-| CRT estático | ❌ Pendiente — elimina dependencia VCRUNTIME140 |
-| GitHub repo | ❌ No creado aún |
+| Dependencias DLL | ⚠️ Requiere `VCRUNTIME140.dll` (local: bundle, CI: static) |
+| CRT estático | ⏳ Pendiente — funciona en GitHub Actions (VS completo), no en VS Insiders local |
+| GitHub repo | ✅ `CerebroCanibalus/falcato` (privado) |
 | GitHub Actions CI | ❌ Pendiente |
 | VS Code Extension | ❌ Pendiente |
 | Falso positivo Defender | ⚠️ Riesgo alto sin firma digital |
@@ -644,14 +644,15 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 ### Fase R1 — Distribución e instalación (RELEASE)
 | # | Tarea | Archivos | Esfuerzo |
 |---|-------|----------|----------|
-| 1 | `+crt-static` en Cargo.toml (release) | 1 línea | 5 min |
-| 2 | Release build + verificar DLLs | — | 15 min |
-| 3 | `clean.ps1` — limpiar basura (exes/ós sueltos) | 1 | 10 min |
-| 4 | `.github/workflows/ci.yml` — build + test en push | 1 | 30 min |
-| 5 | `.github/workflows/release.yml` — build + ZIP en tag | 1 | 30 min |
-| 6 | `scripts/install.ps1` — PATH + VS Code + ejemplos | 1 | 30 min |
-| 7 | Probar en máquina limpia (VM sin Rust) | — | 30 min |
-| 8 | Subir primer release a GitHub, reportar falso positivo a Microsoft | — | 1h |
+| 1 | `+crt-static` en Cargo.toml (solo CI) | 1 línea | 5 min |
+| 2 | `bundle_dlls.ps1` para releases locales | 1 | 10 min |
+| 3 | Release build + verificar DLLs | — | 15 min |
+| 4 | `clean.ps1` — limpiar basura (exes/ós sueltos) | 1 | 10 min |
+| 5 | `.github/workflows/ci.yml` — build + test en push | 1 | 30 min |
+| 6 | `.github/workflows/release.yml` — build + ZIP en tag | 1 | 30 min |
+| 7 | `scripts/install.ps1` — PATH + VS Code + ejemplos | 1 | 30 min |
+| 8 | Probar en máquina limpia (VM sin Rust) | — | 30 min |
+| 9 | Subir primer release a GitHub, reportar falso positivo a Microsoft | — | 1h |
 
 **Resultado:** Alguien descarga ZIP de GitHub Releases, ejecuta `install.ps1`, y tiene `falcato` en PATH + VS Code configurado.
 
@@ -707,8 +708,9 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 
 ## Checklist para release v0.2.0
 
-- [ ] CRT estático (`+crt-static` en Cargo.toml)
-- [ ] Release build limpio (sin DLLs externas)
+- [ ] `+crt-static` en CI (GitHub Actions tiene VS Build Tools completo)
+- [ ] Release build limpio (CI produce .exe sin DLLs externas)
+- [ ] Script `bundle_dlls.ps1` para releases locales (copia VCRUNTIME140.dll)
 - [ ] GitHub repo creado con README y LICENSE
 - [ ] GitHub Actions CI (build + test)
 - [ ] GitHub Actions Release (tag → ZIP)
