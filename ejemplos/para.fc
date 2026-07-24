@@ -1,0 +1,13 @@
+// Ejemplo de bucle para (for-each) en Falcato
+// Itera sobre arrays
+
+función principal() -> Entero32 {
+    los nums: [Entero32; 5] = [10, 20, 30, 40, 50];
+    
+    el suma: Entero32 = 0;
+    para num en nums {
+        suma = suma + num;
+    }
+    
+    retornar suma;
+}

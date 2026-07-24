@@ -1,0 +1,11 @@
+// Ejemplo de ERROR: función 'puro' que intenta mutar parámetro
+// Debe generar error [O050]
+
+función malo(el x: Entero32) -> Entero32 puro {
+    x = x + 1;  // ERROR: función pura no puede mutar parámetro
+    retornar x;
+}
+
+función principal() -> Entero32 {
+    retornar malo(41);
+}

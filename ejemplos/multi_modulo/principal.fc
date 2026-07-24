@@ -1,0 +1,6 @@
+usar matematicas::suma;
+
+función principal() -> Entero32 {
+    el r: Entero32 = suma(3, 4);
+    retornar r;
+}

@@ -1,0 +1,8 @@
+función longitud<N: Entero32>(los nums: [Entero32; N]) -> Entero32 {
+    retornar N;
+}
+
+función principal() -> Entero32 {
+    los nums: [Entero32; 5] = [1, 2, 3, 4, 5];
+    retornar longitud(nums);
+}

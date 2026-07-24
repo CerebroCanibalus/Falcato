@@ -1,0 +1,10 @@
+// Ejemplo de condicionales
+función principal() -> Entero32 {
+    el x: Entero32 = 10;
+    
+    si x > 5 {
+        retornar 100;
+    } sino {
+        retornar 0;
+    }
+}

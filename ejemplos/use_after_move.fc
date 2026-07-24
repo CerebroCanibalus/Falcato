@@ -1,0 +1,12 @@
+// Ejemplo de use-after-move detection con Nivel 1 (verificado)
+
+función principal() -> Entero32 verificado {
+    el x: Entero32 = 42;
+    
+    // Mover x (transferencia de ownership)
+    mover x;
+    
+    // ERROR: x ya no es válido después de mover
+    // En Nivel 1 (verificado), esto debería reportar un error
+    retornar x;
+}

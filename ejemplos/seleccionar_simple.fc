@@ -1,0 +1,46 @@
+fut función productor_a(la canal: Entero64) {
+    el i: Entero32 = 0;
+    mientras i < 3 {
+        canal_enviar(canal, i);
+        i = i + 1;
+        esperar dormir(150);
+    }
+}
+
+fut función productor_b(la canal: Entero64) {
+    el i: Entero32 = 0;
+    mientras i < 3 {
+        canal_enviar(canal, i + 100);
+        i = i + 1;
+        esperar dormir(200);
+    }
+}
+
+fut función principal() -> Entero32 {
+    la canal_a: Entero64 = canal_nuevo(8);
+    la canal_b: Entero64 = canal_nuevo(8);
+    lanzar productor_a(canal_a);
+    lanzar productor_b(canal_b);
+
+    el recibidos: Entero32 = 0;
+    mientras recibidos < 6 {
+        seleccionar {
+            canal_a como va => {
+                imprimir_linea("Dato de A");
+                recibidos = recibidos + 1;
+            }
+            canal_b como vb => {
+                imprimir_linea("Dato de B");
+                recibidos = recibidos + 1;
+            }
+            _ => {
+                esperar dormir(50);
+            }
+        }
+    }
+
+    canal_cerrar(canal_a);
+    canal_cerrar(canal_b);
+    imprimir_linea("Select completo: 6 datos recibidos");
+    retornar 0;
+}

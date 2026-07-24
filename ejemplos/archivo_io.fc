@@ -1,0 +1,40 @@
+// Fase 15D: File I/O — escribir, leer, verificar existencia
+función principal() -> Entero32 {
+    la ruta: Palabra = "test_output.txt";
+
+    // Escribir un archivo
+    el contenido: Texto = texto_desde("Hola desde Falcato!\nSegunda linea.\n");
+    el resultado: Entero32 = archivo_escribir(ruta, contenido);
+    imprimir_linea("escribir resultado: ");
+    imprimir(resultado);
+    imprimir_linea("");
+
+    // Verificar que existe
+    el existe: Booleano = archivo_existe(ruta);
+    imprimir_linea("existe: ");
+    imprimir(existe);
+    imprimir_linea("");
+
+    // Leer el archivo de vuelta
+    el leido: Texto = archivo_leer(ruta);
+    imprimir_linea("contenido leido: ");
+    imprimir_linea(leido);
+
+    // Longitud del texto leido
+    el len: Entero32 = texto_longitud(leido);
+    imprimir_linea("longitud: ");
+    imprimir(len);
+    imprimir_linea("");
+
+    // Verificar archivo que no existe
+    el existe2: Booleano = archivo_existe("no_existe.txt");
+    imprimir_linea("no_existe.txt existe: ");
+    imprimir(existe2);
+    imprimir_linea("");
+
+    // Liberar
+    texto_liberar(contenido);
+    texto_liberar(leido);
+
+    retornar 0;
+}

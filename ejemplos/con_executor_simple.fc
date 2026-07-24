@@ -1,0 +1,19 @@
+fut función tarea(la id: Entero32) {
+    imprimir_linea("Tarea iniciada");
+    esperar dormir(100);
+    imprimir_linea("Tarea terminada");
+}
+
+fut función principal() -> Entero32 {
+    imprimir_linea("=== Thread Pool con con_executor ===");
+
+    con_executor(2) {
+        lanzar tarea(1);
+        lanzar tarea(2);
+        lanzar tarea(3);
+        lanzar tarea(4);
+    }
+
+    imprimir_linea("=== Todas las tareas completadas ===");
+    retornar 0;
+}

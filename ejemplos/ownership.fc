@@ -1,0 +1,12 @@
+// Ejemplo de ownership: el vs la
+función principal() -> Entero32 {
+    // 'el' = owned, mutable
+    el contador: Entero32 = 0;
+    contador = contador + 1;  // OK: mutable
+    
+    // 'la' = borrowed, inmutable
+    la constante: Entero32 = 100;
+    // constante = 50;  // ERROR: [O001] no es mutable
+    
+    retornar contador + constante;  // 101
+}

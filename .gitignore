@@ -1,0 +1,35 @@
+# Compilación
+target/
+target2/
+build/
+*.o
+*.obj
+*.exe
+*.ll
+*.bc
+*.pdb
+*.rlib
+*.d
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencias descargadas
+vendor/
+deps/
+
+# Plugins/Config local
+.opencode/
+
+# Temp / test output
+tmp_*
+test_out.txt
+test_*.txt

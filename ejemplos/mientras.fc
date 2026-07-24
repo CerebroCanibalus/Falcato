@@ -1,0 +1,13 @@
+// Ejemplo de bucle mientras
+función principal() -> Entero32 {
+    el contador: Entero32 = 0;
+    el suma: Entero32 = 0;
+    
+    mientras contador < 10 {
+        suma = suma + contador;
+        contador = contador + 1;
+    }
+    
+    retornar suma;
+}
+// Resultado esperado: 0+1+2+3+4+5+6+7+8+9 = 45

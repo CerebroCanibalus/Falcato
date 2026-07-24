@@ -1,0 +1,14 @@
+// Ejemplo de transferencia de ownership con mover y copiar
+
+función principal() -> Entero32 {
+    el x: Entero32 = 42;
+    
+    // copiar: crea una copia, x sigue siendo válido
+    el y = copiar x;
+    
+    // mover: transfiere ownership (explícito)
+    // Después de mover, x ya no debería usarse (en Nivel 1+)
+    mover x;
+    
+    retornar y;
+}

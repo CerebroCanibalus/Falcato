@@ -1,0 +1,18 @@
+// Ejemplo INCORRECTO: dos borrows mutables al MISMO campo = ERROR
+
+estructural Punto {
+    x: Entero32,
+    y: Entero32
+}
+
+función principal() -> Entero32 estricto {
+    el punto: Punto = Punto { x: 10, y: 20 };
+    
+    // Primer borrow mutable a punto.x
+    el ref1: &mut Entero32 = &mut punto.x;
+    
+    // ERROR: segundo borrow mutable al mismo campo
+    el ref2: &mut Entero32 = &mut punto.x;
+    
+    retornar *ref1;
+}

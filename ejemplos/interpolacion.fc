@@ -1,0 +1,19 @@
+// interpolacion.fc — Prueba de string interpolation {x}
+// Fase 14A: imprimir_linea("El valor es {x}")
+
+función principal() -> Entero32 {
+    el x: Entero32 = 42;
+    el nombre: Entero32 = 7;
+
+    imprimir_linea("El valor de x es {x}");
+    imprimir_linea("Nombre vale {nombre} y x vale {x}");
+    imprimir("Sin newline: x={x}");
+    imprimir_linea(" ...listo!");
+
+    // Bitwise + interpolación juntos
+    el mask: Entero32 = 255;
+    el resultado: Entero32 = mask & 15;
+    imprimir_linea("255 & 15 = {resultado}");
+
+    retornar 0;
+}

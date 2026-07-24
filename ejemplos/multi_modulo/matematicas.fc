@@ -1,0 +1,3 @@
+función suma(el a: Entero32, el b: Entero32) -> Entero32 {
+    retornar a + b;
+}

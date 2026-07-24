@@ -1,0 +1,26 @@
+función principal() -> Entero32 {
+    el x: Entero32 = 2;
+
+    el resultado: Entero32 = coincidir x {
+        0 => 100,
+        1 => 200,
+        2 => 300,
+        _ => 999,
+    };
+
+    imprimir_linea("resultado = {resultado}");
+
+    el dia: Entero32 = 5;
+    el nombre: Entero32 = coincidir dia {
+        1 => 10,
+        2 => 20,
+        3 => 30,
+        4 => 40,
+        5 => 50,
+        _ => 0,
+    };
+
+    imprimir_linea("nombre = {nombre}");
+
+    retornar 0;
+}

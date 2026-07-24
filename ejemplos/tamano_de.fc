@@ -1,0 +1,23 @@
+// tamano_de.fc — Prueba de tamaño_de::<T>() comptime
+// Fase 14A: sizeof como built-in del compiler
+
+función principal() -> Entero32 {
+    el t1: Entero64 = tamaño_de::<Entero8>();
+    el t2: Entero64 = tamaño_de::<Entero32>();
+    el t3: Entero64 = tamaño_de::<Entero64>();
+    el t4: Entero64 = tamaño_de::<Flotante64>();
+    el t5: Entero64 = tamaño_de::<Booleano>();
+
+    // Verificar con interpolación
+    imprimir_linea("Entero8 = {t1} bytes");
+    imprimir_linea("Entero32 = {t2} bytes");
+    imprimir_linea("Entero64 = {t3} bytes");
+    imprimir_linea("Flotante64 = {t4} bytes");
+    imprimir_linea("Booleano = {t5} bytes");
+
+    // Array: [Entero32; 10] = 40 bytes
+    el t6: Entero64 = tamaño_de::<[Entero32; 10]>();
+    imprimir_linea("[Entero32; 10] = {t6} bytes");
+
+    retornar 0;
+}

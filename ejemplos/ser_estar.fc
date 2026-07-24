@@ -1,0 +1,26 @@
+// Ejemplo de Ser/Estar y Subjuntivo en Falcato
+// Pilar II del lenguaje: Ser/Estar = Const/Mut
+
+función principal() -> Entero32 {
+    el x: Entero32 = 5;
+    
+    // Ser: identidad estructural/permanente (==)
+    si x es 5 {
+        x = 10;
+    }
+    
+    // Estar: estado temporal (por ahora, equivalente a ==)
+    // En Fase 6, 'está' verificará estado mutable (vacío, lleno, etc.)
+    si x está 10 {
+        x = 20;
+    }
+    
+    // Subjuntivo: condición improbable (cold path)
+    // Semánticamente marca que este branch es improbable
+    // El compilador puede optimizar en futuras versiones
+    si x fuese es 100 {
+        x = 999;
+    }
+    
+    retornar x;
+}

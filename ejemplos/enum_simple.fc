@@ -1,0 +1,15 @@
+enumeración Estado {
+    Activo,
+    Inactivo,
+    Pausado
+}
+
+función principal() -> Entero32 {
+    el estado: Estado = Estado.Activo;
+    
+    si estado es Estado.Activo {
+        retornar 1;
+    }
+    
+    retornar 0;
+}

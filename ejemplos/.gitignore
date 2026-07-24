@@ -1,0 +1,11 @@
+# Ignorar archivos generados por el compilador
+*.o
+*.exe
+*.obj
+*.lib
+*.dll
+*.pdb
+
+# Ignorar backups de editor
+*.bak
+*~

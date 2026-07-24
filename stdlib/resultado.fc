@@ -1,0 +1,8 @@
+// Resultado<T, E> — tipo para manejo de errores
+// Exito(valor: T) — operación exitosa
+// Error(error: E) — operación fallida
+
+el enumeración Resultado<T, E> {
+    Exito(valor: T),
+    Error(error: E)
+}

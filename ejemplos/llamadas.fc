@@ -1,0 +1,16 @@
+// Ejemplo de verificación de tipos en llamadas a función
+
+función sumar(el a: Entero32, el b: Entero32) -> Entero32 {
+    retornar a + b;
+}
+
+función principal() -> Entero32 {
+    // Llamada correcta
+    el resultado: Entero32 = sumar(10, 20);
+    
+    // Estas líneas darían error de tipo si se descomentaran:
+    // el mal: Entero32 = sumar(10);           // Error: falta argumento
+    // el mal2: Entero32 = sumar(10, "hola");  // Error: tipo incorrecto
+    
+    retornar resultado;
+}

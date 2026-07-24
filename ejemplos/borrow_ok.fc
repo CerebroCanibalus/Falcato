@@ -1,0 +1,11 @@
+// Ejemplo CORRECTO: múltiples borrows inmutables OK
+
+función principal() -> Entero32 estricto {
+    el x: Entero32 = 42;
+    
+    // Múltiples borrows inmutables: OK
+    la ref1: &Entero32 = &x;
+    la ref2: &Entero32 = &x;
+    
+    retornar *ref1;
+}

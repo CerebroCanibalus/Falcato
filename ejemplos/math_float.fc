@@ -1,0 +1,15 @@
+// Fase 15E: raiz y potencia (Flotante64)
+función principal() -> Entero32 {
+    el x: Flotante64 = 25.0;
+    el r: Flotante64 = raiz(x);
+    imprimir(r);
+    imprimir_linea("");
+
+    el base: Flotante64 = 2.0;
+    el exp: Flotante64 = 10.0;
+    el p: Flotante64 = potencia(base, exp);
+    imprimir(p);
+    imprimir_linea("");
+
+    retornar 0;
+}

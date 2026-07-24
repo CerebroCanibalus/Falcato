@@ -1,0 +1,14 @@
+// Ejemplo CORRECTO: usar copiar antes de mover
+
+función principal() -> Entero32 verificado {
+    el x: Entero32 = 42;
+    
+    // copiar x: crea una copia, x sigue siendo válido
+    el y = copiar x;
+    
+    // Mover x (transferencia de ownership)
+    mover x;
+    
+    // OK: y es una copia independiente
+    retornar y;
+}

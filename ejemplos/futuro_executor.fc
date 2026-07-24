@@ -1,0 +1,21 @@
+// Fase 18E: Futuros state machine + executor integrado
+// lanzar fut_función dentro de con_executor → poll loop en worker thread
+
+fut función tarea_lenta(el id: Entero32) -> Entero32 {
+    imprimir_linea("Tarea {id} iniciada");
+    esperar dormir(50);
+    imprimir_linea("Tarea {id} paso 2");
+    esperar dormir(50);
+    imprimir_linea("Tarea {id} completada");
+    retornar id;
+}
+
+función principal() {
+    imprimir_linea("=== Futuros + Executor ===");
+    con_executor(2) {
+        lanzar tarea_lenta(1);
+        lanzar tarea_lenta(2);
+        lanzar tarea_lenta(3);
+    }
+    imprimir_linea("=== Todas las tareas terminaron ===");
+}

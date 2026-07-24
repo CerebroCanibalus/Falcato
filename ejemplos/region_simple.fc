@@ -1,0 +1,15 @@
+// Ejemplo de región (arena allocation)
+// Todas las variables dentro de la región se liberan juntas al final
+
+función principal() -> Entero32 {
+    el resultado: Entero32 = 0;
+    
+    región cálculo {
+        el a: Entero32 = 20;
+        el b: Entero32 = 22;
+        resultado = a + b;
+    }
+    // 'a' y 'b' ya no existen aquí (scope de la región)
+    
+    retornar resultado;
+}

@@ -1,0 +1,20 @@
+// Ejemplo de struct con campo &yo (self-referential type)
+// &yo Nodo = "referencia a otro yo" (como un puntero next en lista enlazada)
+// En Rust: struct Node { next: &Node } → ERROR: missing lifetime specifier
+// En Falcato: &yo resuelve el lifetime automáticamente
+//
+// NOTA: La inicialización de structs self-referential requiere null/Option (Fase futura)
+// Este ejemplo demuestra que el tipo &yo parsea y type-checkea correctamente
+
+estructural Nodo {
+    valor: Entero32,
+    siguiente: &yo Nodo,
+}
+
+función principal() -> Entero32 {
+    // Región como arena allocation
+    región mi_región {
+        el x: Entero32 = 42;
+        retornar x;
+    }
+}

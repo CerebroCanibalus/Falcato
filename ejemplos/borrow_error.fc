@@ -1,0 +1,13 @@
+// Ejemplo INCORRECTO: borrow mutable + inmutable = ERROR
+
+función principal() -> Entero32 estricto {
+    el x: Entero32 = 42;
+    
+    // Borrow mutable
+    el ref_mut: &mut Entero32 = &mut x;
+    
+    // ERROR: no se puede crear borrow inmutable mientras hay borrow mutable
+    la ref: &Entero32 = &x;
+    
+    retornar *ref;
+}

@@ -1,0 +1,44 @@
+// bitwise_simple.fc — Prueba de operadores bitwise
+// Fase 14A: Bitwise operators type-safe
+
+inseguro función puts(el mensaje: Palabra);
+
+función principal() -> Entero32 {
+    // Operadores bitwise básicos
+    el a: Entero32 = 12;    // 1100
+    el b: Entero32 = 10;    // 1010
+
+    el and_result: Entero32 = a & b;     // 1000 = 8
+    el or_result: Entero32 = a | b;      // 1110 = 14
+    el xor_result: Entero32 = a ^ b;     // 0110 = 6
+
+    // Shifts
+    el shl_result: Entero32 = a << 2;    // 110000 = 48
+    el shr_result: Entero32 = a >> 1;    // 0110 = 6
+
+    // Bitwise NOT
+    el cero: Entero32 = 0;
+    el not_cero: Entero32 = ~cero;       // -1 (todos los bits en 1)
+
+    // Verificación con condicionales
+    si and_result es 8 {
+        puts("AND: OK");
+    }
+    si or_result es 14 {
+        puts("OR: OK");
+    }
+    si xor_result es 6 {
+        puts("XOR: OK");
+    }
+    si shl_result es 48 {
+        puts("SHL: OK");
+    }
+    si shr_result es 6 {
+        puts("SHR: OK");
+    }
+    si not_cero es 0 - 1 {
+        puts("NOT: OK");
+    }
+
+    retornar 0;
+}

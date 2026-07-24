@@ -1,0 +1,6 @@
+función principal() -> Entero32 {
+    el a: Entero32 = 10;
+    el b: Entero32 = 20;
+    el c: Entero32 = a + b * 2;
+    retornar c;
+}

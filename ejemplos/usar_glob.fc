@@ -1,0 +1,17 @@
+módulo matematicas {
+    el función suma(el a: Entero32, el b: Entero32) -> Entero32 {
+        retornar a + b;
+    }
+
+    el función producto(el a: Entero32, el b: Entero32) -> Entero32 {
+        retornar a * b;
+    }
+}
+
+usar matematicas::*;
+
+función principal() -> Entero32 {
+    el s: Entero32 = suma(2, 3);
+    el p: Entero32 = producto(s, 2);
+    retornar p;
+}

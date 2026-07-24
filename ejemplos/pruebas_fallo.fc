@@ -1,0 +1,15 @@
+función sumar(el a: Entero32, el b: Entero32) -> Entero32 {
+    retornar a + b;
+}
+
+prueba "suma correcta" {
+    afirmar(sumar(2, 3) == 5);
+}
+
+prueba "suma incorrecta a proposito" {
+    afirmar(sumar(2, 2) == 5);
+}
+
+función principal() -> Entero32 {
+    retornar 0;
+}

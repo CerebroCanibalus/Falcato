@@ -1,0 +1,7 @@
+función principal() -> Entero32 {
+    afirmar(1 + 1 == 2);
+    afirmar(3 * 4 == 12);
+    afirmar(10 > 5);
+    imprimir_linea("Todas las afirmaciones pasaron");
+    retornar 0;
+}

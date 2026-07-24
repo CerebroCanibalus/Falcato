@@ -1,0 +1,6 @@
+// Test: rasgo que no existe
+implementar NoExiste para Entero32 {
+    función foo() -> Entero32 { retornar 0; }
+}
+
+función principal() -> Entero32 { retornar 0; }

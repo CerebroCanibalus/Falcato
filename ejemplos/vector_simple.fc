@@ -1,0 +1,9 @@
+función principal() -> Entero32 {
+    el v: Vector<Entero32> = vector_nuevo<Entero32>();
+    vector_agregar<Entero32>(v, 10);
+    vector_agregar<Entero32>(v, 20);
+    vector_agregar<Entero32>(v, 30);
+    el x: Entero32 = vector_obtener<Entero32>(v, 1);
+    vector_liberar<Entero32>(v);
+    retornar x;
+}

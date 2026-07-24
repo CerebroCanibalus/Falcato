@@ -1,0 +1,13 @@
+// Ejemplo de anotación de efecto 'puro'
+// 'puro' = no muta nada fuera de su scope (como const en C++)
+// El compiler verifica que no se muten parámetros
+
+función doble(la x: Entero32) -> Entero32 puro {
+    // OK: no muta x, solo lo lee
+    retornar x * 2;
+}
+
+función principal() -> Entero32 {
+    el valor: Entero32 = 21;
+    retornar doble(valor);  // 42
+}

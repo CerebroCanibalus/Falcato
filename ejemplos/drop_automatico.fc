@@ -1,0 +1,23 @@
+// Ejemplo de drop automático con Texto (sin retorno explícito)
+// El compilador inserta free() automáticamente al final de la función
+
+inseguro función puts(el mensaje: Palabra);
+
+función crear_texto() {
+    // Crear un Texto en el heap
+    el texto: Texto = texto_desde("Hola desde crear_texto!");
+    
+    // Usar el texto
+    puts("Texto creado en crear_texto");
+    
+    // Al final de la función (sin retorno explícito), el compilador inserta:
+    // free(texto.ptr);
+    // free(texto);
+    // Esto evita memory leaks
+}
+
+función principal() -> Entero32 {
+    crear_texto();
+    puts("Texto liberado automáticamente");
+    retornar 0;
+}

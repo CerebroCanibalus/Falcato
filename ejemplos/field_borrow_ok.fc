@@ -1,0 +1,17 @@
+// Ejemplo CORRECTO: field-level borrowing
+// &mut punto.x y &mut punto.y NO conflictúan (campos distintos)
+
+estructural Punto {
+    x: Entero32,
+    y: Entero32
+}
+
+función principal() -> Entero32 estricto {
+    el punto: Punto = Punto { x: 10, y: 20 };
+    
+    // Borrows mutables a campos distintos: OK
+    el ref_x: &mut Entero32 = &mut punto.x;
+    el ref_y: &mut Entero32 = &mut punto.y;
+    
+    retornar *ref_x;
+}

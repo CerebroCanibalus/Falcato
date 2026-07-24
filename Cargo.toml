@@ -1,0 +1,48 @@
+[package]
+name = "falcato"
+version = "0.1.0"
+edition = "2021"
+authors = ["Falcato Team"]
+description = "Lenguaje de programación de sistemas iberohablante sobre Cranelift"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/falcato/falcato"
+
+[[bin]]
+name = "falcato"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Lexer
+logos = "0.14"
+
+# Parser (manual - sin dependencias externas)
+
+# Cranelift Codegen (puro Rust, sin dependencias del sistema)
+cranelift-codegen = "0.112"
+cranelift-frontend = "0.112"
+cranelift-module = "0.112"
+cranelift-object = "0.112"
+cranelift-native = "0.112"
+target-lexicon = "0.12"
+
+# LSP (Fase 2+)
+tower-lsp = "0.20"
+tokio = { version = "1", features = ["full"] }
+
+# Testing (Fase 2+)
+insta = "1.39"
+
+# Utilities
+thiserror = "1.0"
+anyhow = "1.0"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+
+[profile.release]
+opt-level = 3
+lto = true

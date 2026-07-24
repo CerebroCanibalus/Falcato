@@ -1,0 +1,57 @@
+Falcato — Changelog
+═══════════════════════════════════════════════════════════════════════════
+Formato: YYYY-MM-DD | Cambio | Justificación breve
+═══════════════════════════════════════════════════════════════════════════
+
+2026-06-02 | CREACIÓN DEL PROYECTO + FASE 1 COMPLETADA
+  - Proyecto renombrado: Falcata → Falcato (más masculino)
+  - README.md, PRESENTACION.md, AGENTS.md actualizados con nuevo nombre
+  - docs/hoja_de_ruta.md reescrito como Plan Central completo:
+    • Manifiesto técnico
+    • Registro de decisiones con justificación (D-001 a D-007)
+    • Los 5 Pilares con comparativa técnica vs Rust/Zig/C/Go
+    • Las 5 Ideas Novel para ultra-rápido
+    • Arquitectura completa del compilador
+    • Hoja de ruta con 5 fases
+  - docs/arquitectura.md actualizado con pipeline completo:
+    • Lexer/Parser/AST con Span
+    • Análisis semántico: tipos, ownership, tiempos, layout, memoria, SIMD
+    • FAL IR con optimizaciones específicas
+    • Codegen LLVM con inkwell y C ABI
+    • LSP con tower-lsp
+  - docs/semantica.md: sección FFI expandida (mapeo C→Falcato, punteros,
+    linkage, módulos FFI completos)
+  - AGENTS.md: día-0 vinculante (C ABI, Span, errores español), 5 pilares
+  - ejemplos/hola_mundo.fc: actualizado a FFI directo con puts() de libc
+  - Decisión day-0: C ABI por defecto (layout C, calling C, mangling off)
+  - Decisión day-0: Span en cada nodo AST (requisito para errores y LSP)
+  - Decisión day-0: Errores en español con códigos [F001]
+  - Decisión day-0: CLI falcato build/run/check/lsp
+  - Stack técnico decidido: logos + chumsky + inkwell + clap + tower-lsp
+  - Investigación EML (arXiv 2603.21852): DESCARTADO para runtime
+    (demasiado lento, error numérico acumulativo, profundidades 27-139)
+  - EML reservado para symbolic regression en compile-time (Fase 5+)
+
+2026-06-02 | FASE 1: Prototipo Day-0 COMPLETADO
+  - Migración de inkwell (LLVM) a Cranelift (puro Rust, sin dependencias)
+  - Proyecto Rust creado con Cargo.toml
+  - src/span.rs: Span y Posicion implementados
+  - src/error.rs: Sistema de errores en español con códigos [C001], [I010]
+  - src/lexer.rs: Lexer completo con logos (tokens en español, strings, chars)
+  - src/ast.rs: AST con Span en cada nodo
+  - src/parser.rs: Parser manual descendente (reemplazó chumsky por simplicidad)
+  - src/codegen.rs: Codegen con Cranelift (C ABI, funciones, llamadas, retornos)
+  - src/main.rs: CLI con clap (build, run, check, version)
+  - build.bat: Script de build con entorno VS configurado
+  - Compilación exitosa: hola_mundo.fc → hola_mundo.exe (retorna 42)
+  - Tests: 5/5 pasando (lexer + parser)
+
+═══════════════════════════════════════════════════════════════════════════
+PRÓXIMOS HITOS (pendientes)
+═══════════════════════════════════════════════════════════════════════════
+  [ ] Elegir licencia del proyecto
+  [ ] FFI a libc (puts, printf) en Windows
+  [ ] FASE 2: Sistema de tipos + LSP básico
+  [ ] FASE 3: Ownership + memoria
+
+═══════════════════════════════════════════════════════════════════════════
