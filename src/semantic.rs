@@ -2451,7 +2451,41 @@ No puedes modificar algo que no es 'tuyo'.",
                 tipo
             }
 
+            // GUI (Fase GUI-1): direccion_de(funcion)
+            Expresion::DireccionDe(nombre_funcion, span) => {
+                // Verificar que la función existe en el ámbito actual
+                let funcion_existe = self.funciones.contains_key(nombre_funcion)
+                    || self.simbolos_publicos_importados.contains_key(nombre_funcion);
+                if !funcion_existe {
+                    self.reportar_error(
+                        CategoriaError::Tipo,
+                        85,
+                        span,
+                        format!("Función '{}' no encontrada para 'direccion_de'", nombre_funcion),
+                        Some("Asegúrate de que la función exista y sea accesible en el ámbito actual".to_string()),
+                    );
+                }
+                // direccion_de retorna un puntero (Entero64)
+                Tipo::Entero64
+            }
+
             // Fase 15A: métodos bitwise en enteros
+            Expresion::Bloque(bloque) => {
+                // Analizar todas las sentencias del bloque
+                for sentencia in &bloque.sentencias {
+                    self.analizar_sentencia(sentencia);
+                }
+                // El tipo del bloque es el de la última expresión (o Vacio si no hay)
+                if let Some(ultima) = bloque.sentencias.last() {
+                    match ultima {
+                        Sentencia::Expresion(expr) => self.inferir_tipo(expr),
+                        Sentencia::Retornar(Some(expr), _) => self.inferir_tipo(expr),
+                        _ => Tipo::Vacio,
+                    }
+                } else {
+                    Tipo::Vacio
+                }
+            }
             Expresion::Metodo(receptor, nombre, args, span) => {
                 let tipo_receptor = self.inferir_tipo(receptor);
                 

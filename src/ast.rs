@@ -305,6 +305,10 @@ pub enum Expresion {
     Bloquear(Box<Expresion>, Span),
     /// Método general: x.metodo(args) — desugarea a llamada built-in según tipo del receptor
     Metodo(Box<Expresion>, String, Vec<Expresion>, Span), // receptor, nombre_método, args, span
+    /// Bloque como expresión: { sentencias } — retorna el valor de la última expresión
+    Bloque(Bloque),
+    /// DireccionDe(nombre) — obtiene la dirección (puntero) de una función
+    DireccionDe(String, Span),
 }
 
 impl Expresion {
@@ -333,6 +337,8 @@ impl Expresion {
             Expresion::Lanzar(_, span) => span,
             Expresion::Bloquear(_, span) => span,
             Expresion::Metodo(_, _, _, span) => span,
+            Expresion::Bloque(bloque) => &bloque.span,
+            Expresion::DireccionDe(_, span) => span,
         }
     }
 }

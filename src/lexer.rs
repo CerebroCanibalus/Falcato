@@ -131,6 +131,11 @@ pub enum Token {
     #[token("seleccionar")]
     Seleccionar,
 
+    #[token("direccion_de")]
+    DireccionDe,
+    #[token("dir_de")]
+    DirDe,
+
     #[token("con_executor")]
     ConExecutor,
 

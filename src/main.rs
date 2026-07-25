@@ -515,6 +515,8 @@ fn link_objetos(
             .arg("legacy_stdio_definitions.lib")
             .arg("vcruntime.lib")
             .arg("kernel32.lib")
+            .arg("user32.lib")
+            .arg("gdi32.lib")
             .arg("ws2_32.lib");
 
         let output = cmd.output()

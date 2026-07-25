@@ -357,6 +357,26 @@ fn parse_atom(cursor: &mut ParserCursor) -> Result<Expresion, ErrorSintaxis> {
             let span = Span::combinar(&span_inicio, expr.span());
             return Ok(Expresion::Bloquear(Box::new(expr), span));
         }
+        // GUI (Fase GUI-1): direccion_de(funcion) / dir_de(funcion)
+        Some(Token::DireccionDe) | Some(Token::DirDe) => {
+            let span_inicio = cursor.span_actual();
+            cursor.avanzar(); // direccion_de / dir_de
+            cursor.esperar(Token::ParenAbre)?;
+            let nombre = match cursor.actual() {
+                Some(Token::Identificador(n)) => {
+                    let n = n.clone();
+                    cursor.avanzar();
+                    n
+                }
+                _ => {
+                    let span = cursor.span_actual();
+                    return Err(ErrorSintaxis::identificador_esperado(span, "nombre de función después de 'direccion_de('"));
+                }
+            };
+            cursor.esperar(Token::ParenCierra)?;
+            let span = Span::combinar(&span_inicio, &cursor.span_actual());
+            return Ok(Expresion::DireccionDe(nombre, span));
+        }
         _ => {}
     }
 
@@ -414,6 +434,11 @@ fn parse_atom(cursor: &mut ParserCursor) -> Result<Expresion, ErrorSintaxis> {
             let span_fin = cursor.span_actual();
             let span = Span::combinar(&span_inicio, &span_fin);
             Ok(Expresion::LiteralArray(elementos, span))
+        }
+        Some(Token::LlaveAbre) => {
+            // Bloque como expresión: { sentencia; expresión }
+            let bloque = super::sentencias::parse_bloque(cursor)?;
+            Ok(Expresion::Bloque(bloque))
         }
         Some(Token::Todos) => {
             // todos expr — inicialización de array con valor repetido

@@ -566,6 +566,14 @@ impl IndiceSemantico {
             Expresion::Esperar(expr, _) => Self::colectar_referencias_en_expresion(expr, nombre, refs),
             Expresion::Lanzar(expr, _) => Self::colectar_referencias_en_expresion(expr, nombre, refs),
             Expresion::Bloquear(expr, _) => Self::colectar_referencias_en_expresion(expr, nombre, refs),
+            Expresion::DireccionDe(_, _) => {},  // referencia a función, no a variable
+            Expresion::Bloque(bloque) => {
+                for sentencia in &bloque.sentencias {
+                    if let Sentencia::Expresion(expr) = sentencia {
+                        Self::colectar_referencias_en_expresion(expr, nombre, refs);
+                    }
+                }
+            }
             Expresion::Metodo(receptor, _, args, _) => {
                 Self::colectar_referencias_en_expresion(receptor, nombre, refs);
                 for arg in args {
@@ -950,6 +958,8 @@ impl Backend {
             ("como", "Binding en pattern matching", CompletionItemKind::KEYWORD),
             ("bits", "Campos de bits en struct", CompletionItemKind::KEYWORD),
             ("todos", "Inicialización de arreglo con valor", CompletionItemKind::KEYWORD),
+            ("direccion_de", "Obtiene la dirección de una función", CompletionItemKind::KEYWORD),
+            ("dir_de", "Obtiene la dirección de una función (abreviatura)", CompletionItemKind::KEYWORD),
             ("tipo", "Keyword de tipo (contextual)", CompletionItemKind::KEYWORD),
         ];
 

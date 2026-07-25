@@ -284,6 +284,7 @@ fn recolectar_usos_expr(expr: &Expresion, usos: &mut HashSet<String>) {
         Expresion::Bloquear(inner, _) => {
             recolectar_usos_expr(inner, usos);
         }
+        Expresion::DireccionDe(_, _) => {}  // referencia a función, sin variables
         Expresion::AccesoArray(base, indice, _) => {
             recolectar_usos_expr(base, usos);
             recolectar_usos_expr(indice, usos);
@@ -340,6 +341,13 @@ fn recolectar_usos_expr(expr: &Expresion, usos: &mut HashSet<String>) {
             recolectar_usos_expr(receptor, usos);
             for arg in args {
                 recolectar_usos_expr(arg, usos);
+            }
+        }
+        Expresion::Bloque(bloque) => {
+            for sentencia in &bloque.sentencias {
+                if let Sentencia::Expresion(expr) = sentencia {
+                    recolectar_usos_expr(expr, usos);
+                }
             }
         }
         Expresion::Literal(_) | Expresion::Ruta(_, _) => {}
