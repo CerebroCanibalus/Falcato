@@ -391,6 +391,7 @@ y servidor LSP completo con **6 features para agentes**:
   - Document symbols (outline: funciones, structs, enums, traits)
   - Context-aware completion (variables en scope, campos de struct tras `.`)
   - Hover mejorado (tablas de propiedades, structs/enums/traits)
+  - ✅ Integrado con OpenCode vía `opencode.jsonc` (global) + verificado end-to-end
 Backend Cranelift generando binarios nativos x86_64.
 
 **Documentación completa de usuario:** GUIA.md (hub) + 15 capítulos en GUIA/ (03-15),
@@ -409,6 +410,7 @@ más skill `falcato-language` para LLMs en OpenCode.
 | GitHub repo | ✅ `CerebroCanibalus/falcato` (privado) |
 | GitHub Actions CI | ✅ build + test en push |
 | VS Code Extension | ✅ VSIX instalable, Falcato Dorado theme |
+| LSP para agentes (OpenCode) | ✅ 6 features, integrado globalmente, verificado |
 | Falso positivo Defender | ⚠️ Riesgo alto sin firma digital |
 | Instalador script | ❌ Pendiente |
 
