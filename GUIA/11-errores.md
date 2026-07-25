@@ -201,6 +201,119 @@ fn mezclar() -> Resultado<Entero32, ErrorMatematico> {
 }
 ```
 
+## Programa completo: Calculadora
+
+Este programa une todo lo visto: `Resultado<T,E>`, operador `?`, `coincidir`, arrays, bucles `para`, pattern matching con `es...como`, e interpolación de strings.
+
+```falcato
+// calculadora.fc — Calculadora de 4 operaciones con manejo de errores
+
+enumeración ErrorMatematico {
+    DivisionPorCero,
+    OperacionInvalida,
+}
+
+fn dividir(la a: Entero32, la b: Entero32) -> Resultado<Entero32, ErrorMatematico> {
+    si b es 0 {
+        retornar Resultado.Error(ErrorMatematico.DivisionPorCero);
+    }
+    retornar Resultado.Exito(a / b);
+}
+
+fn operar(la op: Entero32, la a: Entero32, la b: Entero32) -> Resultado<Entero32, ErrorMatematico> {
+    coincidir op {
+        1 => { retornar Resultado.Exito(a + b); }
+        2 => { retornar Resultado.Exito(a - b); }
+        3 => { retornar Resultado.Exito(a * b); }
+        4 => { retornar dividir(a, b)?; }  // propaga error si b=0
+        _ => { retornar Resultado.Error(ErrorMatematico.OperacionInvalida); }
+    }
+}
+
+fn main() -> Entero32 {
+    imprimir_linea("=== CALCULADORA FALCATO ===");
+    imprimir_linea("1) Sumar");
+    imprimir_linea("2) Restar");
+    imprimir_linea("3) Multiplicar");
+    imprimir_linea("4) Dividir");
+    imprimir_linea("0) Salir");
+    imprimir_linea("");
+
+    // Array de opciones para el menú
+    los opciones: [Entero32; 4] = [1, 2, 3, 4];
+
+    mientras verdadero {
+        imprimir("Elige opcion: ");
+        // En Falcato real usarías entrada de usuario; aquí simulamos:
+        el opcion: Entero32 = 4;  // Cambia esto para probar
+
+        si opcion es 0 {
+            imprimir_linea("Hasta luego!");
+            retornar 0;
+        }
+
+        // Validar que la opción existe en el array
+        el valida: Booleano = falso;
+        para op en opciones {
+            si op es opcion {
+                valida = verdadero;
+            }
+        }
+
+        si !valida {
+            imprimir_linea("Opcion invalida. Intenta de nuevo.");
+            continuar;
+        }
+
+        imprimir("Primer numero: ");
+        el a: Entero32 = 10;  // Simulado
+        imprimir("Segundo numero: ");
+        el b: Entero32 = 5;   // Simulado
+
+        // Llamada que devuelve Resultado — usamos coincidir para manejar ambos casos
+        coincidir operar(opcion, a, b) {
+            Resultado.Exito como res => {
+                imprimir_linea("Resultado: {res}");
+            }
+            Resultado.Error como err => {
+                coincidir err {
+                    ErrorMatematico.DivisionPorCero => {
+                        imprimir_linea("Error: No se puede dividir por cero");
+                    }
+                    ErrorMatematico.OperacionInvalida => {
+                        imprimir_linea("Error: Operacion no reconocida");
+                    }
+                }
+            }
+        }
+
+        imprimir_linea("");
+    }
+
+    retornar 0;
+}
+```
+
+**Puntos clave del ejemplo:**
+
+| Concepto | Dónde se ve |
+|----------|-------------|
+| Enum con datos | `ErrorMatematico { DivisionPorCero, OperacionInvalida }` |
+| Función que devuelve `Resultado` | `dividir`, `operar` |
+| Propagar error con `?` | `dividir(a, b)?` en `operar` |
+| `coincidir` exhaustivo | En `operar` (por `op`) y en `main` (por resultado) |
+| `es...como` para extraer | `Resultado.Exito como res`, `Resultado.Error como err` |
+| Array stack-allocated | `los opciones: [Entero32; 4]` |
+| Bucle `para` sobre array | `para op en opciones` |
+| Interpolación | `imprimir_linea("Resultado: {res}")` |
+
+**Compilar y ejecutar:**
+```bash
+falcato run calculadora.fc
+```
+
+---
+
 ## Tabla rápida
 
 | Patrón | Sintaxis | Cuándo usarlo |

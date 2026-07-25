@@ -1,140 +1,74 @@
-// Calculadora Falcato — Demo de aritmetica, arrays, loops, condicionales y Texto
+// Calculadora Falcato — Demo completa: Resultado<T,E>, loops, arrays, Texto
 //
-// Para compilar: falcato build calculadora.fc -o calculadora.exe
-// Para ejecutar: .\calculadora.exe
+// falcato build calculadora.fc -o calculadora.exe
+// .\calculadora.exe
 //
-// NOTA: Resultado<T,E> como retorno de funciones tiene un bug en codegen actual.
-//       Por eso las funciones retornan Entero32 y el manejo de errores se hace
-//       con codigos (0=exito, -1=division entre cero, -2=opcion invalida).
+// 1=Suma, 2=Resta, 3=Multiplicacion, 4=Division
 
-// Ejecuta una operacion aritmetica.
-//   opcion: 1=Suma, 2=Resta, 3=Multiplicacion, 4=Division
-// Retorna: resultado en valor absoluto, o codigo de error negativo
-funcion ejecutar(la opcion: Entero32, el a: Entero32, el b: Entero32) -> Entero32 {
-    si opcion es 1 { retornar a + b; }
-    si opcion es 2 { retornar a - b; }
-    si opcion es 3 { retornar a * b; }
+funcion ejecutar(la opcion: Entero32, el a: Entero32, el b: Entero32) -> Resultado<Entero32, Entero32> {
+    si opcion es 1 { retornar Resultado.Exito(a + b); }
+    si opcion es 2 { retornar Resultado.Exito(a - b); }
+    si opcion es 3 { retornar Resultado.Exito(a * b); }
     si opcion es 4 {
-        si b es 0 { retornar -1; }
-        retornar a / b;
+        si b es 0 { retornar Resultado.Error(-1); }
+        retornar Resultado.Exito(a / b);
     }
-    retornar -2;
+    retornar Resultado.Error(-2);
 }
 
 funcion principal() -> Entero32 {
     imprimir_linea("=== CALCULADORA FALCATO ===");
     imprimir_linea("");
 
-    // --- Pruebas directas ---
-    imprimir_linea("--- Pruebas directas ---");
-    imprimir_linea("");
-
     el a: Entero32 = 42;
     el b: Entero32 = 6;
+    el ceros: Entero32 = 0;
 
-    el suma: Entero32 = a + b;
-    el resta: Entero32 = a - b;
-    el prod: Entero32 = a * b;
-    el div: Entero32 = a / b;
-
-    imprimir_linea("42 + 6 = ");
-    imprimir(suma);
+    // Loop con arreglo de operaciones
+    imprimir_linea("--- 42 y 6 con Resultado<T,E> ---");
     imprimir_linea("");
 
-    imprimir_linea("42 - 6 = ");
-    imprimir(resta);
-    imprimir_linea("");
+    el ops: [Entero32; 4] = [1, 2, 3, 4];
+    para i en 0..4 {
+        el op: Entero32 = ops[i];
+        el res: Resultado<Entero32, Entero32> = ejecutar(op, a, b);
 
-    imprimir_linea("42 * 6 = ");
-    imprimir(prod);
-    imprimir_linea("");
-
-    imprimir_linea("42 / 6 = ");
-    imprimir(div);
-    imprimir_linea("");
-
-    // --- Pruebas via funcion ---
-    imprimir_linea("--- Via funcion ejecutar() ---");
-    imprimir_linea("");
-
-    para i en 1..5 {
-        el resultado: Entero32 = ejecutar(i, a, b);
-        si resultado es -1 {
-            imprimir_linea("  Opcion {i}: Error: division entre cero");
-        } sino {
-            si resultado es -2 {
-                imprimir_linea("  Opcion {i}: Error: opcion invalida");
-            } sino {
-                imprimir_linea("  Opcion {i}: resultado = ");
-                imprimir(resultado);
-                imprimir_linea("");
-            }
+        si res es Resultado.Exito {
+            el valor: Entero32 = res?;
+            imprimir_linea("  Opcion {op}: ");
+            imprimir(valor);
+            imprimir_linea("");
+        }
+        si res es Resultado.Error {
+            imprimir_linea("  Opcion {op}: ERROR");
         }
     }
 
-    // --- Division entre cero ---
+    // Division entre cero
     imprimir_linea("");
-    imprimir_linea("--- Division entre cero ---");
+    imprimir_linea("--- Error: division entre cero ---");
     imprimir_linea("");
-
-    el r_div: Entero32 = ejecutar(4, a, 0);
-    si r_div es -1 {
-        imprimir_linea("  Bien: se capturo division entre cero");
+    el r_div: Resultado<Entero32, Entero32> = ejecutar(4, a, ceros);
+    si r_div es Resultado.Error {
+        imprimir_linea("  Bien: capturada");
     }
 
-    // --- Opcion invalida ---
+    // Opcion invalida
     imprimir_linea("");
-    imprimir_linea("--- Opcion invalida (99) ---");
+    imprimir_linea("--- Error: opcion 99 ---");
     imprimir_linea("");
-
-    el r_inv: Entero32 = ejecutar(99, a, b);
-    si r_inv es -2 {
-        imprimir_linea("  Bien: se capturo opcion invalida(99)");
+    el r_inv: Resultado<Entero32, Entero32> = ejecutar(99, a, b);
+    si r_inv es Resultado.Error {
+        imprimir_linea("  Bien: capturada");
     }
 
-    // --- Resultado<T,E> local (no cruza frontera de funcion) ---
+    // Reutilizar variable Resultado (retornar variable)
     imprimir_linea("");
-    imprimir_linea("--- Resultado<T,E> local ---");
+    imprimir_linea("--- Retornar variable Resultado ---");
     imprimir_linea("");
-
-    el exito: Resultado<Entero32, Entero32> = Resultado.Exito(100);
-    si exito es Resultado.Exito {
-        el valor: Entero32 = exito?;
-        imprimir_linea("  Exito extraido con ?: ");
-        imprimir(valor);
-        imprimir_linea("");
-    }
-
-    el error: Resultado<Entero32, Entero32> = Resultado.Error(-1);
-    si error es Resultado.Error {
-        imprimir_linea("  Error capturado con si es Resultado.Error");
-    }
-
-    // --- Menu de opciones ---
-    imprimir_linea("");
-    imprimir_linea("--- Menu de opciones ---");
-    imprimir_linea("");
-
-    para i en 1..5 {
-        si i es 1 { imprimir_linea("  1 -> Suma"); }
-        si i es 2 { imprimir_linea("  2 -> Resta"); }
-        si i es 3 { imprimir_linea("  3 -> Multiplicacion"); }
-        si i es 4 { imprimir_linea("  4 -> Division"); }
-        si i es 5 { imprimir_linea("  ? -> Invalida"); }
-    }
-
-    // --- Texto ---
-    imprimir_linea("");
-    imprimir_linea("--- Texto ---");
-    imprimir_linea("");
-
-    el mensaje: Texto = texto_desde("Gracias por usar Falcato!");
-    imprimir_linea(mensaje);
-    mensaje.liberar();
-
-    // --- Fin ---
-    imprimir_linea("");
-    imprimir_linea("=== FIN ===");
-
-    retornar 0;
+    el res_exito: Resultado<Entero32, Entero32> = ejecutar(1, 100, 200);
+    retornar res_exito?;
 }
+
+// NOTA: probar con .\calculadora.exe; el codigo de salida es el resultado
+// de 100 + 200 = 300
