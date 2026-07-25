@@ -1,0 +1,47 @@
+// Patron Java comun: Menu con switch-case
+// En Java: switch(opcion) { case 1: ... break; ... }
+// En Falcato: si / sino anidados
+
+funcion principal() -> Entero32 {
+    imprimir_linea("Calculadora simple");
+    imprimir_linea("1. Sumar");
+    imprimir_linea("2. Restar");
+    imprimir_linea("3. Multiplicar");
+
+    el a: Entero32 = 10;
+    el b: Entero32 = 3;
+
+    si a > b {
+        imprimir_linea("a es mayor que b");
+        el diff: Entero32 = a - b;
+        imprimir_linea("Diferencia: ");
+        imprimir(diff);
+        imprimir_linea("");
+    } sino {
+        si a es b {
+            imprimir_linea("a es igual a b");
+        } sino {
+            imprimir_linea("b es mayor que a");
+            el diff: Entero32 = b - a;
+            imprimir_linea("Diferencia: ");
+            imprimir(diff);
+            imprimir_linea("");
+        }
+    }
+
+    el suma: Entero32 = a + b;
+    el resta: Entero32 = a - b;
+    el prod: Entero32 = a * b;
+
+    imprimir_linea("Suma: ");
+    imprimir(suma);
+    imprimir_linea("");
+    imprimir_linea("Resta: ");
+    imprimir(resta);
+    imprimir_linea("");
+    imprimir_linea("Producto: ");
+    imprimir(prod);
+    imprimir_linea("");
+
+    retornar 0;
+}
