@@ -499,6 +499,11 @@ fn link_objetos(
         for obj in objetos {
             cmd.arg(obj);
         }
+        // GUI trampolín C precompilado (lib/trampolin_win32.obj)
+        let trampolin = std::path::Path::new("lib/trampolin_win32.obj");
+        if trampolin.exists() {
+            cmd.arg(trampolin);
+        }
         cmd.arg(format!("/OUT:{}", binario))
             .arg("/SUBSYSTEM:CONSOLE")
             .arg("/ENTRY:principal")
