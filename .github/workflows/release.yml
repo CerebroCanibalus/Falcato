@@ -23,10 +23,8 @@ jobs:
     - name: Cache cargo dependencies
       uses: Swatinem/rust-cache@v2
 
-    - name: Build release binary (CRT estático)
+    - name: Build release binary
       run: cargo build --release --verbose
-      env:
-        RUSTFLAGS: -C target-feature=+crt-static
 
     - name: Create release directory structure
       shell: pwsh
@@ -35,16 +33,6 @@ jobs:
         New-Item -ItemType Directory -Force -Path release\ejemplos
         New-Item -ItemType Directory -Force -Path release\skills
         New-Item -ItemType Directory -Force -Path release\agents
-
-    - name: Build VS Code extension (VSIX)
-      shell: pwsh
-      run: |
-        cd falcato-vscode
-        npm ci
-        npx vsce package
-        $vsix = Get-Item *.vsix | Select-Object -First 1
-        Write-Host "VSIX built: $($vsix.Name)"
-        Copy-Item $vsix.FullName ..\release\bin\
 
     - name: Copy artifacts to release directory
       shell: pwsh
@@ -56,16 +44,17 @@ jobs:
         Copy-Item ejemplos\*.fc release\ejemplos\
 
         # Copy docs
-        Copy-Item README.md release\
-        if (Test-Path LICENSE) { Copy-Item LICENSE release\ }
+        Copy-Item README.md, LICENSE, INSTALL.md, GUIA.md, REFERENCIA.md, ERRORES.md, CHANGELOG.md release\
+        Copy-Item GUIA release\GUIA -Recurse
 
         # Copy skills & agents
         Copy-Item skills\* release\skills\ -Recurse
         Copy-Item agents\* release\agents\ -Recurse
 
-        # Copy install.ps1
+        # Copy installers
         Copy-Item install.ps1 release\
-
+        Copy-Item bundle_dlls.ps1 release\
+        
     - name: Create release ZIP
       shell: pwsh
       run: |
