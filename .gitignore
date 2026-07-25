@@ -2,6 +2,7 @@
 target/
 target2/
 build/
+release/
 *.o
 *.obj
 *.exe

@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-msvc
+
+    - name: Cache cargo dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build release binary (CRT estático)
+      run: cargo build --release --verbose
+      env:
+        RUSTFLAGS: -C target-feature=+crt-static
+
+    - name: Prepare release artifacts
+      shell: pwsh
+      run: |
+        # Create directory structure
+        New-Item -ItemType Directory -Force -Path release\bin
+        New-Item -ItemType Directory -Force -Path release\ejemplos
+        New-Item -ItemType Directory -Force -Path release\docs
+
+        # Copy binary
+        Copy-Item target\release\falcato.exe release\bin\
+
+        # Copy examples
+        Copy-Item ejemplos\*.fc release\ejemplos\
+
+        # Copy docs
+        Copy-Item README.md release\
+        if (Test-Path LICENSE) { Copy-Item LICENSE release\ }
+
+        # Create install.cmd
+        @"
+        @echo off
+        chcp 65001 >nul
+        echo.
+        echo ╔═══════════════════════════════════════╗
+        echo ║      Falcato - Instalación            ║
+        echo ╚═══════════════════════════════════════╝
+        echo.
+        set "FALCATO_DIR=%USERPROFILE%\.falcato"
+        if not exist "%FALCATO_DIR%" mkdir "%FALCATO_DIR%"
+        if not exist "%FALCATO_DIR%\bin" mkdir "%FALCATO_DIR%\bin"
+        if not exist "%FALCATO_DIR%\ejemplos" mkdir "%FALCATO_DIR%\ejemplos"
+        copy "%~dp0bin\falcato.exe" "%FALCATO_DIR%\bin\" >nul
+        copy "%~dp0ejemplos\*.fc" "%FALCATO_DIR%\ejemplos\" >nul
+        echo Agregando a PATH...
+        setx PATH "%FALCATO_DIR%\bin;%PATH%" >nul
+        echo.
+        echo ✅ Falcato instalado en %FALCATO_DIR%
+        echo.
+        echo Ejecuta esto para verificar:
+        echo   falcato version
+        echo   falcato run ejemplos\hola_mundo.fc
+        echo.
+        pause
+        "@ | Out-File -FilePath release\install.cmd -Encoding ASCII
+
+    - name: Create release ZIP
+      shell: pwsh
+      run: |
+        Compress-Archive -Path release\* -DestinationPath "falcato-$($env:GITHUB_REF_NAME).zip"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: falcato-*.zip
+        generate_release_notes: true
+        body: |
+          ## Falcato ${{ github.ref_name }}
+
+          Lenguaje de programación de sistemas iberohablante sobre Cranelift.
+
+          ### Instalación
+          1. Descarga `falcato-${{ github.ref_name }}.zip`
+          2. Extrae en cualquier carpeta
+          3. Ejecuta `install.cmd`
+          4. Abre una terminal nueva y escribe `falcato version`
+
+          ### Requisitos
+          - Windows 10 o superior (x86_64)
+          - No requiere Rust ni VS Build Tools
