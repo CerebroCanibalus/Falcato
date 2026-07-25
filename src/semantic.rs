@@ -54,6 +54,33 @@ use codigos::*;
 ///    hispanohablantes.
 
 /// Información semántica de una variable
+
+/// Tabla de métodos: (nombre_tipo, nombre_método) → nombre_builtin
+/// Permite sintaxis t.metodo(args) → se desugarea a llamada built-in
+fn metodo_a_builtin(tipo: &Tipo, metodo: &str) -> Option<&'static str> {
+    match tipo {
+        Tipo::Texto => match metodo {
+            "agregar" => Some("texto_agregar"),
+            "tam" => Some("texto_longitud"),
+            "liberar" => Some("texto_liberar"),
+            "obtener" => Some("texto_obtener_byte"),
+            "concatenar" => Some("texto_concatenar"),
+            "subtexto" => Some("texto_subtexto"),
+            "comparar" => Some("texto_comparar"),
+            "desde" => Some("texto_desde"),
+            _ => None,
+        },
+        Tipo::Vector(_) => match metodo {
+            "agregar" => Some("vector_agregar"),
+            "tam" => Some("vector_longitud"),
+            "obtener" => Some("vector_obtener"),
+            "liberar" => Some("vector_liberar"),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct InfoVariable {
     pub nombre: String,
@@ -262,6 +289,15 @@ impl AnalizadorSemantico {
             span: span_vacio.clone(),
             es_publica: true,
         });
+        // Alias: decir = imprimir_linea
+        self.funciones.insert("decir".to_string(), FirmaFuncion {
+            nombre: "decir".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("mensaje".to_string(), Tipo::Palabra)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
         self.funciones.insert("afirmar".to_string(), FirmaFuncion {
             nombre: "afirmar".to_string(),
             parametros_genericos: vec![],
@@ -430,6 +466,15 @@ impl AnalizadorSemantico {
         });
         self.funciones.insert("texto_longitud".to_string(), FirmaFuncion {
             nombre: "texto_longitud".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        // Alias: texto_tam = texto_longitud
+        self.funciones.insert("texto_tam".to_string(), FirmaFuncion {
+            nombre: "texto_tam".to_string(),
             parametros_genericos: vec![],
             parametros: vec![("texto".to_string(), Tipo::Texto)],
             retorno: Some(Tipo::Entero32),
@@ -610,6 +655,17 @@ impl AnalizadorSemantico {
         });
         self.funciones.insert("vector_longitud".to_string(), FirmaFuncion {
             nombre: "vector_longitud".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+            ],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        // Alias: vector_tam = vector_longitud
+        self.funciones.insert("vector_tam".to_string(), FirmaFuncion {
+            nombre: "vector_tam".to_string(),
             parametros_genericos: vec![t_generico.clone()],
             parametros: vec![
                 ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
@@ -1699,24 +1755,42 @@ No puedes modificar algo que no es 'tuyo'.",
                 Tipo::Array(Box::new(tipo_elem), 0)
             }
             Expresion::AccesoArray(array, indice, span) => {
+                let tipo_array = self.inferir_tipo(array);
+                
+                // Texto[i] → Entero8 (byte), Texto[inicio..fin] → Texto (subtexto)
+                if tipo_array == Tipo::Texto {
+                    let es_rango = matches!(indice.as_ref(), Expresion::Rango(_, _, _, _));
+                    if es_rango {
+                        // slicing: t[0..5] → Texto
+                        return Tipo::Texto;
+                    }
+                    // t[i] → Entero8
+                    return Tipo::Entero8;
+                }
+                
+                // Vector<T>[i] → T
+                if let Tipo::Vector(tipo_elem) = &tipo_array {
+                    // Por ahora solo índices enteros
+                    return *tipo_elem.clone();
+                }
+                
                 let tipo_indice = self.inferir_tipo(indice);
                 if tipo_indice != Tipo::Entero32 && tipo_indice != Tipo::Entero64 {
                     self.reportar_error(
                         CategoriaError::Tipo,
-                        15, // nuevo código para índice no entero
+                        15,
                         span,
                         format!("Índice de array debe ser Entero, encontrado '{:?}'", tipo_indice),
                         Some("Usa un valor Entero como índice".to_string())
                     );
                 }
                 
-                let tipo_array = self.inferir_tipo(array);
                 match tipo_array {
                     Tipo::Array(tipo_elem, _) | Tipo::ArrayGenerico(tipo_elem, _) => *tipo_elem,
                     _ => {
                         self.reportar_error(
                             CategoriaError::Tipo,
-                            16, // nuevo código para acceso a no-array
+                            16,
                             span,
                             format!("Acceso a array en tipo '{:?}' que no es array", tipo_array),
                             None
@@ -2199,61 +2273,83 @@ No puedes modificar algo que no es 'tuyo'.",
             }
 
             // Fase 15A: métodos bitwise en enteros
-            Expresion::MetodoBitwise(receptor, nombre, args, span) => {
+            Expresion::Metodo(receptor, nombre, args, span) => {
                 let tipo_receptor = self.inferir_tipo(receptor);
-                // Verificar que el receptor es entero
-                let es_entero = matches!(&tipo_receptor,
-                    Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64 |
-                    Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64
-                );
-                if !es_entero {
-                    self.reportar_error(
-                        CategoriaError::Tipo,
-                        1,
-                        span,
-                        format!("Método '.{}' requiere un receptor entero, pero se encontró '{:?}'", nombre, tipo_receptor),
-                        Some("Los métodos bitwise solo funcionan con tipos enteros (Entero32, Natural64, etc.)".to_string()),
+                
+                // Intentar resolver como método de tipo (Texto, Vector, etc.)
+                if let Some(builtin) = metodo_a_builtin(&tipo_receptor, nombre) {
+                    // Buscar la firma del builtin
+                    if let Some(firma) = self.funciones.get(builtin) {
+                        // Verificar número de argumentos
+                        let esperado_args = if builtin.ends_with("_nuevo") || builtin.ends_with("_desde") {
+                            let total_params = firma.parametros.len();
+                            if total_params > 0 { total_params - 1 } else { 0 }
+                        } else if builtin.ends_with("_concatenar") || builtin.ends_with("_comparar") {
+                            let total_params = firma.parametros.len();
+                            if total_params > 0 { total_params - 1 } else { 0 }
+                        } else {
+                            let total_params = firma.parametros.len();
+                            if total_params > 0 { total_params - 1 } else { 0 }
+                        };
+                        let tipo_retorno = firma.retorno.clone().unwrap_or(Tipo::Entero32);
+                        // firma se suelta aquí, ya podemos mutar self
+                        
+                        if args.len() != esperado_args {
+                            self.reportar_error(
+                                CategoriaError::Tipo, 1, span,
+                                format!(".{} requiere {} argumento(s), se pasaron {}", nombre, esperado_args, args.len()),
+                                None,
+                            );
+                        }
+                        
+                        tipo_retorno
+                    } else {
+                        Tipo::Entero32 // fallback
+                    }
+                } else {
+                    // No es método de tipo built-in → verificar método bitwise
+                    let es_entero = matches!(&tipo_receptor,
+                        Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64 |
+                        Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64
                     );
-                }
-                // Verificar args según el método
-                match nombre.as_str() {
-                    "poner_bit" | "quitar_bit" | "alternar_bit" => {
-                        if args.len() != 1 {
-                            self.reportar_error(
-                                CategoriaError::Tipo, 1, span,
-                                format!(".{} requiere exactamente 1 argumento (posición del bit)", nombre),
-                                None,
-                            );
+                    
+                    if es_entero {
+                        // Validar método bitwise
+                        match nombre.as_str() {
+                            "poner_bit" | "quitar_bit" | "alternar_bit" => {
+                                if args.len() != 1 {
+                                    self.reportar_error(CategoriaError::Tipo, 1, span,
+                                        format!(".{} requiere exactamente 1 argumento (posición del bit)", nombre), None);
+                                }
+                            }
+                            "extraer_bits" => {
+                                if args.len() != 2 {
+                                    self.reportar_error(CategoriaError::Tipo, 1, span,
+                                        ".extraer_bits requiere 2 argumentos (offset, cantidad)".to_string(), None);
+                                }
+                            }
+                            "ceros_izquierda" | "unos" => {
+                                if !args.is_empty() {
+                                    self.reportar_error(CategoriaError::Tipo, 1, span,
+                                        format!(".{} no acepta argumentos", nombre), None);
+                                }
+                            }
+                            _ => {
+                                self.reportar_error(CategoriaError::Tipo, 1, span,
+                                    format!("Tipo '{:?}' no tiene método '.{}'", tipo_receptor, nombre),
+                                    Some("Revisa el nombre del método. Para enteros: poner_bit, quitar_bit, alternar_bit, extraer_bits, ceros_izquierda, unos. Para Texto: agregar, tam, liberar, obtener, concatenar, subtexto, comparar, desde. Para Vector: agregar, tam, obtener, liberar.".to_string()),
+                                );
+                            }
                         }
-                    }
-                    "extraer_bits" => {
-                        if args.len() != 2 {
-                            self.reportar_error(
-                                CategoriaError::Tipo, 1, span,
-                                ".extraer_bits requiere 2 argumentos (offset, cantidad)".to_string(),
-                                None,
-                            );
-                        }
-                    }
-                    "ceros_izquierda" | "unos" => {
-                        if !args.is_empty() {
-                            self.reportar_error(
-                                CategoriaError::Tipo, 1, span,
-                                format!(".{} no acepta argumentos", nombre),
-                                None,
-                            );
-                        }
-                    }
-                    _ => {
-                        self.reportar_error(
-                            CategoriaError::Tipo, 1, span,
-                            format!("Método bitwise '.{}' no existe", nombre),
-                            Some("Métodos disponibles: poner_bit, quitar_bit, alternar_bit, extraer_bits, ceros_izquierda, unos".to_string()),
+                        tipo_receptor
+                    } else {
+                        self.reportar_error(CategoriaError::Tipo, 1, span,
+                            format!("Tipo '{:?}' no tiene método '.{}'", tipo_receptor, nombre),
+                            Some("Los métodos disponibles dependen del tipo. Para enteros: poner_bit, quitar_bit, etc. Para Texto: agregar, tam, etc.".to_string()),
                         );
+                        Tipo::Entero32
                     }
                 }
-                // El retorno es el mismo tipo del receptor
-                tipo_receptor
             }
         }
     }
@@ -2270,7 +2366,24 @@ No puedes modificar algo que no es 'tuyo'.",
 
     fn tipo_operacion(&mut self, op: OperadorBinario, tipo: &Tipo, span: &Span) -> Tipo {
         match op {
-            OperadorBinario::Suma |
+            OperadorBinario::Suma => {
+                // Suma polimórfica: numérica + Texto
+                if *tipo == Tipo::Texto {
+                    // Texto + Texto → concatenación
+                    tipo.clone()
+                } else if !self.es_numerico(tipo) {
+                    self.reportar_error(
+                        CategoriaError::Tipo,
+                        OPERACION_ARITMETICA_INVALIDA,
+                        span,
+                        format!("Operación '+' no válida para tipo '{:?}'. Se requiere tipo numérico (Entero o Real) o Texto para concatenación", tipo),
+                        None
+                    );
+                    Tipo::Entero32
+                } else {
+                    tipo.clone()
+                }
+            }
             OperadorBinario::Resta |
             OperadorBinario::Multiplicacion |
             OperadorBinario::Division |

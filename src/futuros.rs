@@ -336,7 +336,7 @@ fn recolectar_usos_expr(expr: &Expresion, usos: &mut HashSet<String>) {
                 recolectar_usos_expr(&brazo.cuerpo, usos);
             }
         }
-        Expresion::MetodoBitwise(receptor, _, args, _) => {
+        Expresion::Metodo(receptor, _, args, _) => {
             recolectar_usos_expr(receptor, usos);
             for arg in args {
                 recolectar_usos_expr(arg, usos);

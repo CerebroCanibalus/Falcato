@@ -303,8 +303,8 @@ pub enum Expresion {
     Lanzar(Box<Expresion>, Span),
     /// Async (Fase 18): bloquear(expr) — bridge sync→async (bloquea thread)
     Bloquear(Box<Expresion>, Span),
-    /// Fase 15A: método bitwise en enteros — x.poner_bit(3), x.unos(), etc.
-    MetodoBitwise(Box<Expresion>, String, Vec<Expresion>, Span), // receptor, nombre_método, args, span
+    /// Método general: x.metodo(args) — desugarea a llamada built-in según tipo del receptor
+    Metodo(Box<Expresion>, String, Vec<Expresion>, Span), // receptor, nombre_método, args, span
 }
 
 impl Expresion {
@@ -332,7 +332,7 @@ impl Expresion {
             Expresion::Esperar(_, span) => span,
             Expresion::Lanzar(_, span) => span,
             Expresion::Bloquear(_, span) => span,
-            Expresion::MetodoBitwise(_, _, _, span) => span,
+            Expresion::Metodo(_, _, _, span) => span,
         }
     }
 }

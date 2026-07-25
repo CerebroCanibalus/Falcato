@@ -14,6 +14,7 @@ pub enum Token {
     Funcion,
     
     #[token("retornar")]
+    #[token("devolver")]
     Retornar,
     
     #[token("si")]
@@ -108,6 +109,7 @@ pub enum Token {
     Implementar,
 
     #[token("coincidir")]
+    #[token("emparejar")]
     Coincidir,
 
     #[token("prueba")]

@@ -129,7 +129,8 @@ fn parse_postfix(
                         return Err(ErrorSintaxis::identificador_esperado(span, "nombre de campo después de '.'"));
                     }
                 };
-                // Fase 15A: si sigue ParenAbre, es método bitwise: x.poner_bit(3)
+                // Fase 15A/15F: si sigue ParenAbre, es método: x.metodo(args)
+                // General: funciona para bitwise, texto, vector, etc.
                 if cursor.actual() == Some(&Token::ParenAbre) {
                     cursor.avanzar(); // (
                     let mut args = Vec::new();
@@ -142,7 +143,7 @@ fn parse_postfix(
                     }
                     cursor.esperar(Token::ParenCierra)?;
                     let span = Span::combinar(&span_inicio, &cursor.span_actual());
-                    resultado = Expresion::MetodoBitwise(Box::new(resultado), nombre_campo, args, span);
+                    resultado = Expresion::Metodo(Box::new(resultado), nombre_campo, args, span);
                 } else {
                     let span = Span::combinar(&span_inicio, &cursor.span_actual());
                     resultado = Expresion::AccesoCampo(Box::new(resultado), nombre_campo, span);

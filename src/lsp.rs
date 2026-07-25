@@ -472,7 +472,7 @@ impl IndiceSemantico {
             Expresion::Esperar(expr, _) => Self::colectar_referencias_en_expresion(expr, nombre, refs),
             Expresion::Lanzar(expr, _) => Self::colectar_referencias_en_expresion(expr, nombre, refs),
             Expresion::Bloquear(expr, _) => Self::colectar_referencias_en_expresion(expr, nombre, refs),
-            Expresion::MetodoBitwise(receptor, _, args, _) => {
+            Expresion::Metodo(receptor, _, args, _) => {
                 Self::colectar_referencias_en_expresion(receptor, nombre, refs);
                 for arg in args {
                     Self::colectar_referencias_en_expresion(arg, nombre, refs);

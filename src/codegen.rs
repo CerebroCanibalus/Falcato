@@ -1144,6 +1144,76 @@ impl Codegen {
     // Fase 15A: Métodos bitwise en enteros
     // ============================================================
 
+    fn compilar_metodo(
+        &mut self,
+        receptor: &Expresion,
+        nombre: &str,
+        args: &[Expresion],
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        use crate::ast::Tipo;
+        
+        // Inferir tipo del receptor
+        let tipo_receptor = self.inferir_tipo(receptor, variables);
+        
+        // Si es método de tipo (Texto, Vector), desugar a llamada built-in
+        match &tipo_receptor {
+            Tipo::Texto => {
+                let builtin = match nombre {
+                    "agregar" => Some("texto_agregar"),
+                    "tam" => Some("texto_longitud"),
+                    "liberar" => Some("texto_liberar"),
+                    "obtener" => Some("texto_obtener_byte"),
+                    "concatenar" => Some("texto_concatenar"),
+                    "subtexto" => Some("texto_subtexto"),
+                    "comparar" => Some("texto_comparar"),
+                    "desde" => Some("texto_desde"),
+                    _ => None,
+                };
+                if let Some(func) = builtin {
+                    let mut argumentos = vec![receptor.clone()];
+                    argumentos.extend(args.iter().cloned());
+                    let llamada = Llamada {
+                        funcion: func.to_string(),
+                        tipo_args: vec![],
+                        argumentos,
+                        span: receptor.span().clone(),
+                    };
+                    return self.compilar_llamada(&llamada, builder, variables);
+                }
+                // Fallback a bitwise
+                self.compilar_metodo_bitwise(receptor, nombre, args, builder, variables)
+            }
+            Tipo::Vector(_) => {
+                let builtin = match nombre {
+                    "agregar" => Some("vector_agregar"),
+                    "tam" => Some("vector_longitud"),
+                    "obtener" => Some("vector_obtener"),
+                    "liberar" => Some("vector_liberar"),
+                    _ => None,
+                };
+                if let Some(func) = builtin {
+                    let mut argumentos = vec![receptor.clone()];
+                    argumentos.extend(args.iter().cloned());
+                    let llamada = Llamada {
+                        funcion: func.to_string(),
+                        tipo_args: vec![],
+                        argumentos,
+                        span: receptor.span().clone(),
+                    };
+                    return self.compilar_llamada(&llamada, builder, variables);
+                }
+                // Fallback a bitwise
+                self.compilar_metodo_bitwise(receptor, nombre, args, builder, variables)
+            }
+            _ => {
+                // Bitwise methods u otros
+                self.compilar_metodo_bitwise(receptor, nombre, args, builder, variables)
+            }
+        }
+    }
+
     fn compilar_metodo_bitwise(
         &mut self,
         receptor: &Expresion,
@@ -2651,11 +2721,55 @@ impl Codegen {
                 Ok(base_ptr)
             }
             Expresion::AccesoArray(array, indice, span) => {
+                let tipo_array = self.inferir_tipo(array, variables);
+                
+                // Texto[i] → builtin texto_obtener_byte
+                // Texto[inicio..fin] → builtin texto_subtexto
+                if tipo_array == Tipo::Texto {
+                    // Verificar si el índice es un rango (slicing)
+                    if let Expresion::Rango(inicio, fin, _inclusivo, _) = indice.as_ref() {
+                        let llamada = Llamada {
+                            funcion: "texto_subtexto".to_string(),
+                            tipo_args: vec![],
+                            argumentos: vec![
+                                array.as_ref().clone(),
+                                *inicio.clone(),
+                                *fin.clone(),
+                            ],
+                            span: span.clone(),
+                        };
+                        return self.compilar_llamada(&llamada, builder, variables);
+                    } else {
+                        let llamada = Llamada {
+                            funcion: "texto_obtener_byte".to_string(),
+                            tipo_args: vec![],
+                            argumentos: vec![
+                                array.as_ref().clone(),
+                                indice.as_ref().clone(),
+                            ],
+                            span: span.clone(),
+                        };
+                        return self.compilar_llamada(&llamada, builder, variables);
+                    }
+                }
+                
+                // Vector<T>[i] → builtin vector_obtener
+                if let Tipo::Vector(_) = &tipo_array {
+                    let llamada = Llamada {
+                        funcion: "vector_obtener".to_string(),
+                        tipo_args: vec![],
+                        argumentos: vec![
+                            array.as_ref().clone(),
+                            indice.as_ref().clone(),
+                        ],
+                        span: span.clone(),
+                    };
+                    return self.compilar_llamada(&llamada, builder, variables);
+                }
+                
                 let array_val = self.compilar_expresion(array, builder, variables)?;
                 let idx_val = self.compilar_expresion(indice, builder, variables)?;
                 
-                // Inferir tipo del array para obtener tamaño del elemento
-                let tipo_array = self.inferir_tipo(array, variables);
                 let (tipo_elem, tamano_elem) = match tipo_array {
                     Tipo::Array(ref t, _) => {
                         let tam = self.tamano_tipo(t);
@@ -2768,6 +2882,19 @@ impl Codegen {
                 Ok(val)
             }
             Expresion::Binaria(izq, op, der, span) => {
+                // Texto + Texto → concatenación via builtin
+                if *op == OperadorBinario::Suma {
+                    let tipo_izq = self.inferir_tipo(izq, variables);
+                    if tipo_izq == Tipo::Texto {
+                        let llamada = Llamada {
+                            funcion: "texto_concatenar".to_string(),
+                            tipo_args: vec![],
+                            argumentos: vec![izq.as_ref().clone(), der.as_ref().clone()],
+                            span: span.clone(),
+                        };
+                        return self.compilar_llamada(&llamada, builder, variables);
+                    }
+                }
                 let val_izq = self.compilar_expresion(izq, builder, variables)?;
                 let val_der = self.compilar_expresion(der, builder, variables)?;
                 self.compilar_operacion_binaria(*op, val_izq, val_der, builder)
@@ -3397,8 +3524,8 @@ impl Codegen {
             }
 
             // Fase 15A: métodos bitwise en enteros
-            Expresion::MetodoBitwise(receptor, nombre, args, _span) => {
-                self.compilar_metodo_bitwise(receptor, nombre, args, builder, variables)
+            Expresion::Metodo(receptor, nombre, args, _span) => {
+                self.compilar_metodo(receptor, nombre, args, builder, variables)
             }
         }
     }
@@ -3550,12 +3677,12 @@ impl Codegen {
 
     fn es_llamada_builtin(&self, llamada: &Llamada) -> bool {
         matches!(llamada.funcion.as_str(),
-            "imprimir" | "imprimir_linea" | "tamaño_de" | "afirmar" |
-            "texto_nuevo" | "texto_desde" | "texto_agregar" | "texto_longitud" | "texto_liberar" |
+            "imprimir" | "imprimir_linea" | "decir" | "tamaño_de" | "afirmar" |
+            "texto_nuevo" | "texto_desde" | "texto_agregar" | "texto_longitud" | "texto_tam" | "texto_liberar" |
             "texto_concatenar" | "texto_subtexto" | "texto_comparar" | "texto_obtener_byte" |
             "archivo_leer" | "archivo_escribir" | "archivo_existe" |
             "abs" | "max" | "min" | "raiz" | "potencia" |
-            "vector_nuevo" | "vector_agregar" | "vector_obtener" | "vector_longitud" | "vector_liberar" |
+            "vector_nuevo" | "vector_agregar" | "vector_obtener" | "vector_longitud" | "vector_tam" | "vector_liberar" |
             "dormir" |
             "tcp_vincular" | "tcp_aceptar" | "tcp_leer" | "tcp_escribir" | "tcp_cerrar" |
             "canal_nuevo" | "canal_enviar" | "canal_recibir" | "canal_cerrar" | "canal_intentar" |
@@ -3571,13 +3698,13 @@ impl Codegen {
     ) -> Result<cranelift_codegen::ir::Value, ()> {
         match llamada.funcion.as_str() {
             "imprimir" => self.builtin_imprimir(builder, variables, &llamada.argumentos, false),
-            "imprimir_linea" => self.builtin_imprimir(builder, variables, &llamada.argumentos, true),
+            "imprimir_linea" | "decir" => self.builtin_imprimir(builder, variables, &llamada.argumentos, true),
             "tamaño_de" => self.builtin_tamano_de(builder, &llamada.tipo_args),
             "afirmar" => self.builtin_afirmar(builder, variables, &llamada.argumentos, &llamada.span),
             "texto_nuevo" => self.builtin_texto_nuevo(builder),
             "texto_desde" => self.builtin_texto_desde(builder, variables, &llamada.argumentos),
             "texto_agregar" => self.builtin_texto_agregar(builder, variables, &llamada.argumentos),
-            "texto_longitud" => self.builtin_texto_longitud(builder, variables, &llamada.argumentos),
+            "texto_longitud" | "texto_tam" => self.builtin_texto_longitud(builder, variables, &llamada.argumentos),
             "texto_liberar" => self.builtin_texto_liberar(builder, variables, &llamada.argumentos),
             "texto_concatenar" => self.builtin_texto_concatenar(builder, variables, &llamada.argumentos),
             "texto_subtexto" => self.builtin_texto_subtexto(builder, variables, &llamada.argumentos),
@@ -3594,7 +3721,7 @@ impl Codegen {
             "vector_nuevo" => self.builtin_vector_nuevo(builder, &llamada.tipo_args),
             "vector_agregar" => self.builtin_vector_agregar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "vector_obtener" => self.builtin_vector_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),
-            "vector_longitud" => self.builtin_vector_longitud(builder, variables, &llamada.argumentos),
+            "vector_longitud" | "vector_tam" => self.builtin_vector_longitud(builder, variables, &llamada.argumentos),
             "vector_liberar" => self.builtin_vector_liberar(builder, variables, &llamada.argumentos),
             "dormir" => self.builtin_dormir(builder, variables, &llamada.argumentos),
             "tcp_vincular" => self.builtin_tcp_vincular(builder, variables, &llamada.argumentos),
