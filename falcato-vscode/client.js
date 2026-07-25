@@ -101,6 +101,18 @@ function findFalcato() {
         }
     } catch (e) {}
 
+    // 4. Buscar en directorio de desarrollo (D:\Falcato)
+    try {
+        const devPaths = [
+            'D:\\Falcato\\target\\release\\falcato.exe',
+            'D:\\Falcato\\target\\debug\\falcato.exe',
+        ];
+        const fs = require('fs');
+        for (const p of devPaths) {
+            if (fs.existsSync(p)) return p;
+        }
+    } catch (e) {}
+
     return null;
 }
 

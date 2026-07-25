@@ -91,6 +91,31 @@ El binario compilado está en `target\release\falcato.exe`.
 
 ---
 
+## 🧠 LSP — La Pieza Clave para Agentes e IA
+
+El servidor LSP de Falcato es lo que permite que **editores** (VS Code) y **agentes** (OpenCode) entiendan tu código en tiempo real. Sin el LSP, el compilador solo te dice los errores cuando ejecutas; con el LSP, los errores aparecen **mientras escribes**.
+
+### Lo que hace el LSP
+
+| Feature | Para qué sirve |
+|---------|---------------|
+| **Diagnósticos** | Errores y warnings en tiempo real mientras escribes |
+| **Autocompletado** | Keywords, tipos, funciones built-in, variables en scope |
+| **Signature Help** | Muestra parámetros al escribir `funcion(` |
+| **Hover** | Tipo y ownership de variables, firmas de funciones |
+| **Ir a definición** | Salta a la declaración de variables y funciones |
+| **Document Symbols** | Outline del archivo (funciones, structs, enums) |
+| **Code Actions** | Quick fixes para errores comunes |
+
+### Cómo se conecta
+
+- **VS Code**: via la extensión (`client.js`), que lanza `falcato lsp` como child process
+- **OpenCode**: configurado en `opencode.jsonc` global, lanza `D:\Falcato\target\release\falcato.exe lsp`
+
+Sin el LSP instalado, el compilador sigue funcionando, pero **pierdes toda la retroalimentación en tiempo real** que hace que Falcato sea usable como herramienta de enseñanza para IA.
+
+---
+
 ## Opción 3: VS Code Extension
 
 Para tener resaltado de sintaxis, LSP y tema "Falcato Dorado":
@@ -115,6 +140,15 @@ code --install-extension falcato-vscode\falcato-language-*.vsix
 1. `Ctrl+K Ctrl+T`
 2. Busca "Falcato Dorado"
 3. Selecciónalo
+
+### Para desarrolladores: construir el VSIX
+
+```powershell
+cd D:\Falcato\falcato-vscode
+npm install                        # solo la primera vez
+npx vsce package                   # genera .vsix
+code --install-extension falcato-language-*.vsix --force
+```
 
 ---
 

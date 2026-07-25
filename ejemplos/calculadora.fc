@@ -1,47 +1,140 @@
-// Patron Java comun: Menu con switch-case
-// En Java: switch(opcion) { case 1: ... break; ... }
-// En Falcato: si / sino anidados
+// Calculadora Falcato — Demo de aritmetica, arrays, loops, condicionales y Texto
+//
+// Para compilar: falcato build calculadora.fc -o calculadora.exe
+// Para ejecutar: .\calculadora.exe
+//
+// NOTA: Resultado<T,E> como retorno de funciones tiene un bug en codegen actual.
+//       Por eso las funciones retornan Entero32 y el manejo de errores se hace
+//       con codigos (0=exito, -1=division entre cero, -2=opcion invalida).
+
+// Ejecuta una operacion aritmetica.
+//   opcion: 1=Suma, 2=Resta, 3=Multiplicacion, 4=Division
+// Retorna: resultado en valor absoluto, o codigo de error negativo
+funcion ejecutar(la opcion: Entero32, el a: Entero32, el b: Entero32) -> Entero32 {
+    si opcion es 1 { retornar a + b; }
+    si opcion es 2 { retornar a - b; }
+    si opcion es 3 { retornar a * b; }
+    si opcion es 4 {
+        si b es 0 { retornar -1; }
+        retornar a / b;
+    }
+    retornar -2;
+}
 
 funcion principal() -> Entero32 {
-    imprimir_linea("Calculadora simple");
-    imprimir_linea("1. Sumar");
-    imprimir_linea("2. Restar");
-    imprimir_linea("3. Multiplicar");
+    imprimir_linea("=== CALCULADORA FALCATO ===");
+    imprimir_linea("");
 
-    el a: Entero32 = 10;
-    el b: Entero32 = 3;
+    // --- Pruebas directas ---
+    imprimir_linea("--- Pruebas directas ---");
+    imprimir_linea("");
 
-    si a > b {
-        imprimir_linea("a es mayor que b");
-        el diff: Entero32 = a - b;
-        imprimir_linea("Diferencia: ");
-        imprimir(diff);
-        imprimir_linea("");
-    } sino {
-        si a es b {
-            imprimir_linea("a es igual a b");
-        } sino {
-            imprimir_linea("b es mayor que a");
-            el diff: Entero32 = b - a;
-            imprimir_linea("Diferencia: ");
-            imprimir(diff);
-            imprimir_linea("");
-        }
-    }
+    el a: Entero32 = 42;
+    el b: Entero32 = 6;
 
     el suma: Entero32 = a + b;
     el resta: Entero32 = a - b;
     el prod: Entero32 = a * b;
+    el div: Entero32 = a / b;
 
-    imprimir_linea("Suma: ");
+    imprimir_linea("42 + 6 = ");
     imprimir(suma);
     imprimir_linea("");
-    imprimir_linea("Resta: ");
+
+    imprimir_linea("42 - 6 = ");
     imprimir(resta);
     imprimir_linea("");
-    imprimir_linea("Producto: ");
+
+    imprimir_linea("42 * 6 = ");
     imprimir(prod);
     imprimir_linea("");
+
+    imprimir_linea("42 / 6 = ");
+    imprimir(div);
+    imprimir_linea("");
+
+    // --- Pruebas via funcion ---
+    imprimir_linea("--- Via funcion ejecutar() ---");
+    imprimir_linea("");
+
+    para i en 1..5 {
+        el resultado: Entero32 = ejecutar(i, a, b);
+        si resultado es -1 {
+            imprimir_linea("  Opcion {i}: Error: division entre cero");
+        } sino {
+            si resultado es -2 {
+                imprimir_linea("  Opcion {i}: Error: opcion invalida");
+            } sino {
+                imprimir_linea("  Opcion {i}: resultado = ");
+                imprimir(resultado);
+                imprimir_linea("");
+            }
+        }
+    }
+
+    // --- Division entre cero ---
+    imprimir_linea("");
+    imprimir_linea("--- Division entre cero ---");
+    imprimir_linea("");
+
+    el r_div: Entero32 = ejecutar(4, a, 0);
+    si r_div es -1 {
+        imprimir_linea("  Bien: se capturo division entre cero");
+    }
+
+    // --- Opcion invalida ---
+    imprimir_linea("");
+    imprimir_linea("--- Opcion invalida (99) ---");
+    imprimir_linea("");
+
+    el r_inv: Entero32 = ejecutar(99, a, b);
+    si r_inv es -2 {
+        imprimir_linea("  Bien: se capturo opcion invalida(99)");
+    }
+
+    // --- Resultado<T,E> local (no cruza frontera de funcion) ---
+    imprimir_linea("");
+    imprimir_linea("--- Resultado<T,E> local ---");
+    imprimir_linea("");
+
+    el exito: Resultado<Entero32, Entero32> = Resultado.Exito(100);
+    si exito es Resultado.Exito {
+        el valor: Entero32 = exito?;
+        imprimir_linea("  Exito extraido con ?: ");
+        imprimir(valor);
+        imprimir_linea("");
+    }
+
+    el error: Resultado<Entero32, Entero32> = Resultado.Error(-1);
+    si error es Resultado.Error {
+        imprimir_linea("  Error capturado con si es Resultado.Error");
+    }
+
+    // --- Menu de opciones ---
+    imprimir_linea("");
+    imprimir_linea("--- Menu de opciones ---");
+    imprimir_linea("");
+
+    para i en 1..5 {
+        si i es 1 { imprimir_linea("  1 -> Suma"); }
+        si i es 2 { imprimir_linea("  2 -> Resta"); }
+        si i es 3 { imprimir_linea("  3 -> Multiplicacion"); }
+        si i es 4 { imprimir_linea("  4 -> Division"); }
+        si i es 5 { imprimir_linea("  ? -> Invalida"); }
+    }
+
+    // --- Texto ---
+    imprimir_linea("");
+    imprimir_linea("--- Texto ---");
+    imprimir_linea("");
+
+    el mensaje: Texto = texto_desde("Gracias por usar Falcato!");
+    imprimir_linea(mensaje);
+    mensaje.liberar();
+
+    // --- Fin ---
+    imprimir_linea("");
+    imprimir_linea("=== FIN ===");
 
     retornar 0;
 }
