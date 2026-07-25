@@ -1168,7 +1168,6 @@ impl Codegen {
                     "concatenar" => Some("texto_concatenar"),
                     "subtexto" => Some("texto_subtexto"),
                     "comparar" => Some("texto_comparar"),
-                    "desde" => Some("texto_desde"),
                     _ => None,
                 };
                 if let Some(func) = builtin {

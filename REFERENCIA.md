@@ -18,19 +18,22 @@
 
 ## I/O (entrada/salida)
 
-| Función | Firma | Qué hace |
-|---------|-------|----------|
-| `imprimir` | `(Palabra) -> Vacío` | Escribe en pantalla, sin salto de línea |
-| `imprimir_linea` | `(Palabra) -> Vacío` | Escribe en pantalla, con salto de línea |
-| `decir` | `(Palabra) -> Vacío` | Igual que `imprimir_linea` (alias) |
+| Función | Firma real | Qué hace |
+|---------|------------|----------|
+| `imprimir` | `(cualquier tipo) -> Vacío` | Escribe en pantalla, sin salto de línea |
+| `imprimir_linea` | `(cualquier tipo) -> Vacío` | Escribe en pantalla, con salto de línea |
+| `decir` | `(cualquier tipo) -> Vacío` | Igual que `imprimir_linea` (alias) |
 
-> `imprimir` e `imprimir_linea` también aceptan `Entero32`, `Entero8`, `Booleano`, `Flotante64`, `Palabra` y `Texto`.
+> Aceptan: `Entero32`, `Entero8`, `Entero64`, `Natural8/16/32/64`, `Flotante64`, `Booleano`,
+> `Palabra` y `Texto`. El compilador elige el formato automáticamente.
 
 **Ejemplo:**
 ```falcato
 imprimir("Hola ");
 imprimir_linea("mundo");
-decir("¡Fácil!");          // alias más corto
+decir(42);               // números
+decir(3.14);             // decimales
+decir(verdadero);        // booleanos
 ```
 
 ---

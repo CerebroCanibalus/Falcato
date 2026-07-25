@@ -67,7 +67,6 @@ fn metodo_a_builtin(tipo: &Tipo, metodo: &str) -> Option<&'static str> {
             "concatenar" => Some("texto_concatenar"),
             "subtexto" => Some("texto_subtexto"),
             "comparar" => Some("texto_comparar"),
-            "desde" => Some("texto_desde"),
             _ => None,
         },
         Tipo::Vector(_) => match metodo {
@@ -1712,8 +1711,8 @@ No puedes modificar algo que no es 'tuyo'.",
                             );
                         } else {
                             // Verificar tipos de cada argumento
-                            // imprimir/imprimir_linea son polimórficos (aceptan cualquier tipo)
-                            let es_polimorfica = llamada.funcion == "imprimir" || llamada.funcion == "imprimir_linea";
+                            // imprimir/imprimir_linea/decir son polimórficos (aceptan cualquier tipo)
+                            let es_polimorfica = llamada.funcion == "imprimir" || llamada.funcion == "imprimir_linea" || llamada.funcion == "decir";
                             if !es_polimorfica {
                                 for (i, (arg, (nombre_param, tipo_param))) in 
                                     llamada.argumentos.iter().zip(firma_efectiva.parametros.iter()).enumerate() {
