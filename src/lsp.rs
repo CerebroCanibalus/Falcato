@@ -16,12 +16,15 @@ use crate::span::Span;
 // ÍNDICE SEMÁNTICO PARA LSP
 // ============================================
 
+#[allow(deprecated)]
+
 /// Información de una variable para hover/definition
 #[derive(Debug, Clone)]
 pub struct InfoVariableLsp {
     pub nombre: String,
     pub tipo: String,
     pub articulo: String,
+    pub articulo_raw: String,
     pub span_declaracion: Span,
 }
 
@@ -31,6 +34,31 @@ pub struct InfoFuncionLsp {
     pub nombre: String,
     pub retorno: Option<String>,
     pub parametros: Vec<String>,
+    pub parametros_raw: Vec<(String, String)>, // (nombre, tipo_string)
+    pub span_declaracion: Span,
+}
+
+/// Información de un struct para outline/completion
+#[derive(Debug, Clone)]
+pub struct InfoStructLsp {
+    pub nombre: String,
+    pub campos: Vec<(String, String)>, // (nombre, tipo_string)
+    pub span_declaracion: Span,
+}
+
+/// Información de un enum para outline/completion
+#[derive(Debug, Clone)]
+pub struct InfoEnumLsp {
+    pub nombre: String,
+    pub variantes: Vec<(String, Option<String>)>, // (nombre, tipo_dato_opcional)
+    pub span_declaracion: Span,
+}
+
+/// Información de un trait para outline/completion
+#[derive(Debug, Clone)]
+pub struct InfoTraitLsp {
+    pub nombre: String,
+    pub metodos: Vec<String>, // firmas
     pub span_declaracion: Span,
 }
 
@@ -39,6 +67,9 @@ pub struct InfoFuncionLsp {
 pub struct IndiceSemantico {
     pub variables: HashMap<String, InfoVariableLsp>,
     pub funciones: HashMap<String, InfoFuncionLsp>,
+    pub structs: HashMap<String, InfoStructLsp>,
+    pub enums: HashMap<String, InfoEnumLsp>,
+    pub traits: HashMap<String, InfoTraitLsp>,
 }
 
 impl IndiceSemantico {
@@ -55,6 +86,15 @@ impl IndiceSemantico {
                 Declaracion::Funcion(func) => {
                     indice.indexar_funcion(func);
                 }
+                Declaracion::Estructural(estructural) => {
+                    indice.indexar_estructural(estructural);
+                }
+                Declaracion::Enumeracion(enumeracion) => {
+                    indice.indexar_enumeracion(enumeracion);
+                }
+                Declaracion::Rasgo(rasgo) => {
+                    indice.indexar_rasgo(rasgo);
+                }
                 _ => {}
             }
         }
@@ -69,11 +109,15 @@ impl IndiceSemantico {
         let params: Vec<String> = func.parametros.iter()
             .map(|p| format!("{} {}: {:?}", self.articulo_str(p.articulo), p.nombre, p.tipo))
             .collect();
+        let params_raw: Vec<(String, String)> = func.parametros.iter()
+            .map(|p| (p.nombre.clone(), format!("{:?}", p.tipo)))
+            .collect();
 
         self.funciones.insert(func.nombre.clone(), InfoFuncionLsp {
             nombre: func.nombre.clone(),
             retorno: func.retorno.as_ref().map(|t| format!("{:?}", t)),
             parametros: params,
+            parametros_raw: params_raw,
             span_declaracion: func.span.clone(),
         });
 
@@ -83,6 +127,7 @@ impl IndiceSemantico {
                 nombre: param.nombre.clone(),
                 tipo: format!("{:?}", param.tipo),
                 articulo: self.articulo_str(param.articulo).to_string(),
+                articulo_raw: format!("{:?}", param.articulo),
                 span_declaracion: param.span.clone(),
             });
         }
@@ -91,6 +136,54 @@ impl IndiceSemantico {
         for sentencia in &func.cuerpo.sentencias {
             self.indexar_sentencia(sentencia);
         }
+    }
+
+    fn indexar_estructural(&mut self,
+        decl: &EstructuralDecl,
+    ) {
+        let campos: Vec<(String, String)> = decl.campos.iter()
+            .map(|c| (c.nombre.clone(), format!("{:?}", c.tipo)))
+            .collect();
+        self.structs.insert(decl.nombre.clone(), InfoStructLsp {
+            nombre: decl.nombre.clone(),
+            campos,
+            span_declaracion: decl.span.clone(),
+        });
+    }
+
+    fn indexar_enumeracion(&mut self,
+        decl: &EnumeracionDecl,
+    ) {
+        let variantes: Vec<(String, Option<String>)> = decl.variantes.iter()
+            .map(|v| {
+                let tipo_dato = v.datos.as_ref().map(|d| format!("{:?}", d));
+                (v.nombre.clone(), tipo_dato)
+            })
+            .collect();
+        self.enums.insert(decl.nombre.clone(), InfoEnumLsp {
+            nombre: decl.nombre.clone(),
+            variantes,
+            span_declaracion: decl.span.clone(),
+        });
+    }
+
+    fn indexar_rasgo(&mut self,
+        decl: &RasgoDecl,
+    ) {
+        let metodos: Vec<String> = decl.metodos.iter()
+            .map(|m| {
+                let params: Vec<String> = m.parametros.iter()
+                    .map(|p| format!("{} {}: {:?}", self.articulo_str(p.articulo), p.nombre, p.tipo))
+                    .collect();
+                let ret = m.retorno.as_ref().map(|t| format!(" -> {:?}", t)).unwrap_or_default();
+                format!("fn {}({}){}", m.nombre, params.join(", "), ret)
+            })
+            .collect();
+        self.traits.insert(decl.nombre.clone(), InfoTraitLsp {
+            nombre: decl.nombre.clone(),
+            metodos,
+            span_declaracion: decl.span.clone(),
+        });
     }
 
     fn indexar_sentencia(&mut self,
@@ -103,6 +196,7 @@ impl IndiceSemantico {
                     tipo: decl.tipo.as_ref().map(|t| format!("{:?}", t))
                         .unwrap_or_else(|| "inferido".to_string()),
                     articulo: self.articulo_str(decl.articulo).to_string(),
+                    articulo_raw: format!("{:?}", decl.articulo),
                     span_declaracion: decl.span.clone(),
                 });
             }
@@ -591,16 +685,22 @@ impl Backend {
     ) -> Option<Hover> {
         // Buscar como variable
         if let Some(var) = indice.variables.get(nombre) {
-            let contenido = format!(
-                "**{}** `\n{} {}: {}`\n\n---\n*Artículo*: `{}` → {}\n*Tipo*: `{}`",
-                var.nombre,
-                var.articulo,
-                var.nombre,
-                var.tipo,
-                var.articulo,
-                self.explicar_articulo(&var.articulo),
+            let mut contenido = format!(
+                "**{}** | `{}`\n\n| Propiedad | Valor |\n|-----------|-------|\n\
+                 | Artículo | `{}` → {} |\n| Tipo | `{}` |\n",
+                var.nombre, var.articulo,
+                var.articulo_raw, self.explicar_articulo(&var.articulo_raw),
                 var.tipo
             );
+            // Si también es función (mismo nombre), mostrar declaración
+            if let Some(func) = indice.funciones.get(nombre) {
+                let params = func.parametros.join(", ");
+                let ret = func.retorno.as_deref().unwrap_or("Vacío");
+                contenido.push_str(&format!(
+                    "\n---\n*Declaración*: `{}({}) -> {}`\n",
+                    func.nombre, params, ret
+                ));
+            }
 
             return Some(Hover {
                 contents: HoverContents::Markup(MarkupContent {
@@ -615,13 +715,61 @@ impl Backend {
         if let Some(func) = indice.funciones.get(nombre) {
             let params = func.parametros.join(", ");
             let ret = func.retorno.as_deref().unwrap_or("Vacío");
-            let contenido = format!(
-                "**fn** `{}({}) -> {}`\n\n---\n*Función de Falcato*",
-                func.nombre,
-                params,
-                ret
+            let mut contenido = format!(
+                "**fn** `{}({}) -> {}`\n\n| Parámetro | Tipo |\n|-----------|------|\n",
+                func.nombre, params, ret
             );
+            for (n, t) in &func.parametros_raw {
+                contenido.push_str(&format!("| `{}` | `{}` |\n", n, t));
+            }
+            contenido.push_str(&format!("\n---\n*Función de Falcato*"));
 
+            return Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: contenido,
+                }),
+                range: None,
+            });
+        }
+
+        // Buscar como struct
+        if let Some(s) = indice.structs.get(nombre) {
+            let mut contenido = format!("**estructural** `{}`\n\n| Campo | Tipo |\n|-------|------|\n", s.nombre);
+            for (n, t) in &s.campos {
+                contenido.push_str(&format!("| `{}` | `{}` |\n", n, t));
+            }
+            return Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: contenido,
+                }),
+                range: None,
+            });
+        }
+
+        // Buscar como enum
+        if let Some(e) = indice.enums.get(nombre) {
+            let mut contenido = format!("**enumeración** `{}`\n\n| Variante | Dato |\n|----------|------|\n", e.nombre);
+            for (v, t) in &e.variantes {
+                let tipo_str = t.as_deref().unwrap_or("—");
+                contenido.push_str(&format!("| `{}` | `{}` |\n", v, tipo_str));
+            }
+            return Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: contenido,
+                }),
+                range: None,
+            });
+        }
+
+        // Buscar como trait
+        if let Some(t) = indice.traits.get(nombre) {
+            let mut contenido = format!("**rasgo** `{}`\n\n| Método |\n|--------|\n", t.nombre);
+            for m in &t.metodos {
+                contenido.push_str(&format!("| `{}` |\n", m));
+            }
             return Some(Hover {
                 contents: HoverContents::Markup(MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -638,74 +786,227 @@ impl Backend {
         articulo: &str,
     ) -> &'static str {
         match articulo {
-            "el" => "owned mutable (tú tienes el valor)",
-            "la" => "borrowed immutable (prestado, solo lectura)",
-            "un" => "optional (puede ser None)",
-            "los" => "colección owned mutable",
-            "las" => "colección borrowed immutable",
+            "el" => "dueño único, mutable",
+            "la" => "prestado, solo lectura",
+            "un" => "opcional (quizás existe)",
+            "los" => "compartido (ref-counted), múltiples dueños",
+            "las" => "compartido, solo lectura (todos leen)",
             _ => "desconocido",
         }
     }
 
     /// Lista de items para autocompletado
+    /// Genera items de autocompletado basados en el contexto del documento
+    fn items_autocompletado_contexto(
+        &self,
+        indice: &IndiceSemantico,
+        contenido: &str,
+        linea_actual: u32,
+    ) -> Vec<CompletionItem> {
+        let mut items = Vec::new();
+
+        // Variables del documento
+        for (nombre, var) in &indice.variables {
+            items.push(CompletionItem {
+                label: nombre.clone(),
+                kind: Some(CompletionItemKind::VARIABLE),
+                detail: Some(format!("{} {}: {}", var.articulo, nombre, var.tipo)),
+                ..Default::default()
+            });
+        }
+
+        // Funciones del documento
+        for (nombre, func) in &indice.funciones {
+            let params = func.parametros.join(", ");
+            let ret = func.retorno.as_deref().unwrap_or("Vacío");
+            items.push(CompletionItem {
+                label: nombre.clone(),
+                kind: Some(CompletionItemKind::FUNCTION),
+                detail: Some(format!("{}({}) -> {}", nombre, params, ret)),
+                ..Default::default()
+            });
+        }
+
+        // Structs del documento
+        for (nombre, s) in &indice.structs {
+            items.push(CompletionItem {
+                label: nombre.clone(),
+                kind: Some(CompletionItemKind::STRUCT),
+                detail: Some(format!("estructural {} ({} campos)", nombre, s.campos.len())),
+                ..Default::default()
+            });
+        }
+
+        // Enums del documento
+        for (nombre, e) in &indice.enums {
+            items.push(CompletionItem {
+                label: nombre.clone(),
+                kind: Some(CompletionItemKind::ENUM),
+                detail: Some(format!("enumeración {} ({} variantes)", nombre, e.variantes.len())),
+                ..Default::default()
+            });
+        }
+
+        // Traits del documento
+        for (nombre, t) in &indice.traits {
+            items.push(CompletionItem {
+                label: nombre.clone(),
+                kind: Some(CompletionItemKind::INTERFACE),
+                detail: Some(format!("rasgo {} ({} métodos)", nombre, t.metodos.len())),
+                ..Default::default()
+            });
+        }
+
+        // Si estamos después de un `.` (acceso a campo/método), completar campos de struct
+        let line_prefix: String = contenido.lines()
+            .nth(linea_actual as usize)
+            .and_then(|l| {
+                let before_cursor = if (l.len() as u32) < 50 { l } else { &l[..50.min(l.len())] };
+                let dot_pos = before_cursor.rfind('.');
+                dot_pos.map(|p| before_cursor[..p].trim().to_string())
+            })
+            .unwrap_or_default();
+
+        if line_prefix.ends_with('.') {
+            let type_name = line_prefix.trim_end_matches('.');
+            // Buscar struct con ese nombre
+            if let Some(s) = indice.structs.get(type_name) {
+                for (campo, tipo) in &s.campos {
+                    items.push(CompletionItem {
+                        label: campo.clone(),
+                        kind: Some(CompletionItemKind::FIELD),
+                        detail: Some(format!("{}: {}", campo, tipo)),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+
+        items
+    }
+
+    /// Convierte un Span de Falcato a Range de LSP
+    fn span_a_rango(&self, span: &Span) -> Range {
+        Range {
+            start: Position {
+                line: span.inicio.linea.saturating_sub(1),
+                character: span.inicio.columna.saturating_sub(1),
+            },
+            end: Position {
+                line: span.fin.linea.saturating_sub(1),
+                character: span.fin.columna.saturating_sub(1),
+            },
+        }
+    }
+
+    /// Verifica si un Range de diagnóstico se solapa con otro Range
+    fn span_en_rango(&self, diag_range: Range, request_range: &Range) -> bool {
+        diag_range.start.line >= request_range.start.line
+            && diag_range.start.line <= request_range.end.line
+    }
+
     fn items_autocompletado() -> Vec<CompletionItem> {
         let mut items = Vec::new();
 
-        // Keywords
+        // Keywords — todas las palabras reservadas del lenguaje
         let keywords = vec![
-            ("función", "Declara una función"),
-            ("retornar", "Retorna un valor"),
-            ("si", "Condicional"),
-            ("sino", "Rama alternativa"),
-            ("mientras", "Bucle mientras"),
-            ("para", "Bucle para (próximamente)"),
-            ("inseguro", "Función FFI insegura"),
-            ("estructural", "Define un struct (próximamente)"),
-            ("enumeración", "Define un enum (próximamente)"),
-            ("usar", "Importa un módulo (próximamente)"),
-            ("módulo", "Define un módulo (próximamente)"),
+            ("función", "Declara una función", CompletionItemKind::KEYWORD),
+            ("fn", "Alias de función", CompletionItemKind::KEYWORD),
+            ("retornar", "Retorna un valor", CompletionItemKind::KEYWORD),
+            ("devolver", "Alias de retornar", CompletionItemKind::KEYWORD),
+            ("si", "Condicional si", CompletionItemKind::KEYWORD),
+            ("sino", "Rama alternativa", CompletionItemKind::KEYWORD),
+            ("es", "Comparación de identidad (==)", CompletionItemKind::KEYWORD),
+            ("está", "Comparación de estado / truthiness", CompletionItemKind::KEYWORD),
+            ("fuese", "Subjuntivo — cold path optimization", CompletionItemKind::KEYWORD),
+            ("mientras", "Bucle mientras (condición)", CompletionItemKind::KEYWORD),
+            ("para", "Bucle para (iteración)", CompletionItemKind::KEYWORD),
+            ("en", "Separador para/bucle", CompletionItemKind::KEYWORD),
+            ("coincidir", "Pattern matching exhaustivo", CompletionItemKind::KEYWORD),
+            ("emparejar", "Alias de coincidir", CompletionItemKind::KEYWORD),
+            ("inseguro", "Bloque o función FFI insegura", CompletionItemKind::KEYWORD),
+            ("estructural", "Define un struct (layout C)", CompletionItemKind::KEYWORD),
+            ("enumeración", "Define un enum (tag+union)", CompletionItemKind::KEYWORD),
+            ("rasgo", "Define un trait/interface", CompletionItemKind::KEYWORD),
+            ("implementar", "Implementa un trait para un tipo", CompletionItemKind::KEYWORD),
+            ("módulo", "Define un módulo", CompletionItemKind::KEYWORD),
+            ("usar", "Importa un símbolo de otro módulo", CompletionItemKind::KEYWORD),
+            ("mover", "Transfiere ownership explícitamente", CompletionItemKind::KEYWORD),
+            ("copiar", "Clona un valor explícitamente", CompletionItemKind::KEYWORD),
+            ("prestar", "Presta una referencia explícitamente", CompletionItemKind::KEYWORD),
+            ("región", "Bloque de arena allocation", CompletionItemKind::KEYWORD),
+            ("puro", "Anotación de efecto: sin side effects", CompletionItemKind::KEYWORD),
+            ("muta", "Anotación de efecto: muta campo(s)", CompletionItemKind::KEYWORD),
+            ("lee", "Anotación de efecto: lee campo(s)", CompletionItemKind::KEYWORD),
+            ("fut", "Función asíncrona (futuro)", CompletionItemKind::KEYWORD),
+            ("esperar", "Espera un futuro (await)", CompletionItemKind::KEYWORD),
+            ("lanzar", "Lanza un hilo/tarea", CompletionItemKind::KEYWORD),
+            ("bloquear", "Bridge sync→async", CompletionItemKind::KEYWORD),
+            ("seleccionar", "Select de canales", CompletionItemKind::KEYWORD),
+            ("con_executor", "Crea un thread pool", CompletionItemKind::KEYWORD),
+            ("cancelar", "Cancelación estructurada", CompletionItemKind::KEYWORD),
+            ("prueba", "Define un test", CompletionItemKind::KEYWORD),
+            ("afirmar", "Aserción en tests", CompletionItemKind::KEYWORD),
+            ("como", "Binding en pattern matching", CompletionItemKind::KEYWORD),
+            ("bits", "Campos de bits en struct", CompletionItemKind::KEYWORD),
+            ("todos", "Inicialización de arreglo con valor", CompletionItemKind::KEYWORD),
+            ("tipo", "Keyword de tipo (contextual)", CompletionItemKind::KEYWORD),
         ];
 
-        for (kw, doc) in keywords {
+        for (kw, doc, kind) in keywords {
             items.push(CompletionItem {
                 label: kw.to_string(),
-                kind: Some(CompletionItemKind::KEYWORD),
+                kind: Some(kind),
                 detail: Some(doc.to_string()),
+                insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                 ..Default::default()
             });
         }
 
-        // Artículos (ownership)
+        // Artículos (ownership — 5 tipos)
         let articulos = vec![
-            ("el", "Owned mutable (tú tienes el valor, puedes modificarlo)"),
-            ("la", "Borrowed immutable (prestado, solo lectura)"),
-            ("un", "Optional (puede ser None o Some)"),
-            ("los", "Colección owned mutable"),
-            ("las", "Colección borrowed immutable"),
+            ("el", "Owned mutable (dueño único, puedes modificar)", CompletionItemKind::KEYWORD),
+            ("la", "Borrowed inmutable (prestado, solo lectura)", CompletionItemKind::KEYWORD),
+            ("un", "Optional (quizás existe, quizás no)", CompletionItemKind::KEYWORD),
+            ("los", "Shared owned (ref-counted, múltiples dueños)", CompletionItemKind::KEYWORD),
+            ("las", "Shared borrowed (todos leen, nadie escribe)", CompletionItemKind::KEYWORD),
         ];
 
-        for (art, doc) in articulos {
+        for (art, doc, kind) in articulos {
             items.push(CompletionItem {
                 label: art.to_string(),
-                kind: Some(CompletionItemKind::KEYWORD),
+                kind: Some(kind),
                 detail: Some(doc.to_string()),
                 ..Default::default()
             });
         }
 
-        // Tipos primitivos
+        // Tipos — primitivos + compuestos
         let tipos = vec![
-            "Entero8", "Entero16", "Entero32", "Entero64",
-            "Natural8", "Natural16", "Natural32", "Natural64",
-            "Flotante32", "Flotante64",
-            "Booleano", "Caracter", "Palabra", "Texto", "Vacío",
+            ("Entero8", "Entero de 8 bits con signo"),
+            ("Entero16", "Entero de 16 bits con signo"),
+            ("Entero32", "Entero de 32 bits con signo"),
+            ("Entero64", "Entero de 64 bits con signo"),
+            ("Natural8", "Entero de 8 bits sin signo"),
+            ("Natural16", "Entero de 16 bits sin signo"),
+            ("Natural32", "Entero de 32 bits sin signo"),
+            ("Natural64", "Entero de 64 bits sin signo"),
+            ("Flotante32", "Flotante de 32 bits (f32)"),
+            ("Flotante64", "Flotante de 64 bits (f64)"),
+            ("Booleano", "Booleano: verdadero o falso"),
+            ("Caracter", "Carácter Unicode de 32 bits"),
+            ("Palabra", "String literal inmutable (&str)"),
+            ("Texto", "String heap-allocado growable (24 bytes, ¡liberar!)"),
+            ("Vacío", "Tipo unitario (sin valor)"),
+            ("Vector", "Vector dinámico genérico (heap, ¡liberar!)"),
+            ("Resultado", "Result<T,E> — Exito(valor) o Error(codigo)"),
         ];
 
-        for t in tipos {
+        for (t, doc) in tipos {
             items.push(CompletionItem {
                 label: t.to_string(),
                 kind: Some(CompletionItemKind::TYPE_PARAMETER),
-                detail: Some(format!("Tipo primitivo {}", t)),
+                detail: Some(doc.to_string()),
                 ..Default::default()
             });
         }
@@ -720,7 +1021,75 @@ impl Backend {
             });
         }
 
+        // Built-in functions (más comunes)
+        let builtins = vec![
+            ("imprimir", "(mensaje: T) -> Vacío", CompletionItemKind::FUNCTION),
+            ("imprimir_linea", "(mensaje: T) -> Vacío", CompletionItemKind::FUNCTION),
+            ("decir", "(mensaje: T) -> Vacío — alias de imprimir_linea", CompletionItemKind::FUNCTION),
+            ("tamaño_de::<T>", "() -> Entero64 — sizeof comptime", CompletionItemKind::FUNCTION),
+            ("dormir", "(ms: Entero32) -> Vacío — suspende hilo actual", CompletionItemKind::FUNCTION),
+            ("abs", "(x: Entero32) -> Entero32", CompletionItemKind::FUNCTION),
+            ("max", "(a: Entero32, b: Entero32) -> Entero32", CompletionItemKind::FUNCTION),
+            ("min", "(a: Entero32, b: Entero32) -> Entero32", CompletionItemKind::FUNCTION),
+            ("raiz", "(x: Flotante64) -> Flotante64 — sqrt()", CompletionItemKind::FUNCTION),
+            ("potencia", "(base: Flotante64, exp: Flotante64) -> Flotante64 — pow()", CompletionItemKind::FUNCTION),
+            ("texto_nuevo", "() -> Texto", CompletionItemKind::FUNCTION),
+            ("texto_desde", "(s: Palabra) -> Texto", CompletionItemKind::FUNCTION),
+            ("texto_agregar", "(texto: Texto, fragmento: Palabra) -> Vacío", CompletionItemKind::FUNCTION),
+            ("texto_concatenar", "(a: Texto, b: Texto) -> Texto", CompletionItemKind::FUNCTION),
+            ("texto_liberar", "(texto: Texto) -> Vacío", CompletionItemKind::FUNCTION),
+            ("vector_nuevo", "<T>() -> Vector<T>", CompletionItemKind::FUNCTION),
+            ("vector_agregar", "<T>(v: Vector<T>, val: T) -> Vacío", CompletionItemKind::FUNCTION),
+            ("vector_liberar", "<T>(v: Vector<T>) -> Vacío", CompletionItemKind::FUNCTION),
+            ("diccionario_nuevo", "<K,V>() -> Diccionario<K,V>", CompletionItemKind::FUNCTION),
+            ("diccionario_insertar", "<K,V>(d: Diccionario<K,V>, k: K, v: V) -> Vacío", CompletionItemKind::FUNCTION),
+            ("archivo_leer", "(ruta: Palabra) -> Texto", CompletionItemKind::FUNCTION),
+            ("archivo_escribir", "(ruta: Palabra, contenido: Texto) -> Entero32", CompletionItemKind::FUNCTION),
+            ("canal_nuevo", "(capacidad: Entero32) -> Canal", CompletionItemKind::FUNCTION),
+            ("canal_enviar", "(canal: Canal, valor: Entero32) -> Vacío", CompletionItemKind::FUNCTION),
+            ("canal_recibir", "(canal: Canal) -> Entero32", CompletionItemKind::FUNCTION),
+        ];
+
+        for (name, sig, kind) in builtins {
+            items.push(CompletionItem {
+                label: name.to_string(),
+                kind: Some(kind),
+                detail: Some(sig.to_string()),
+                ..Default::default()
+            });
+        }
+
         items
+    }
+
+    /// Genera firma de función para signature help
+    fn firma_a_signature_info(
+        nombre: &str,
+        params: &[(String, Tipo)],
+        retorno: Option<&Tipo>,
+    ) -> SignatureInformation {
+        let params_str: Vec<String> = params.iter()
+            .map(|(n, t)| format!("{}: {:?}", n, t))
+            .collect();
+        let ret_str = retorno.map(|t| format!("{:?}", t)).unwrap_or_else(|| "Vacío".to_string());
+        let label = format!("{}({}) -> {}", nombre, params_str.join(", "), ret_str);
+
+        let param_info: Vec<ParameterInformation> = params.iter()
+            .map(|(n, t)| ParameterInformation {
+                    label: ParameterLabel::LabelOffsets([
+                    label.find(n).unwrap_or(0) as u32,
+                    label.find(n).map(|i| i + n.len()).unwrap_or(0) as u32,
+                ]),
+                documentation: Some(Documentation::String(format!("{:?}", t))),
+            })
+            .collect();
+
+        SignatureInformation {
+            label,
+            documentation: Some(Documentation::String(format!("Función `{}` de Falcato", nombre))),
+            parameters: Some(param_info),
+            active_parameter: Some(0),
+        }
     }
 }
 
@@ -745,11 +1114,23 @@ impl LanguageServer for Backend {
                         ":".to_string(),
                         ".".to_string(),
                     ]),
+                    all_commit_characters: Some(vec![
+                        "\n".to_string(),
+                        ";".to_string(),
+                        ",".to_string(),
+                    ]),
                     ..Default::default()
                 }),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
+                signature_help_provider: Some(SignatureHelpOptions {
+                    trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+                    retrigger_characters: Some(vec![",".to_string()]),
+                    ..Default::default()
+                }),
+                document_symbol_provider: Some(OneOf::Left(true)),
+                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 diagnostic_provider: Some(
                     DiagnosticServerCapabilities::Options(DiagnosticOptions {
                         identifier: Some("falcato".to_string()),
@@ -852,14 +1233,276 @@ impl LanguageServer for Backend {
             .await;
     }
 
-    // === Autocompletado ===
+    // === Autocompletado (context-aware) ===
 
     async fn completion(
         &self,
-        _: CompletionParams,
+        params: CompletionParams,
     ) -> Result<Option<CompletionResponse>> {
-        let items = Self::items_autocompletado();
+        // Siempre incluir items estáticos (keywords, tipos, builtins)
+        let mut items = Self::items_autocompletado();
+
+        // Añadir items contextuales del documento
+        let uri = params.text_document_position.text_document.uri;
+        let pos = params.text_document_position.position;
+
+        let docs = self.documentos.read().await;
+        if let Some(doc) = docs.get(&uri) {
+            let contextuales = self.items_autocompletado_contexto(
+                &doc.indice,
+                &doc.contenido,
+                pos.line,
+            );
+            items.extend(contextuales);
+        }
+
         Ok(Some(CompletionResponse::Array(items)))
+    }
+
+    // === Signature Help ===
+
+    async fn signature_help(
+        &self,
+        params: SignatureHelpParams,
+    ) -> Result<Option<SignatureHelp>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+
+        let docs = self.documentos.read().await;
+        let doc = match docs.get(&uri) {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+
+        // Buscar nombre de función alrededor de la posición (antes de '(')
+        let line = doc.contenido.lines().nth(pos.line as usize).unwrap_or("");
+        let before_paren = if let Some(paren_pos) = line[..pos.character as usize].rfind('(') {
+            let before = line[..paren_pos].trim();
+            before.split_whitespace().last().map(|s| s.to_string())
+        } else {
+            None
+        };
+
+        let func_name = match before_paren {
+            Some(ref n) if !n.is_empty() && n.chars().all(|c| c.is_alphanumeric() || c == '_') => n.clone(),
+            _ => return Ok(None),
+        };
+
+        // Buscar función en índice
+        if let Some(func) = doc.indice.funciones.get(&func_name) {
+            let params_info: Vec<ParameterInformation> = func.parametros_raw.iter()
+                .map(|(n, t)| ParameterInformation {
+                    label: ParameterLabel::Simple(format!("{}: {}", n, t)),
+                    documentation: Some(Documentation::String(t.clone())),
+                })
+                .collect();
+
+            let params_str = func.parametros_raw.iter()
+                .map(|(n, t)| format!("{}: {}", n, t))
+                .collect::<Vec<_>>().join(", ");
+            let ret = func.retorno.as_deref().unwrap_or("Vacío");
+            let label = format!("{}({}) -> {}", func.nombre, params_str, ret);
+
+            return Ok(Some(SignatureHelp {
+                signatures: vec![SignatureInformation {
+                    label,
+                    documentation: Some(Documentation::String(format!("Función `{}` de Falcato", func.nombre))),
+                    parameters: Some(params_info),
+                    active_parameter: Some(0),
+                }],
+                active_signature: Some(0),
+                active_parameter: Some(0),
+            }));
+        }
+
+        Ok(None)
+    }
+
+    // === Code Actions ===
+
+    async fn code_action(
+        &self,
+        params: CodeActionParams,
+    ) -> Result<Option<CodeActionResponse>> {
+        let uri = params.text_document.uri;
+
+        let docs = self.documentos.read().await;
+        let doc = match docs.get(&uri) {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+
+        // Re-analizar para obtener diagnósticos actualizados
+        let (diagnosticos, _, _) = self.analizar_documento(&uri, &doc.contenido).await;
+
+        let mut actions: Vec<CodeActionOrCommand> = Vec::new();
+
+        for diag in &diagnosticos {
+            // Solo acciones para errores en el rango solicitado
+            if !self.span_en_rango(diag.range, &params.range) {
+                continue;
+            }
+
+            let codigo = diag.code.as_ref()
+                .and_then(|c| match c {
+                    NumberOrString::String(s) => Some(s.as_str()),
+                    _ => None,
+                })
+                .unwrap_or("");
+
+            match codigo {
+                "T001" | "T005" => {
+                    // Error de tipo → sugerencia de cambio
+                    actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                        title: "💡 Revisar tipo (abre hover)".to_string(),
+                        kind: Some(CodeActionKind::QUICKFIX),
+                        diagnostics: Some(vec![diag.clone()]),
+                        ..Default::default()
+                    }));
+                }
+                "O001" => {
+                    // Error de ownership (usar después de mover / mutar inmutable)
+                    actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                        title: "🔧 Usar `mover` / `copiar` antes del uso".to_string(),
+                        kind: Some(CodeActionKind::QUICKFIX),
+                        diagnostics: Some(vec![diag.clone()]),
+                        ..Default::default()
+                    }));
+                }
+                _ => {
+                    // Genérico: mostrar sugerencia del compilador
+                    let suggestion = diag.message.contains("💡");
+                    if suggestion {
+                        actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                            title: format!("💡 Seguir sugerencia del compilador"),
+                            kind: Some(CodeActionKind::QUICKFIX),
+                            diagnostics: Some(vec![diag.clone()]),
+                            ..Default::default()
+                        }));
+                    }
+                }
+            }
+        }
+
+        if actions.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(actions))
+        }
+    }
+
+    // === Document Symbols ===
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> Result<Option<DocumentSymbolResponse>> {
+        let uri = params.text_document.uri;
+
+        let docs = self.documentos.read().await;
+        let doc = match docs.get(&uri) {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+
+        let mut symbols: Vec<DocumentSymbol> = Vec::new();
+
+        // Funciones
+        for func in doc.indice.funciones.values() {
+            let params_str = func.parametros_raw.iter()
+                .map(|(n, t)| format!("{}: {}", n, t))
+                .collect::<Vec<_>>().join(", ");
+            let ret = func.retorno.as_deref().unwrap_or("Vacío");
+            let detail = format!("{}({}) -> {}", func.nombre, params_str, ret);
+
+            symbols.push(DocumentSymbol {
+                name: func.nombre.clone(),
+                kind: SymbolKind::FUNCTION,
+                range: self.span_a_rango(&func.span_declaracion),
+                selection_range: self.span_a_rango(&func.span_declaracion),
+                detail: Some(detail),
+                children: None,
+                tags: None,
+                deprecated: None,
+            });
+        }
+
+        // Structs
+        for s in doc.indice.structs.values() {
+            let campos: Vec<DocumentSymbol> = s.campos.iter()
+                .map(|(n, t)| DocumentSymbol {
+                    name: n.clone(),
+                    kind: SymbolKind::FIELD,
+                    range: Range { start: Position { line: 0, character: 0 }, end: Position { line: 0, character: 0 } },
+                    selection_range: Range { start: Position { line: 0, character: 0 }, end: Position { line: 0, character: 0 } },
+                    detail: Some(t.clone()),
+                    children: None,
+                    tags: None,
+                    deprecated: None,
+                })
+                .collect();
+
+            symbols.push(DocumentSymbol {
+                name: s.nombre.clone(),
+                kind: SymbolKind::STRUCT,
+                range: self.span_a_rango(&s.span_declaracion),
+                selection_range: self.span_a_rango(&s.span_declaracion),
+                detail: Some(format!("estructural ({} campos)", s.campos.len())),
+                children: Some(campos),
+                tags: None,
+                deprecated: None,
+            });
+        }
+
+        // Enums
+        for e in doc.indice.enums.values() {
+            let variantes: Vec<DocumentSymbol> = e.variantes.iter()
+                .map(|(n, t)| {
+                    let detail = t.as_deref().unwrap_or("—");
+                    DocumentSymbol {
+                        name: n.clone(),
+                        kind: SymbolKind::ENUM_MEMBER,
+                        range: Range { start: Position { line: 0, character: 0 }, end: Position { line: 0, character: 0 } },
+                        selection_range: Range { start: Position { line: 0, character: 0 }, end: Position { line: 0, character: 0 } },
+                        detail: Some(detail.to_string()),
+                        children: None,
+                        tags: None,
+                        deprecated: None,
+                    }
+                })
+                .collect();
+
+            symbols.push(DocumentSymbol {
+                name: e.nombre.clone(),
+                kind: SymbolKind::ENUM,
+                range: self.span_a_rango(&e.span_declaracion),
+                selection_range: self.span_a_rango(&e.span_declaracion),
+                detail: Some(format!("enumeración ({} variantes)", e.variantes.len())),
+                children: Some(variantes),
+                tags: None,
+                deprecated: None,
+            });
+        }
+
+        // Traits
+        for t in doc.indice.traits.values() {
+            symbols.push(DocumentSymbol {
+                name: t.nombre.clone(),
+                kind: SymbolKind::INTERFACE,
+                range: self.span_a_rango(&t.span_declaracion),
+                selection_range: self.span_a_rango(&t.span_declaracion),
+                detail: Some(format!("rasgo ({} métodos)", t.metodos.len())),
+                children: None,
+                tags: None,
+                deprecated: None,
+            });
+        }
+
+        if symbols.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(DocumentSymbolResponse::Nested(symbols)))
+        }
     }
 
     // === Hover ===
@@ -974,11 +1617,17 @@ impl LanguageServer for Backend {
             None => return Ok(None),
         };
 
-        // Buscar span de declaración
+        // Buscar span de declaración — ahora incluye structs/enums/traits
         let span = doc.indice.variables.get(&ident)
             .map(|v| v.span_declaracion.clone())
             .or_else(|| doc.indice.funciones.get(&ident)
-                .map(|f| f.span_declaracion.clone()));
+                .map(|f| f.span_declaracion.clone()))
+            .or_else(|| doc.indice.structs.get(&ident)
+                .map(|s| s.span_declaracion.clone()))
+            .or_else(|| doc.indice.enums.get(&ident)
+                .map(|e| e.span_declaracion.clone()))
+            .or_else(|| doc.indice.traits.get(&ident)
+                .map(|t| t.span_declaracion.clone()));
 
         let span = match span {
             Some(s) => s,

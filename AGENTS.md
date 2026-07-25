@@ -384,7 +384,13 @@ y **método syntax generalizada** (`.agregar()`, `.tam()`, `.liberar()` en Texto
 **operadores compuestos** (`a + b` concatena Texto, `t[0]`/`t[0..5]` indexa Texto, `v[0]` indexa Vector),
 **aliases** (`devolver`/`emparejar`/`decir`/`texto_tam`/`vector_tam`),
 **i18n completa de "array" → "arreglo"** en docs y errores de compilador,
-y servidor LSP completo.
+y servidor LSP completo con **6 features para agentes**:
+  - Autocompletado completo (todos los keywords sin "próximamente", 60+ items)
+  - Signature help (parámetros al tipear `(`)
+  - Code actions (quick fixes desde diagnósticos [T001], [O001])
+  - Document symbols (outline: funciones, structs, enums, traits)
+  - Context-aware completion (variables en scope, campos de struct tras `.`)
+  - Hover mejorado (tablas de propiedades, structs/enums/traits)
 Backend Cranelift generando binarios nativos x86_64.
 
 **Documentación completa de usuario:** GUIA.md (hub) + 15 capítulos en GUIA/ (03-15),
