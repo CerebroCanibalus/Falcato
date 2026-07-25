@@ -19,7 +19,7 @@ Bienvenido. Cada capítulo son 5-10 minutos y empieza desde lo más básico.
 | 06 | [Bucles](GUIA/06-bucles.md) | `mientras`, `para` |
 | 07 | [Funciones](GUIA/07-funciones.md) | Tus propias herramientas |
 | 08 | [Texto](GUIA/08-texto.md) | Strings, interpolación, liberación |
-| 09 | [Colecciones](GUIA/09-colecciones.md) | Arrays y vectores |
+| 09 | [Colecciones](GUIA/09-colecciones.md) | Arreglos y vectores |
 | 10 | [Datos compuestos](GUIA/10-datos.md) | Structs, enums, pattern matching |
 | 11 | [Errores](GUIA/11-errores.md) | Resultado y `?` |
 | 12 | [Métodos](GUIA/12-metodos.md) | Sintaxis `.nombre()` y operadores |

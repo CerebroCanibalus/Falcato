@@ -1439,7 +1439,7 @@ impl Codegen {
                                     CategoriaError::Interno,
                                     21,
                                     decl.span.clone(),
-                                    "Expresión no válida para inicialización de array".to_string(),
+                                    "Expresión no válida para inicialización de arreglo".to_string(),
                                 ));
                             }
                         }
@@ -1690,7 +1690,7 @@ impl Codegen {
                                     CategoriaError::Interno,
                                     20,
                                     asig.span.clone(),
-                                    "Asignación a array en tipo no-array".to_string(),
+                                    "Asignación a arreglo en tipo no-arreglo".to_string(),
                                 ));
                                 return Err(());
                             }
@@ -2011,7 +2011,7 @@ impl Codegen {
                                 CategoriaError::Interno,
                                 40,
                                 bucle.span.clone(),
-                                "'para' requiere array o rango en codegen".to_string(),
+                                "'para' requiere arreglo o rango en codegen".to_string(),
                             ));
                             return Err(());
                         }
@@ -2779,7 +2779,7 @@ impl Codegen {
                             CategoriaError::Interno,
                             20,
                             span.clone(),
-                            "Acceso a array en tipo no-array".to_string(),
+                            "Acceso a arreglo en tipo no-arreglo".to_string(),
                         ));
                         return Err(());
                     }

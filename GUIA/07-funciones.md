@@ -193,7 +193,7 @@ También genéricos numéricos:
 
 ```falcato
 fn longitud<N: Entero32>(la nums: [Entero32; N]) -> Entero32 {
-    retornar N;  // N es el tamaño del array, conocido en compilación
+    retornar N;  // N es el tamaño del arreglo, conocido en compilación
 }
 ```
 

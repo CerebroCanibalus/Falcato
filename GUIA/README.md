@@ -23,7 +23,7 @@ Empieza por el [índice principal](../GUIA.md).
 | 06 | [06-bucles.md](06-bucles.md) | Bucles |
 | 07 | [07-funciones.md](07-funciones.md) | Funciones |
 | 08 | [08-texto.md](08-texto.md) | Texto y Palabra |
-| 09 | [09-colecciones.md](09-colecciones.md) | Arrays y Vectores |
+| 09 | [09-colecciones.md](09-colecciones.md) | Arreglos y Vectores |
 | 10 | [10-datos.md](10-datos.md) | Structs y Enums |
 | 11 | [11-errores.md](11-errores.md) | Manejo de errores |
 | 12 | [12-metodos.md](12-metodos.md) | Sintaxis de método |

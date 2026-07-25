@@ -70,7 +70,7 @@ para i en 0..=5 {           // 0, 1, 2, 3, 4, 5
     decir("Incluye el 5");
 }
 
-// Sobre arrays
+// Sobre arreglos
 los dias: [Palabra; 5] = ["Lu", "Ma", "Mi", "Ju", "Vi"];
 para d en dias {
     decir("Hoy es {d}");
@@ -155,7 +155,7 @@ para i en 0..=5 {
 | Situación | Usa |
 |-----------|-----|
 | Sabes cuántas veces | `para` |
-| Recorres array/vector | `para` |
+| Recorres arreglo/vector | `para` |
 | No sabes cuándo termina | `mientras` |
 | Depende de una condición externa | `mientras` |
 | Bucle infinito con salida interna | `mientras verdadero` |

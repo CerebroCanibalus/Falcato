@@ -1001,7 +1001,7 @@ impl AnalizadorSemantico {
                                 CategoriaError::Tipo,
                                 DISCONCORDANCIA_TIPO,
                                 &decl.span,
-                                format!("Disconcordancia de tipo en 'todos': elemento es '{:?}' pero array espera '{:?}'",
+                                format!("Disconcordancia de tipo en 'todos': elemento es '{:?}' pero arreglo espera '{:?}'",
                                     tipo_elem, tipo_esperado),
                                 Some(format!("Cambia el tipo a '{:?}' o el valor de relleno", tipo_elem))
                             );
@@ -1015,7 +1015,7 @@ impl AnalizadorSemantico {
                                 CategoriaError::Tipo,
                                 DISCONCORDANCIA_TIPO,
                                 &decl.span,
-                                format!("Disconcordancia de tipo en 'todos': elemento es '{:?}' pero array espera '{:?}'",
+                                format!("Disconcordancia de tipo en 'todos': elemento es '{:?}' pero arreglo espera '{:?}'",
                                     tipo_elem, tipo_esperado),
                                 Some(format!("Cambia el tipo a '{:?}' o el valor de relleno", tipo_elem))
                             );
@@ -1116,7 +1116,7 @@ No puedes modificar algo que no es 'tuyo'.",
                                 CategoriaError::Tipo,
                                 15,
                                 &asig.span,
-                                "Índice de array debe ser Entero".to_string(),
+                                "Índice de arreglo debe ser Entero".to_string(),
                                 None
                             );
                         }
@@ -1128,7 +1128,7 @@ No puedes modificar algo que no es 'tuyo'.",
                                         CategoriaError::Tipo,
                                         ASIGNACION_INCOMPATIBLE,
                                         &asig.span,
-                                        format!("Disconcordancia: array almacena '{:?}' pero se asigna '{:?}'",
+                                        format!("Disconcordancia: arreglo almacena '{:?}' pero se asigna '{:?}'",
                                             tipo_elem, tipo_valor),
                                         None
                                     );
@@ -1139,7 +1139,7 @@ No puedes modificar algo que no es 'tuyo'.",
                                     CategoriaError::Tipo,
                                     16,
                                     &asig.span,
-                                    format!("Asignación a array en tipo '{:?}' que no es array", tipo_array),
+                                    format!("Asignación a arreglo en tipo '{:?}' que no es arreglo", tipo_array),
                                     None
                                 );
                             }
@@ -1274,8 +1274,8 @@ No puedes modificar algo que no es 'tuyo'.",
                                     CategoriaError::Tipo,
                                     23,
                                     &bucle.span,
-                                    format!("'para' requiere un array o rango, encontrado '{:?}'", tipo_iterable),
-                                    Some("Usa un array [T; N] o un rango: 0..10".to_string())
+                                    format!("'para' requiere un arreglo o rango, encontrado '{:?}'", tipo_iterable),
+                                    Some("Usa un arreglo [T; N] o un rango: 0..10".to_string())
                                 );
                                 Tipo::Entero32
                             }
@@ -1779,7 +1779,7 @@ No puedes modificar algo que no es 'tuyo'.",
                         CategoriaError::Tipo,
                         15,
                         span,
-                        format!("Índice de array debe ser Entero, encontrado '{:?}'", tipo_indice),
+                            format!("Índice de arreglo debe ser Entero, encontrado '{:?}'", tipo_indice),
                         Some("Usa un valor Entero como índice".to_string())
                     );
                 }
@@ -1791,7 +1791,7 @@ No puedes modificar algo que no es 'tuyo'.",
                             CategoriaError::Tipo,
                             16,
                             span,
-                            format!("Acceso a array en tipo '{:?}' que no es array", tipo_array),
+                            format!("Acceso a arreglo en tipo '{:?}' que no es arreglo", tipo_array),
                             None
                         );
                         Tipo::Entero32
@@ -1810,10 +1810,10 @@ No puedes modificar algo que no es 'tuyo'.",
                         if tipo_elem != tipo {
                             self.reportar_error(
                                 CategoriaError::Tipo,
-                                17, // nuevo código para array heterogéneo
+                                17, // nuevo código para arreglo heterogéneo
                                 span,
-                                format!("Elemento {} del array es '{:?}' pero se espera '{:?}'", i, tipo_elem, tipo),
-                                Some("Todos los elementos de un array deben ser del mismo tipo".to_string())
+                                format!("Elemento {} del arreglo es '{:?}' pero se espera '{:?}'", i, tipo_elem, tipo),
+                                Some("Todos los elementos de un arreglo deben ser del mismo tipo".to_string())
                             );
                         }
                     }

@@ -1,17 +1,17 @@
-# 09 — Colecciones: arrays y vectores
+# 09 — Colecciones: arreglos y vectores
 
 ← [08: Texto y Palabra](08-texto.md) | [Indice](../GUIA.md) | [Siguiente: Datos compuestos →](10-datos.md)
 
 ---
 
-Falcato tiene dos formas de guardar listas de cosas: **arrays** (tamaño fijo, rápidos) y **vectores** (tamaño variable, flexibles). Los dos usan `[índice]` para acceder.
+Falcato tiene dos formas de guardar listas de cosas: **arreglos** (tamaño fijo, rápidos) y **vectores** (tamaño variable, flexibles). Los dos usan `[índice]` para acceder.
 
-## Array `[T; N]` — tamaño fijo
+## Arreglo `[T; N]` — tamaño fijo
 
-Los arrays viven en la **pila** (stack). Son rapidísimos pero su tamaño se decide al escribirlos y **no puede cambiar**.
+Los arreglos viven en la **pila** (stack). Son rapidísimos pero su tamaño se decide al escribirlos y **no puede cambiar**.
 
 ```
-Cómo se ve en memoria (array de 5 enteros):
+Cómo se ve en memoria (arreglo de 5 enteros):
 
    Dirección baja                    Dirección alta
    ┌────┬────┬────┬────┬────┐
@@ -52,7 +52,7 @@ los ceros: [Entero32; 100] = todos 0;    // 100 ceros
 los unos: [Entero32; 50] = todos -1;     // 50 unos
 ```
 
-### Copiar un array
+### Copiar un arreglo
 
 ```falcato
 los original: [Entero32; 3] = [1, 2, 3];
@@ -60,7 +60,7 @@ los copia: [Entero32; 3] = copiar original;
 // Ahora son independientes. Modificar copia no afecta original.
 ```
 
-### Arrays en la vida real
+### Arreglos en la vida real
 
 ```falcato
 // Días de la semana — siempre 7
@@ -87,7 +87,7 @@ para i en 0..9 {
 historial[9] = nuevo_valor;
 ```
 
-### Matrices 2D (arrays de arrays)
+### Matrices 2D (arreglos de arreglos)
 
 ```falcato
 // Un tablero 3×3
@@ -159,7 +159,7 @@ v.liberar();  // ← SIEMPRE
 ### Acumular (sumar todos)
 
 ```falcato
-fn sumar_array(nums: [Entero32; 5]) -> Entero32 {
+fn sumar_arreglo(nums: [Entero32; 5]) -> Entero32 {
     el total: Entero32 = 0;
     para n en nums {
         total = total + n;
@@ -281,9 +281,9 @@ función principal() -> Entero32 {
 los arr: [Entero32; 3] = [1, 2, 3];
 arr[5] = 99;  // ¡CRASH! Solo hay posiciones 0,1,2
 
-// Error: confundir array con vector
+// Error: confundir arreglo con vector
 el datos: [Entero32; 3] = [1, 2, 3];
-datos.agregar(4);  // Error: los arrays no tienen agregar
+datos.agregar(4);  // Error: los arreglos no tienen agregar
 
 // Error: olvidar liberar vector
 fn perder_memoria() {
@@ -292,16 +292,16 @@ fn perder_memoria() {
     // falta v.liberar() → PÉRDIDA DE MEMORIA
 }
 
-// Error: usar array para datos dinámicos
+// Error: usar arreglo para datos dinámicos
 fn cuantos_usuarios(cantidad: Entero32) {
     el usuarios: [Entero32; 10] = ???;  // ¿y si son más de 10?
     // Usa Vector<Entero32> mejor
 }
 ```
 
-## ¿Array o Vector? — tabla expandida
+## ¿Arreglo o Vector? — tabla expandida
 
-| Situación | Array | Vector | ¿Por qué? |
+| Situación | Arreglo | Vector | ¿Por qué? |
 |-----------|-------|--------|-----------|
 | Días de la semana | ✅ | ❌ | Siempre 7, fijo |
 | Buffer de 1024 bytes | ✅ | ❌ | El hardware espera exactamente eso |
@@ -309,14 +309,14 @@ fn cuantos_usuarios(cantidad: Entero32) {
 | Lista de usuarios conectados | ❌ | ✅ | Van y vienen |
 | Paleta de 4 colores | ✅ | ❌ | Son 4, punto |
 | Matriz 3×3 para juegos | ✅ | ❌ | Tamaño conocido |
-| Dibujar píxeles en pantalla | ✅ ❌ | Depende | Si es resolución fija → array |
+| Dibujar píxeles en pantalla | ✅ ❌ | Depende | Si es resolución fija → arreglo |
 | Cache de resultados | ❌ | ✅ | No sabes cuántos serán |
 
-**Regla de oro:** Si sabes el número antes de ejecutar → array. Si los datos llegan vivos → vector.
+**Regla de oro:** Si sabes el número antes de ejecutar → arreglo. Si los datos llegan vivos → vector.
 
 ## Tabla rápida (referencia)
 
-| | Array `[T; N]` | Vector `Vector<T>` |
+| | Arreglo `[T; N]` | Vector `Vector<T>` |
 |---|-------|--------|
 | Crear | `[10, 20, 30]` | `vector_nuevo::<T>()` |
 | Añadir | ❌ No puede | `v.agregar(x)` |
