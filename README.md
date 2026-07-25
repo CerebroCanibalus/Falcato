@@ -19,12 +19,13 @@
 Ve a [Releases](https://github.com/CerebroCanibalus/falcato/releases) y descarga `falcato-v0.2.0-x86_64-windows.zip` (o la versión más reciente).
 
 ### 2. Instalar
-Extrae el ZIP y ejecuta `install.cmd`:
-```cmd
+Extrae el ZIP y ejecuta `install.ps1` (PowerShell):
+```powershell
 falcato-v0.2.0-x86_64-windows.zip  →  Extraer aquí
-install.cmd
+.\install.ps1
 ```
-Esto instala `falcato.exe` en `%USERPROFILE%\.falcato\bin` y lo agrega al PATH.
+Menú interactivo: eliges qué instalar (PATH obligatorio, VS Code, OpenCode, Claude Code, Cursor).
+Instala `falcato.exe` en `%USERPROFILE%\.falcato\bin` y lo agrega al PATH de usuario.
 
 ### 3. Probar
 Abre una **terminal nueva** y escribe:
@@ -60,7 +61,7 @@ fn principal() -> Entero32 {
 
 ## ¿Por qué Falcato existe?
 
-Hay 7,000+ millones de hispanohablantes. Menos del 5% programa. La barrera no es la lógica — es el lenguaje de la documentación, los errores, y la sintaxis.
+Hay **~600 millones de hispanohablantes** en el mundo (nativos + L2, Instituto Cervantes 2024). Menos del 5% programa. La barrera no es la lógica — es el lenguaje de la documentación, los errores, y la sintaxis.
 
 Falcato responde a tres preguntas:
 
