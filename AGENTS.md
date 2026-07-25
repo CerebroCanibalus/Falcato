@@ -380,7 +380,7 @@ Backend Cranelift generando binarios nativos x86_64.
 | CRT estático | ⏳ Pendiente — funciona en GitHub Actions (VS completo), no en VS Insiders local |
 | GitHub repo | ✅ `CerebroCanibalus/falcato` (privado) |
 | GitHub Actions CI | ❌ Pendiente |
-| VS Code Extension | ✅ Archivos creados (faltan npm install + test) |
+| VS Code Extension | ✅ VSIX instalable, Falcato Dorado theme |
 | Falso positivo Defender | ⚠️ Riesgo alto sin firma digital |
 | Instalador script | ❌ Pendiente |
 
@@ -641,40 +641,43 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 > El Roadmap original (Fases 9-19) es el plan conceptual. Esta sección
 > define **lo que toca ahora**, en orden de prioridad real.
 
-### Fase R1 — Distribución e instalación (RELEASE)
+### Fase R1 — Distribución e instalación (RELEASE) ✅ COMPLETADA
+| # | Tarea | Archivos | Estado |
+|---|-------|----------|--------|
+| 1 | Repositorio GitHub creado | `CerebroCanibalus/falcato` | ✅ |
+| 2 | `.gitignore` mejorado | 1 | ✅ |
+| 3 | `clean.ps1` — limpiar basura compilada | 1 | ✅ |
+| 4 | `bundle_dlls.ps1` — bundle VCRUNTIME140 para releases locales | 1 | ✅ |
+| 5 | `.github/workflows/ci.yml` — build + test en push | 1 | ✅ |
+| 6 | `.github/workflows/release.yml` — build + ZIP en tag | 1 | ✅ |
+| 7 | `+crt-static` en CI | 1 línea | ⏳ Pendiente |
+
+**Resultado:** Repo listo con CI. El release build de GitHub Actions produce .exe sin DLLs externas.
+
+### Fase R2 — VS Code Extension ✅ COMPLETADA
+| # | Tarea | Archivos | Estado |
+|---|-------|----------|--------|
+| 1 | `package.json` (extension manifest) | 1 | ✅ |
+| 2 | `falcato.tmLanguage.json` (syntax highlighting) | 1 | ✅ |
+| 3 | `language-configuration.json` (brackets, comentarios) | 1 | ✅ |
+| 4 | `client.js` — LSP client (lanza `falcato lsp`) | 1 | ✅ |
+| 5 | `themes/falcato-color-theme.json` (tema "Falcato Dorado") | 1 | ✅ |
+| 6 | VSIX empaquetado | `npx vsce package` | ✅ |
+
+**Resultado:** Syntax highlighting + LSP + tema único "Falcato Dorado". Instalar vía VSIX.
+
+### Fase R3 — Documentación completa + Skills para IA
 | # | Tarea | Archivos | Esfuerzo |
 |---|-------|----------|----------|
-| 1 | `+crt-static` en Cargo.toml (solo CI) | 1 línea | 5 min |
-| 2 | `bundle_dlls.ps1` para releases locales | 1 | 10 min |
-| 3 | Release build + verificar DLLs | — | 15 min |
-| 4 | `clean.ps1` — limpiar basura (exes/ós sueltos) | 1 | 10 min |
-| 5 | `.github/workflows/ci.yml` — build + test en push | 1 | 30 min |
-| 6 | `.github/workflows/release.yml` — build + ZIP en tag | 1 | 30 min |
-| 7 | `scripts/install.ps1` — PATH + VS Code + ejemplos | 1 | 30 min |
-| 8 | Probar en máquina limpia (VM sin Rust) | — | 30 min |
-| 9 | Subir primer release a GitHub, reportar falso positivo a Microsoft | — | 1h |
+| 1 | `INSTALL.md` — cómo instalar Falcato en 3 pasos | 1 | 30 min |
+| 2 | `QUICKSTART.md` — tutorial rápido (hola mundo → archivo → colecciones) | 1 | 1h |
+| 3 | `REFERENCIA.md` — catálogo completo de built-ins | 1 | 2h |
+| 4 | `ERRORES.md` — cada código [T###] explicado con causa y fix | 1 | 3h |
+| 5 | Skill `falcato-language` (OpenCode) — gramática compacta + tipos + ownership + patrones | 1 | 1h |
+| 6 | `AGENTS.md` genérico — workflow check→fix→build para cualquier LLM | 1 | 30 min |
+| 7 | Carpeta `falcato-skill/` con ejemplos de referencia anotados | varios | 1h |
 
-**Resultado:** Alguien descarga ZIP de GitHub Releases, ejecuta `install.ps1`, y tiene `falcato` en PATH + VS Code configurado.
-
-### Fase R2 — VS Code Extension
-| # | Tarea | Archivos |
-|---|-------|----------|
-| 1 | `falcato-vscode/package.json` (extension manifest) | 1 |
-| 2 | `syntaxes/falcato.tmLanguage.json` (syntax highlighting) | 1 |
-| 3 | `language-configuration.json` (brackets, comentarios) | 1 |
-| 4 | `client.js` — LSP client (lanza `falcato lsp`) | 1 |
-| 5 | `install.ps1` actualizado para copiar extensión | 1 |
-
-**Resultado:** Syntax highlighting + errores en rojo + autocompletado + hover en VS Code.
-
-### Fase R3 — Skill Falcato para LLMs
-| # | Tarea | Archivos |
-|---|-------|----------|
-| 1 | Skill `falcato-language` (OpenCode) — gramática + tipos + ownership + patrones | 1 |
-| 2 | `AGENTS.md` genérico para cualquier LLM (check→fix→build workflow) | 1 |
-| 3 | Carpeta `falcato-skill/` con ejemplos de referencia | varios |
-
-**Resultado:** Cualquier LLM (Claude, GPT, Gemini) puede escribir Falcato siguiendo la skill.
+**Resultado:** Un nuevo programador o cualquier LLM puede aprender y escribir Falcato productivamente sin haberlo visto antes.
 
 ### Fase R4 — Colecciones (Diccionario + Conjunto)
 | # | Tarea | Archivos | Líneas |
@@ -687,37 +690,30 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 
 **Resultado:** Programas reales con hash maps y conjuntos.
 
-### Fase R5 — Documentación
-| # | Tarea | Archivos |
-|---|-------|----------|
-| 1 | `INSTALL.md` — instalar en 3 pasos | 1 |
-| 2 | `QUICKSTART.md` — hola mundo → archivo → colección | 1 |
-| 3 | `REFERENCIA.md` — todas las built-ins | 1 |
-| 4 | `ERRORES.md` — cada código [T###] explicado | 1 |
-
-### Fase R6 — Proyecto ejemplo 500+ líneas
+### Fase R5 — Proyecto ejemplo 500+ líneas
 - Word counter: lee archivo, tokeniza, cuenta frecuencia con Diccionario, ordena con Vector
 - Valida el pipeline completo: módulos, colecciones, archivos, I/O
 
-### Fase R7 — Drop automático
+### Fase R6 — Drop automático
 - Análisis de CFG para insertar `free` al final de scope
 - Elimina fugas en Texto, Vector, Diccionario, Conjunto, TCP sockets
 
-### Fase R8 — Package manager (post-v1)
+### Fase R7 — Package manager (post-v1)
 - `Falcato.toml`, dependencias git, comandos `nuevo`/`construir`
 
 ## Checklist para release v0.2.0
 
 - [ ] `+crt-static` en CI (GitHub Actions tiene VS Build Tools completo)
 - [ ] Release build limpio (CI produce .exe sin DLLs externas)
-- [ ] Script `bundle_dlls.ps1` para releases locales (copia VCRUNTIME140.dll)
-- [ ] GitHub repo creado con README y LICENSE
-- [ ] GitHub Actions CI (build + test)
-- [ ] GitHub Actions Release (tag → ZIP)
-- [ ] VS Code Extension (syntax + LSP)
-- [ ] Skill `falcato-language` para LLMs
-- [ ] Diccionario + Conjunto implementados
+- [x] Script `bundle_dlls.ps1` para releases locales
+- [x] GitHub repo creado con README y LICENSE
+- [x] GitHub Actions CI (build + test)
+- [ ] GitHub Actions Release (tag → ZIP) — probar con tag
+- [x] VS Code Extension (syntax + LSP + theme Falcato Dorado)
 - [ ] Documentación básica (INSTALL + QUICKSTART)
+- [ ] Skill `falcato-language` para LLMs
+- [ ] AGENTS.md genérico para cualquier LLM
+- [ ] Diccionario + Conjunto implementados
 - [ ] Proyecto ejemplo >500 líneas funcionando
 - [ ] Falso positivo reportado a Microsoft Security Center
 - [ ] Script `install.ps1` probado en máquina limpia
