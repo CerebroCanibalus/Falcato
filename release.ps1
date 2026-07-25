@@ -1,15 +1,17 @@
-# release.ps1 — Script de release simple (sin npm, sin node, sin drama)
+# release.ps1 — Script de release para Falcato
 #
 # Uso:
-#   .\release.ps1                    # release normal (cargo build --release)
-#   .\release.ps1 -SkipBuild         # solo empaqueta (si ya compilaste)
-#   .\release.ps1 -Version "0.3.0"   # versión custom (default: detecta del tag)
+#   .\release.ps1                           # release completo
+#   .\release.ps1 -SkipBuild                # solo empaqueta
+#   .\release.ps1 -Version "0.3.0"          # versión custom
+#   .\release.ps1 -SkipVsix                 # salta build VSIX
 #
-# Produce: falcato-<version>.zip en la raíz del proyecto.
-# No requiere npm, node, ni dependencias externas.
+# Produce: falcato-<version>.zip en release/
+# Incluye: binario, ejemplos, docs, skills, install.ps1 y VSIX (si hay npm)
 
 param(
     [switch]$SkipBuild,
+    [switch]$SkipVsix,
     [string]$Version = ""
 )
 
@@ -24,25 +26,23 @@ Write-Host ""
 
 # 1. Detectar versión
 if (-not $Version) {
-    # Intentar desde tag de git
     $tag = git -C $ProjectRoot describe --tags --exact-match 2>$null
     if ($tag) {
         $Version = $tag
-        Write-Host "[1/5] Versión detectada desde tag: $Version" -ForegroundColor Green
+        Write-Host "[1/6] Versión desde tag: $Version" -ForegroundColor Green
     } else {
-        # Usar versión del Cargo.toml
         $cargo = Get-Content "$ProjectRoot\Cargo.toml" | Select-String -Pattern '^version = "(.*)"' | ForEach-Object { $_.Matches.Groups[1].Value }
         $Version = "v$cargo"
-        Write-Host "[1/5] Versión desde Cargo.toml: $Version" -ForegroundColor Yellow
+        Write-Host "[1/6] Versión desde Cargo.toml: $Version" -ForegroundColor Yellow
     }
 } else {
     if (-not $Version.StartsWith("v")) { $Version = "v$Version" }
-    Write-Host "[1/5] Versión manual: $Version" -ForegroundColor Green
+    Write-Host "[1/6] Versión manual: $Version" -ForegroundColor Green
 }
 
-# 2. Build
+# 2. Build binario
 if (-not $SkipBuild) {
-    Write-Host "[2/5] Compilando falcato.exe (release)..." -ForegroundColor Green
+    Write-Host "[2/6] Compilando falcato.exe (release)..." -ForegroundColor Green
     Push-Location $ProjectRoot
     try {
         $result = cargo build --release 2>&1
@@ -56,20 +56,62 @@ if (-not $SkipBuild) {
     }
     Write-Host "      OK: target\release\falcato.exe" -ForegroundColor Green
 } else {
-    Write-Host "[2/5] Build saltado (-SkipBuild)" -ForegroundColor Yellow
+    Write-Host "[2/6] Build saltado (-SkipBuild)" -ForegroundColor Yellow
 }
 
-# 3. Preparar directorio de distribución
-Write-Host "[3/5] Preparando directorio de distribución..." -ForegroundColor Green
+# 3. Build VSIX (si hay npm y no se saltó)
+$vsixIncluido = $false
+if (-not $SkipVsix) {
+    Write-Host "[3/6] Extensión VS Code..." -ForegroundColor Green
+    $vsixDir = "$ProjectRoot\falcato-vscode"
+    if (Test-Path "$vsixDir\package.json") {
+        $npmPath = (Get-Command "npm" -ErrorAction SilentlyContinue).Source
+        if ($npmPath) {
+            Write-Host "      npm detectado: $npmPath" -ForegroundColor Green
+            Push-Location $vsixDir
+            try {
+                # Si no hay node_modules, instalarlos
+                if (-not (Test-Path "$vsixDir\node_modules")) {
+                    Write-Host "      Instalando dependencias npm..." -ForegroundColor Yellow
+                    npm ci 2>&1 | Out-Null
+                }
+                # Construir VSIX
+                Write-Host "      Construyendo VSIX..." -ForegroundColor Green
+                npx vsce package 2>&1 | Out-Null
+                $vsixFile = Get-Item "$vsixDir\*.vsix" | Select-Object -First 1
+                if ($vsixFile) {
+                    Write-Host "      VSIX: $($vsixFile.Name)" -ForegroundColor Green
+                    $vsixIncluido = $true
+                } else {
+                    Write-Host "      AVISO: No se generó .vsix (posible error de vsce)" -ForegroundColor Yellow
+                }
+            } catch {
+                Write-Host "      AVISO: Error construyendo VSIX: $_" -ForegroundColor Yellow
+            } finally {
+                Pop-Location
+            }
+        } else {
+            Write-Host "      ⚠ npm no encontrado. VSIX no se incluirá." -ForegroundColor Yellow
+            Write-Host "        Para generar el VSIX manualmente:" -ForegroundColor Yellow
+            Write-Host "        cd falcato-vscode && npm install && npx vsce package" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "      ⚠ Directorio 'falcato-vscode/' no encontrado" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "[3/6] VSIX saltado (-SkipVsix)" -ForegroundColor Yellow
+}
 
-# Limpiar directorios previos
+# 4. Preparar directorio de distribución
+Write-Host "[4/6] Preparando directorio de distribución..." -ForegroundColor Green
+
 Remove-Item -Path $DistDir -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path "$DistDir\bin" | Out-Null
 New-Item -ItemType Directory -Force -Path "$DistDir\ejemplos" | Out-Null
 New-Item -ItemType Directory -Force -Path "$DistDir\skills" | Out-Null
 New-Item -ItemType Directory -Force -Path "$DistDir\agents" | Out-Null
 
-# Copiar binario
+# Binario
 if (Test-Path "$ProjectRoot\target\release\falcato.exe") {
     Copy-Item "$ProjectRoot\target\release\falcato.exe" "$DistDir\bin\"
 } else {
@@ -77,16 +119,34 @@ if (Test-Path "$ProjectRoot\target\release\falcato.exe") {
     exit 1
 }
 
-# Copiar ejemplos
+# VSIX (si se generó)
+if ($vsixIncluido) {
+    $vsixFile = Get-Item "$ProjectRoot\falcato-vscode\*.vsix" | Select-Object -First 1
+    if ($vsixFile) {
+        Copy-Item $vsixFile.FullName "$DistDir\bin\"
+        Write-Host "      VSIX incluido en bin/" -ForegroundColor Green
+    }
+}
+
+# Ejemplos
 Copy-Item "$ProjectRoot\ejemplos\*.fc" "$DistDir\ejemplos\"
 
-# Copiar docs esenciales
+# Docs
 foreach ($doc in @("README.md", "LICENSE", "INSTALL.md", "GUIA.md", "REFERENCIA.md", "ERRORES.md", "CHANGELOG.md")) {
     $path = "$ProjectRoot\$doc"
     if (Test-Path $path) { Copy-Item $path "$DistDir\" }
 }
+# Carpeta GUIA/
+if (Test-Path "$ProjectRoot\GUIA") {
+    Copy-Item "$ProjectRoot\GUIA" "$DistDir\GUIA" -Recurse
+}
+# Carpeta docs/
+if (Test-Path "$ProjectRoot\docs") {
+    New-Item -ItemType Directory -Force -Path "$DistDir\docs" | Out-Null
+    Copy-Item "$ProjectRoot\docs\*.md" "$DistDir\docs\"
+}
 
-# Copiar skills y agents
+# Skills y agents
 if (Test-Path "$ProjectRoot\skills") {
     Copy-Item "$ProjectRoot\skills\*" "$DistDir\skills\" -Recurse
 }
@@ -94,36 +154,45 @@ if (Test-Path "$ProjectRoot\agents") {
     Copy-Item "$ProjectRoot\agents\*" "$DistDir\agents\" -Recurse
 }
 
-# Copiar instalador
+# Instaladores
 if (Test-Path "$ProjectRoot\install.ps1") {
     Copy-Item "$ProjectRoot\install.ps1" "$DistDir\"
 }
-
-# Copiar bundle DLLs (para releases locales sin CRT static)
 if (Test-Path "$ProjectRoot\bundle_dlls.ps1") {
     Copy-Item "$ProjectRoot\bundle_dlls.ps1" "$DistDir\"
 }
 
 Write-Host "      Archivos copiados a $DistDir" -ForegroundColor Green
 
-# 4. Empaquetar ZIP
-Write-Host "[4/5] Empaquetando ZIP..." -ForegroundColor Green
+# 5. Empaquetar ZIP
+Write-Host "[5/6] Empaquetando ZIP..." -ForegroundColor Green
 $zipName = "falcato-$Version.zip"
 $zipPath = "$ReleaseDir\$zipName"
 Remove-Item -Path $zipPath -Force -ErrorAction SilentlyContinue
 Compress-Archive -Path "$DistDir\*" -DestinationPath $zipPath
 Write-Host "      ZIP creado: $zipPath" -ForegroundColor Green
 
-# 5. Limpiar
-Write-Host "[5/5] Limpiando temporales..." -ForegroundColor Green
+# 6. Limpiar
+Write-Host "[6/6] Limpiando temporales..." -ForegroundColor Green
 Remove-Item -Path $DistDir -Recurse -Force -ErrorAction SilentlyContinue
+# Limpiar VSIX temporal del directorio falcato-vscode
+if ($vsixIncluido) {
+    Remove-Item "$ProjectRoot\falcato-vscode\*.vsix" -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host ""
 Write-Host "=== Release listo: $zipName ===" -ForegroundColor Cyan
 Write-Host "Tamaño: $([math]::Round((Get-Item $zipPath).Length / 1MB, 2)) MB" -ForegroundColor Cyan
+Write-Host "Contenido:" -ForegroundColor Cyan
+if ($vsixIncluido) {
+    Write-Host "  ✅ falcato.exe + VSIX + ejemplos + docs + install.ps1" -ForegroundColor Cyan
+} else {
+    Write-Host "  ✅ falcato.exe + ejemplos + docs + install.ps1" -ForegroundColor Cyan
+    Write-Host "  ⚠ VSIX no incluido (npm no disponible)" -ForegroundColor Yellow
+}
 Write-Host ""
-Write-Host "Para publicar en GitHub:"
-Write-Host "  1. Crea un tag:    git tag v0.2.0"
-Write-Host "  2. Push el tag:    git push origin v0.2.0"
-Write-Host "  3. O sube manual:  Sube $zipName a GitHub Releases"
+Write-Host "Para publicar en GitHub:" -ForegroundColor Gray
+Write-Host "  1. Crea un tag:    git tag v0.2.0" -ForegroundColor Gray
+Write-Host "  2. Push el tag:    git push origin v0.2.0" -ForegroundColor Gray
+Write-Host "  3. O sube manual:  Sube $zipName a GitHub Releases" -ForegroundColor Gray
 Write-Host ""
