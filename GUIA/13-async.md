@@ -1,6 +1,6 @@
 # 13 — Async: varias cosas a la vez
 
-← [12: Metodos](12-metodos.md) | [Indice](INDICE.md) | [Siguiente: Glosario →](14-glosario.md)
+← [12: Metodos](12-metodos.md) | [Indice](../GUIA.md) | [Siguiente: Ownership →](14-ownership.md)
 
 ---
 
@@ -66,4 +66,4 @@ con_executor(4) {          // 4 hilos en pool
 
 ---
 
-← [12: Metodos](12-metodos.md) | [Indice](INDICE.md) | [Siguiente: Glosario →](14-glosario.md)
+← [12: Metodos](12-metodos.md) | [Indice](../GUIA.md) | [Siguiente: Ownership →](14-ownership.md)

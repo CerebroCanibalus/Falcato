@@ -1,6 +1,6 @@
 # 08 — Texto y Palabra
 
-← [07: Funciones](07-funciones.md) | [Indice](INDICE.md) | [Siguiente: Colecciones →](09-colecciones.md)
+← [07: Funciones](07-funciones.md) | [Indice](../GUIA.md) | [Siguiente: Colecciones →](09-colecciones.md)
 
 ---
 
@@ -60,4 +60,4 @@ c.liberar();
 
 ---
 
-← [07: Funciones](07-funciones.md) | [Indice](INDICE.md) | [Siguiente: Colecciones →](09-colecciones.md)
+← [07: Funciones](07-funciones.md) | [Indice](../GUIA.md) | [Siguiente: Colecciones →](09-colecciones.md)

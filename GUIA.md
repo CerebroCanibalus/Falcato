@@ -9,22 +9,23 @@ Bienvenido. Cada capítulo son 5-10 minutos y empieza desde lo más básico.
 
 ## Capítulos
 
-| # | Capítulo | Que aprenderás |
+| # | Capítulo | Qué aprenderás |
 |---|----------|----------------|
-| 01 | [Que es Falcato?](GUIA/01-que-es-falcato.md) | La filosofía del lenguaje |
+| 01 | [¿Qué es Falcato?](GUIA/01-que-es-falcato.md) | La filosofía del lenguaje |
 | 02 | [Tu primer programa](GUIA/02-tu-primer-programa.md) | "Hola, mundo" |
-| 03 | [Variables](GUIA/03-variables.md) | `el`, `la`, `un` |
-| 04 | [Operaciones](GUIA/04-operaciones.md) | Aritmética, comparaciones |
-| 05 | [Decisiones](GUIA/05-decisiones.md) | `si`, `es`, `está` |
+| 03 | [Variables](GUIA/03-variables.md) | `el`, `la`, `un`, `los`, `las` |
+| 04 | [Operaciones](GUIA/04-operaciones.md) | Aritmética, comparaciones, bitwise |
+| 05 | [Decisiones](GUIA/05-decisiones.md) | `si`, `es`, `está`, `sino` |
 | 06 | [Bucles](GUIA/06-bucles.md) | `mientras`, `para` |
 | 07 | [Funciones](GUIA/07-funciones.md) | Tus propias herramientas |
-| 08 | [Texto](GUIA/08-texto.md) | Strings e interpolación |
+| 08 | [Texto](GUIA/08-texto.md) | Strings, interpolación, liberación |
 | 09 | [Colecciones](GUIA/09-colecciones.md) | Arrays y vectores |
-| 10 | [Datos compuestos](GUIA/10-datos.md) | Structs y enums |
-| 11 | [Errores](GUIA/11-errores.md) | Resultado y ? |
-| 12 | [Metodos](GUIA/12-metodos.md) | Sintaxis .nombre() |
-| 13 | [Async](GUIA/13-async.md) | Hilos y canales |
-| 14 | [Glosario](GUIA/14-glosario.md) | Terminos rapidos |
+| 10 | [Datos compuestos](GUIA/10-datos.md) | Structs, enums, pattern matching |
+| 11 | [Errores](GUIA/11-errores.md) | Resultado y `?` |
+| 12 | [Métodos](GUIA/12-metodos.md) | Sintaxis `.nombre()` y operadores |
+| 13 | [Async](GUIA/13-async.md) | Hilos, canales, TCP, thread pool |
+| 14 | [Ownership](GUIA/14-ownership.md) | Mover, copiar, prestar, regiones |
+| 15 | [Glosario](GUIA/15-glosario.md) | Términos rápidos |
 
 ## Otras guías
 

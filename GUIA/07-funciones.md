@@ -1,6 +1,6 @@
 # 07 — Funciones
 
-← [06: Bucles](06-bucles.md) | [Indice](INDICE.md) | [Siguiente: Texto y Palabra →](08-texto.md)
+← [06: Bucles](06-bucles.md) | [Indice](../GUIA.md) | [Siguiente: Texto y Palabra →](08-texto.md)
 
 ---
 
@@ -68,4 +68,4 @@ función suma(a: Entero32, b: Entero32) -> Entero32 {
 
 ---
 
-← [06: Bucles](06-bucles.md) | [Indice](INDICE.md) | [Siguiente: Texto y Palabra →](08-texto.md)
+← [06: Bucles](06-bucles.md) | [Indice](../GUIA.md) | [Siguiente: Texto y Palabra →](08-texto.md)

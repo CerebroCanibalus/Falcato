@@ -1,6 +1,6 @@
 # 01 — ¿Qué es Falcato?
 
-← [Índice](INDICE.md) | [Siguiente: Tu primer programa →](02-tu-primer-programa.md)
+← [Índice](../GUIA.md) | [Siguiente: Tu primer programa →](02-tu-primer-programa.md)
 
 ---
 
@@ -57,4 +57,4 @@ Falcato usa **Cranelift**, un compilador que traduce código a máquina en **mil
 
 ---
 
-← [Índice](INDICE.md) | [Siguiente: Tu primer programa →](02-tu-primer-programa.md)
+← [Índice](../GUIA.md) | [Siguiente: Tu primer programa →](02-tu-primer-programa.md)

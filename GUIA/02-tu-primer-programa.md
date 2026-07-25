@@ -1,6 +1,6 @@
 # 02 — Tu primer programa
 
-← [01: Que es Falcato?](01-que-es-falcato.md) | [Indice](INDICE.md) | [Siguiente: Variables →](03-variables.md)
+← [01: Que es Falcato?](01-que-es-falcato.md) | [Indice](../GUIA.md) | [Siguiente: Variables →](03-variables.md)
 
 ---
 
@@ -41,4 +41,4 @@ Verás:
 
 ---
 
-← [01: Que es Falcato?](01-que-es-falcato.md) | [Indice](INDICE.md) | [Siguiente: Variables →](03-variables.md)
+← [01: Que es Falcato?](01-que-es-falcato.md) | [Indice](../GUIA.md) | [Siguiente: Variables →](03-variables.md)

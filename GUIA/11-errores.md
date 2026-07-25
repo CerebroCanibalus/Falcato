@@ -1,6 +1,6 @@
 # 11 — Errores: cuando las cosas salen mal
 
-← [10: Datos compuestos](10-datos.md) | [Indice](INDICE.md) | [Siguiente: Métodos →](12-metodos.md)
+← [10: Datos compuestos](10-datos.md) | [Indice](../GUIA.md) | [Siguiente: Métodos →](12-metodos.md)
 
 ---
 
@@ -59,4 +59,4 @@ Para la lista completa: [ERRORES.md](../ERRORES.md)
 
 ---
 
-← [10: Datos compuestos](10-datos.md) | [Indice](INDICE.md) | [Siguiente: Métodos →](12-metodos.md)
+← [10: Datos compuestos](10-datos.md) | [Indice](../GUIA.md) | [Siguiente: Métodos →](12-metodos.md)

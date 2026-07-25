@@ -1,6 +1,6 @@
 # 12 — Métodos: sintaxis .nombre()
 
-← [11: Errores](11-errores.md) | [Indice](INDICE.md) | [Siguiente: Async →](13-async.md)
+← [11: Errores](11-errores.md) | [Indice](../GUIA.md) | [Siguiente: Async →](13-async.md)
 
 ---
 
@@ -72,4 +72,4 @@ función principal() -> Entero32 {
 
 ---
 
-← [11: Errores](11-errores.md) | [Indice](INDICE.md) | [Siguiente: Async →](13-async.md)
+← [11: Errores](11-errores.md) | [Indice](../GUIA.md) | [Siguiente: Async →](13-async.md)

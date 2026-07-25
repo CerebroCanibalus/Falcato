@@ -1,3 +1,3 @@
 ---
-> El índice de la guía está en [GUIA.md](../GUIA.md) (raíz del repositorio).
+> El índice principal está en [../GUIA.md](../GUIA.md).
 ---
