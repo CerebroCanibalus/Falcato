@@ -13,7 +13,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
@@ -28,26 +28,27 @@ jobs:
       env:
         RUSTFLAGS: -C target-feature=+crt-static
 
+    - name: Create release directory structure
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path release\bin
+        New-Item -ItemType Directory -Force -Path release\ejemplos
+        New-Item -ItemType Directory -Force -Path release\skills
+        New-Item -ItemType Directory -Force -Path release\agents
+
     - name: Build VS Code extension (VSIX)
       shell: pwsh
       run: |
         cd falcato-vscode
         npm ci
-        npx vsce package --no-dependencies
+        npx vsce package
         $vsix = Get-Item *.vsix | Select-Object -First 1
         Write-Host "VSIX built: $($vsix.Name)"
         Copy-Item $vsix.FullName ..\release\bin\
 
-    - name: Prepare release artifacts
+    - name: Copy artifacts to release directory
       shell: pwsh
       run: |
-        # Create directory structure
-        New-Item -ItemType Directory -Force -Path release\bin
-        New-Item -ItemType Directory -Force -Path release\ejemplos
-        New-Item -ItemType Directory -Force -Path release\docs
-        New-Item -ItemType Directory -Force -Path release\skills
-        New-Item -ItemType Directory -Force -Path release\agents
-
         # Copy binary
         Copy-Item target\release\falcato.exe release\bin\
 
