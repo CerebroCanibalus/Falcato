@@ -1,0 +1,57 @@
+{
+    "name": "falcato-language",
+    "displayName": "Falcato Language",
+    "description": "Soporte para el lenguaje Falcato - sistema de tipos iberohablante sobre Cranelift",
+    "version": "0.2.0",
+    "publisher": "CerebroCanibalus",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/CerebroCanibalus/falcato"
+    },
+    "engines": {
+        "vscode": "^1.90.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "activationEvents": [
+        "onLanguage:falcato"
+    ],
+    "main": "./client.js",
+    "contributes": {
+        "languages": [
+            {
+                "id": "falcato",
+                "aliases": ["Falcato", "falcato"],
+                "extensions": [".fc"],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "falcato",
+                "scopeName": "source.falcato",
+                "path": "./syntaxes/falcato.tmLanguage.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "falcato.version",
+                "title": "Falcato: Mostrar versión"
+            }
+        ]
+    },
+    "scripts": {
+        "postinstall": "node ./node_modules/vscode/bin/install",
+        "package": "vsce package"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
+    },
+    "devDependencies": {
+        "vscode": "^1.90.2",
+        "@types/vscode": "^1.90.0",
+        "vsce": "^2.15.0"
+    }
+}

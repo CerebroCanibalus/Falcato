@@ -1,0 +1,173 @@
+{
+    "name": "Falcato",
+    "scopeName": "source.falcato",
+    "fileTypes": [".fc"],
+    "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#keywords" },
+        { "include": "#types" },
+        { "include": "#function-decl" },
+        { "include": "#articles" },
+        { "include": "#operators" },
+        { "include": "#identifiers" }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "begin": "/\\*",
+                    "end": "\\*/",
+                    "name": "comment.block.falcato"
+                },
+                {
+                    "match": "//.*$",
+                    "name": "comment.line.double-slash.falcato"
+                }
+            ]
+        },
+        "strings": {
+            "patterns": [
+                {
+                    "begin": "\"",
+                    "end": "\"",
+                    "name": "string.quoted.double.falcato",
+                    "patterns": [
+                        {
+                            "match": "\\\\[nrt0\"\\\\]",
+                            "name": "constant.character.escape.falcato"
+                        },
+                        {
+                            "match": "\\\\x[0-9a-fA-F]{2}",
+                            "name": "constant.character.escape.falcato"
+                        },
+                        {
+                            "match": "\\{[^}]*\\}",
+                            "name": "variable.parameter.falcato"
+                        }
+                    ]
+                }
+            ]
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "match": "\\b[0-9]+\\.[0-9]+([eE][+-]?[0-9]+)?\\b",
+                    "name": "constant.numeric.float.falcato"
+                },
+                {
+                    "match": "\\b[0-9]+\\b",
+                    "name": "constant.numeric.integer.falcato"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "match": "\\b(si|sino|mientras|para|retornar|coincidir|como|es|está|fuese|y|o|no|en)\\b",
+                    "name": "keyword.control.falcato"
+                },
+                {
+                    "match": "\\b(función|funcion|fn|fut|futuro|rasgo|implementar|estructural|enumeración|módulo|usar|prueba|afirmar|bits)\\b",
+                    "name": "keyword.declaration.falcato"
+                },
+                {
+                    "match": "\\b(mover|copiar|prestar|esperar|lanzar|bloquear|dormir|cancelar|con_executor|región|seleccionar)\\b",
+                    "name": "keyword.other.falcato"
+                },
+                {
+                    "match": "\\b(inseguro|puro|muta|lee|verificado|estricto)\\b",
+                    "name": "keyword.modifier.falcato"
+                },
+                {
+                    "match": "\\b(verdadero|falso)\\b",
+                    "name": "constant.language.boolean.falcato"
+                }
+            ]
+        },
+        "types": {
+            "patterns": [
+                {
+                    "match": "\\b(Entero8|Entero16|Entero32|Entero64|Natural8|Natural16|Natural32|Natural64|Flotante32|Flotante64|Booleano|Caracter|Palabra|Texto|Vacio)\\b",
+                    "name": "storage.type.primitive.falcato"
+                },
+                {
+                    "match": "\\b(Resultado|Vector|Diccionario|Conjunto)\\b",
+                    "name": "storage.type.generic.falcato"
+                },
+                {
+                    "match": "\\b(cualquier)\\b",
+                    "name": "storage.type.any.falcato"
+                }
+            ]
+        },
+        "function-decl": {
+            "patterns": [
+                {
+                    "match": "\\b(función|funcion|fn|fut|futuro)\\s+([a-zA-Z_áéíóúñ][a-zA-Z0-9_áéíóúñ]*)",
+                    "captures": {
+                        "1": { "name": "keyword.declaration.falcato" },
+                        "2": { "name": "entity.name.function.falcato" }
+                    }
+                }
+            ]
+        },
+        "articles": {
+            "patterns": [
+                {
+                    "match": "\\b(el|la|un|los|las)\\b",
+                    "name": "keyword.article.falcato"
+                }
+            ]
+        },
+        "operators": {
+            "patterns": [
+                {
+                    "match": "->|=>|::|\\.\\.|=|\\.\\.\\.",
+                    "name": "keyword.operator.directive.falcato"
+                },
+                {
+                    "match": "\\?",
+                    "name": "keyword.operator.propagation.falcato"
+                },
+                {
+                    "match": "&|\\|\\||&&|\\|",
+                    "name": "keyword.operator.logical.falcato"
+                },
+                {
+                    "match": "==|!=|<=|>=|<|>",
+                    "name": "keyword.operator.comparison.falcato"
+                },
+                {
+                    "match": "<<|>>|>>>|~",
+                    "name": "keyword.operator.bitwise.falcato"
+                },
+                {
+                    "match": "[+\\-*/%]",
+                    "name": "keyword.operator.arithmetic.falcato"
+                },
+                {
+                    "match": "&(?![&|])",
+                    "name": "keyword.operator.reference.falcato"
+                },
+                {
+                    "match": "\\*",
+                    "name": "keyword.operator.dereference.falcato"
+                }
+            ]
+        },
+        "identifiers": {
+            "patterns": [
+                {
+                    "match": "\\b([A-ZÁÉÍÓÚÑ][a-zA-Z0-9_áéíóúñ]*)\\b",
+                    "name": "support.class.falcato"
+                },
+                {
+                    "match": "\\b([a-z_áéíóúñ][a-zA-Z0-9_áéíóúñ]*)\\b",
+                    "name": "variable.other.falcato"
+                }
+            ]
+        }
+    }
+}
