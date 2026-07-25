@@ -380,7 +380,7 @@ Backend Cranelift generando binarios nativos x86_64.
 | CRT estático | ⏳ Pendiente — funciona en GitHub Actions (VS completo), no en VS Insiders local |
 | GitHub repo | ✅ `CerebroCanibalus/falcato` (privado) |
 | GitHub Actions CI | ❌ Pendiente |
-| VS Code Extension | ❌ Pendiente |
+| VS Code Extension | ✅ Archivos creados (faltan npm install + test) |
 | Falso positivo Defender | ⚠️ Riesgo alto sin firma digital |
 | Instalador script | ❌ Pendiente |
 
