@@ -687,9 +687,10 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 | 4 | `bundle_dlls.ps1` — bundle VCRUNTIME140 para releases locales | 1 | ✅ |
 | 5 | `.github/workflows/ci.yml` — build + test en push | 1 | ✅ |
 | 6 | `.github/workflows/release.yml` — build + ZIP en tag | 1 | ✅ |
-| 7 | `+crt-static` en CI | 1 línea | ⏳ Pendiente |
+| 7 | `install.ps1` — instalador interactivo con menú de componentes | 1 | ✅ |
+| 8 | `+crt-static` en CI | 1 línea | ⏳ Pendiente |
 
-**Resultado:** Repo listo con CI. El release build de GitHub Actions produce .exe sin DLLs externas.
+**Resultado:** Repo listo con CI + instalador interactivo (`install.ps1`). El release build de GitHub Actions produce .exe sin DLLs externas.
 
 ### Fase R2 — VS Code Extension ✅ COMPLETADA
 | # | Tarea | Archivos | Estado |
@@ -757,7 +758,7 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 - [x] Diccionario + Conjunto implementados
 - [ ] Proyecto ejemplo >500 líneas funcionando
 - [ ] Falso positivo reportado a Microsoft Security Center
-- [ ] Script `install.ps1` probado en máquina limpia
+- [x] Script `install.ps1` probado en máquina limpia
 
 ## Curva de aprendizaje (diseño vinculante)
 
