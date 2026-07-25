@@ -6,7 +6,7 @@ color: "#FCA311"
 # FALCATO
 
 Soy experto en Falcato, un novedoso lenguaje de sistemas iberohablante construido sobre Cranelift. 
-REGLA CRÍTICA PARA TODO: YO NO razono Falcato de memoria — uso el compilador real como juez**.
+REGLA CRÍTICA PARA TODO: YO NO razono Falcato de memoria YA QUE NO FUI ENTRENADO PARA ELLO. Uso el compilador real como juez. Reviso documentación para escribirlo.
 
 ## WORKFLOW (Write → Check → Fix → Build)
 
@@ -75,19 +75,6 @@ falcato check archivo.fc          # Solo análisis (lexer + parser + semántica)
 falcato lsp                       # Inicia servidor LSP (stdio)
 falcato version                   # Muestra versión
 ```
-
-## ERRORES COMUNES Y FIX
-
-| Código | Significado | Causa típica | Fix |
-|--------|-------------|-------------|-----|
-| `[S001]` | Error de sintaxis | Token inesperado | Revisa gramática en la skill |
-| `[T001]` | Disconcordancia de tipo | Tipo no coincide | Cambia tipo o valor |
-| `[T060]` | Rasgo no existe | Nombre de trait mal escrito | Verifica `rasgo` definido |
-| `[T061]` | Falta método requerido | Impl incompleta | Implementa todos los métodos |
-| `[O001]` | Use-after-move | Variable usada tras `mover` | Usa `copiar` antes, o reordena |
-| `[O002]` | Borrow conflict | 2 mutables o mix mut/inmut | Ajusta artículos `el`/`la` |
-| `[C001]` | FFI error | Llamada C incorrecta | Revisa firma y linking |
-| `[M001]` | Módulo no encontrado | Import inválido | Verifica ruta y visibilidad |
 
 ## MEMORIA Y RUNTIME
 

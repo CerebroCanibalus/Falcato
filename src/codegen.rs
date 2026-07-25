@@ -6938,6 +6938,39 @@ impl Codegen {
                     Tipo::Nombre(enum_nombre.clone())
                 }
             }
+            Expresion::Llamada(llamada) => {
+                // Inferir tipo según la función conocida
+                // Bug fix: sin esto, toda llamada caía al default Entero32
+                match llamada.funcion.as_str() {
+                    "como_entero64" | "texto_a_puntero" | "direccion_de" | "dir_de" => {
+                        Tipo::Entero64
+                    }
+                    "texto_nuevo" | "texto_desde" | "texto_concatenar" | "texto_subtexto" => {
+                        Tipo::Texto
+                    }
+                    "archivo_leer" => Tipo::Texto,
+                    "vector_nuevo" => Tipo::Vector(Box::new(Tipo::Entero32)),
+                    "canal_nuevo" => Tipo::Entero64,
+                    "tcp_vincular" | "tcp_aceptar" => Tipo::Entero64,
+                    "abs" | "max" | "min" | "texto_longitud" | "texto_comparar" | "archivo_escribir" => {
+                        Tipo::Entero32
+                    }
+                    "tamano_de" => Tipo::Entero32,
+                    "raiz" | "potencia" => Tipo::Flotante64,
+                    "archivo_existe" | "texto_obtener_byte" => Tipo::Entero8,
+                    _ => {
+                        // Para built-ins no listados o funciones de usuario, verificar
+                        // si es inseguro FFI (no tenemos firma en codegen, asumir Entero64
+                        // por ser el tipo de puntero más común en FFI)
+                        if llamada.funcion.starts_with("fc_") {
+                            Tipo::Entero64  // funciones del trampolín C retornan punteros
+                        } else {
+                            Tipo::Entero32  // default: Entero32 por compatibilidad
+                        }
+                    }
+                }
+            }
+            Expresion::DireccionDe(_, _) => Tipo::Entero64,
             _ => Tipo::Entero32,
         }
     }

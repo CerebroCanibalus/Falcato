@@ -158,6 +158,56 @@ impl Entorno {
             self.padre.as_ref().and_then(|p| p.buscar_const(nombre))
         })
     }
+
+    /// Recolecta todos los nombres de variables en este scope y padres
+    pub fn todos_nombres(&self) -> Vec<String> {
+        let mut nombres: Vec<String> = self.variables.keys().cloned().collect();
+        if let Some(ref padre) = self.padre {
+            nombres.extend(padre.todos_nombres());
+        }
+        nombres
+    }
+}
+
+/// Distancia de Levenshtein simple para sugerencias de nombres
+fn distancia_levenshtein(a: &str, b: &str) -> usize {
+    let la = a.len();
+    let lb = b.len();
+    if la == 0 { return lb; }
+    if lb == 0 { return la; }
+    
+    let mut fila: Vec<usize> = (0..=lb).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut prev = fila[0];
+        fila[0] = i + 1;
+        for (j, cb) in b.chars().enumerate() {
+            let temp = fila[j + 1];
+            fila[j + 1] = if ca == cb {
+                prev
+            } else {
+                1 + prev.min(fila[j]).min(fila[j + 1])
+            };
+            prev = temp;
+        }
+    }
+    fila[lb]
+}
+
+/// Encuentra el nombre más similar en una lista
+fn sugerir_nombre(escrito: &str, disponibles: &[String]) -> Option<String> {
+    let mut mejor: Option<(usize, &String)> = None;
+    for nombre in disponibles {
+        let d = distancia_levenshtein(escrito, nombre);
+        let limite = if escrito.len() <= 3 { 1 } else { (escrito.len() + 2) / 3 };
+        if d <= limite {
+            match mejor {
+                Some((d_mejor, _)) if d < d_mejor => mejor = Some((d, nombre)),
+                None => mejor = Some((d, nombre)),
+                _ => {}
+            }
+        }
+    }
+    mejor.map(|(_, n)| n.clone())
 }
 
 /// Información de un struct declarado
@@ -1687,11 +1737,16 @@ No puedes modificar algo que no es 'tuyo'.",
                 } else if let Some(_te) = self.enums.get(&nombre_cualificado) {
                     Tipo::Nombre(nombre_cualificado)
                 } else {
+                    let sugerencia = sugerir_nombre(&path[0], &self.entorno.todos_nombres());
+                    let msg = match sugerencia {
+                        Some(ref s) => format!("'{}' no tiene concordancia en este contexto. ¿Quizás quisiste decir '{}'?", path[0], s),
+                        None => format!("'{}' no tiene concordancia en este contexto", path[0]),
+                    };
                     self.reportar_error(
                         CategoriaError::Tipo,
                         VARIABLE_NO_DECLARADA,
                         span,
-                        format!("'{}' no tiene concordancia en este contexto", nombre_cualificado),
+                        msg,
                         Some(format!("¿Olvidaste declarar '{}' como módulo?", path[0]))
                     );
                     Tipo::Entero32
@@ -1737,11 +1792,16 @@ No puedes modificar algo que no es 'tuyo'.",
                         if let Some((tipo, _)) = self.entorno.buscar_const(nombre) {
                             tipo.clone()
                         } else {
+                            let sugerencia = sugerir_nombre(nombre, &self.entorno.todos_nombres());
+                            let msg = match sugerencia {
+                                Some(ref s) => format!("'{}' no tiene concordancia en este contexto. ¿Quizás quisiste decir '{}'?", nombre, s),
+                                None => format!("'{}' no tiene concordancia en este contexto. ¿Olvidaste declararlo con artículo?", nombre),
+                            };
                             self.reportar_error(
                                 CategoriaError::Tipo,
                                 VARIABLE_NO_DECLARADA,
                                 span,
-                                format!("'{}' no tiene concordancia en este contexto. ¿Olvidaste declararlo con artículo?", nombre),
+                                msg,
                                 Some("Los identificadores deben declararse con artículo: el, la, un, los, las".to_string())
                             );
                             Tipo::Entero32 // Tipo por defecto para continuar análisis
@@ -1763,6 +1823,21 @@ No puedes modificar algo que no es 'tuyo'.",
                             op, tipo_izq, tipo_der),
                         Some("Ambos operandos deben ser del mismo tipo".to_string())
                     );
+                }
+
+                // Verificar división por cero en constantes
+                if matches!(op, OperadorBinario::Division | OperadorBinario::Modulo) {
+                    if let Expresion::Literal(Literal::Entero(valor, _)) = der.as_ref() {
+                        if *valor == 0 {
+                            self.reportar_error(
+                                CategoriaError::Tipo,
+                                99, // T099: división por cero
+                                span,
+                                format!("División por cero en operación '{:?}'", op),
+                                Some("El divisor no puede ser cero. Usa un valor distinto de cero.".to_string())
+                            );
+                        }
+                    }
                 }
 
                 self.tipo_operacion(*op, &tipo_izq, span)
@@ -1911,6 +1986,7 @@ No puedes modificar algo que no es 'tuyo'.",
                         } else {
                             // Verificar tipos de cada argumento
                             // imprimir/imprimir_linea/decir son polimórficos (aceptan cualquier tipo)
+                            // pero aún así debemos inferir tipos para detectar variables no declaradas
                             let es_polimorfica = llamada.funcion == "imprimir" || llamada.funcion == "imprimir_linea" || llamada.funcion == "decir";
                             if !es_polimorfica {
                                 for (i, (arg, (nombre_param, tipo_param))) in 
@@ -1926,6 +2002,12 @@ No puedes modificar algo que no es 'tuyo'.",
                                             Some(format!("Cambia el argumento a tipo '{:?}'", tipo_param))
                                         );
                                     }
+                                }
+                            } else {
+                                // Aún para funciones polimórficas, inferir tipos de argumentos
+                                // para detectar variables no declaradas
+                                for arg in &llamada.argumentos {
+                                    self.inferir_tipo(arg);
                                 }
                             }
                         }

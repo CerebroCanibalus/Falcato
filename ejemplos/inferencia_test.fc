@@ -1,0 +1,18 @@
+// Test: inferencia de tipo para como_entero64
+// Antes del fix: el x = como_entero64(0) infería Entero32 -> Cranelift crash
+// Después del fix: debe inferir Entero64 y compilar OK
+
+inseguro funcion puts(el mensaje: Palabra);
+
+funcion principal() -> Entero32 {
+    el x = como_entero64(42);
+    
+    // Verificar que podemos comparar con Entero64 sin error
+    si x == como_entero64(42) {
+        puts("OK: x es 42 (Entero64)");
+    } sino {
+        puts("ERROR: x no es 42");
+    }
+    
+    retornar 0;
+}
