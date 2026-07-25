@@ -119,8 +119,8 @@ fn main() {
             }
         }
         Comandos::Lsp => {
-            println!("[Falcato LSP] Iniciando servidor...");
-            println!("[Falcato LSP] Usando stdio para comunicación");
+            eprintln!("[Falcato LSP] Iniciando servidor...");
+            eprintln!("[Falcato LSP] Usando stdio para comunicación");
             let runtime = tokio::runtime::Runtime::new()
                 .expect("No se pudo crear runtime de Tokio");
             runtime.block_on(async {

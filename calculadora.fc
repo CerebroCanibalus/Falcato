@@ -1,0 +1,142 @@
+// Calculadora Falcato — Demo de funciones, enumeraciones, coincidir y Resultado
+//
+// Para compilar: falcato build calculadora.fc -o calculadora.exe
+// Para ejecutar: .\calculadora.exe
+
+// Enumeracion con las operaciones disponibles
+enumeracion Operacion {
+    Suma,
+    Resta,
+    Multiplicacion,
+    Division,
+    Desconocida,
+}
+
+// Funcion que ejecuta una operacion sobre dos enteros usando pattern matching
+// Retorna Resultado para manejar division entre cero
+funcion ejecutar(op: Operacion, a: Entero32, b: Entero32) -> Resultado<Entero32, Entero32> {
+    coincidir op {
+        Operacion.Suma => {
+            Resultado.Exito(a + b)
+        }
+        Operacion.Resta => {
+            Resultado.Exito(a - b)
+        }
+        Operacion.Multiplicacion => {
+            Resultado.Exito(a * b)
+        }
+        Operacion.Division => {
+            si b es 0 {
+                Resultado.Error(-1)
+            } sino {
+                Resultado.Exito(a / b)
+            }
+        }
+        Operacion.Desconocida => {
+            Resultado.Error(-2)
+        }
+    }
+}
+
+// Convierte un entero a operacion (simula seleccion de menu)
+funcion entero_a_opcion(valor: Entero32) -> Operacion {
+    coincidir valor {
+        1 => Operacion.Suma,
+        2 => Operacion.Resta,
+        3 => Operacion.Multiplicacion,
+        4 => Operacion.Division,
+        _ => Operacion.Desconocida,
+    }
+}
+
+funcion nombre_operacion(op: Operacion) -> Texto {
+    coincidir op {
+        Operacion.Suma => Texto.desde("Suma"),
+        Operacion.Resta => Texto.desde("Resta"),
+        Operacion.Multiplicacion => Texto.desde("Multiplicacion"),
+        Operacion.Division => Texto.desde("Division"),
+        Operacion.Desconocida => Texto.desde("Desconocida"),
+    }
+}
+
+funcion mostrar_resultado(a: Entero32, b: Entero32, op: Operacion, res: Resultado<Entero32, Entero32>) {
+    coincidir res {
+        Resultado.Exito como valor => {
+            el nombre: Texto = nombre_operacion(op);
+            imprimir_linea("Resultado de {a} + {b}: ");
+            imprimir(valor);
+            imprimir_linea("");
+            nombre.liberar();
+        }
+        Resultado.Error como codigo => {
+            coincidir codigo {
+                -1 => { imprimir_linea("Error: Division entre cero"); }
+                -2 => { imprimir_linea("Error: Operacion desconocida"); }
+                _ => {
+                    imprimir_linea("Error desconocido: ");
+                    imprimir(codigo);
+                    imprimir_linea("");
+                }
+            }
+        }
+    }
+}
+
+funcion principal() -> Entero32 {
+    imprimir_linea("=== CALCULADORA FALCATO (DEMO) ===");
+    imprimir_linea("Probando las 4 operaciones basicas con Resultado y coincidir");
+    imprimir_linea("");
+    
+    // Valores de prueba
+    el a: Entero32 = 42;
+    el b: Entero32 = 6;
+    el c: Entero32 = 0;  // para probar division entre cero
+    
+    // Probar cada operacion con a y b
+    el ops: [Operacion; 4] = [
+        Operacion.Suma,
+        Operacion.Resta,
+        Operacion.Multiplicacion,
+        Operacion.Division,
+    ];
+    
+    imprimir_linea("--- Operaciones con 42 y 6 ---");
+    imprimir_linea("");
+    
+    para i en 0..4 {
+        el op: Operacion = ops[i];
+        el resultado: Resultado<Entero32, Entero32> = ejecutar(op, a, b);
+        mostrar_resultado(a, b, op, resultado);
+        imprimir_linea("");
+    }
+    
+    // Probar division entre cero
+    imprimir_linea("--- Division entre cero (prueba de error) ---");
+    imprimir_linea("");
+    el res_div_cero: Resultado<Entero32, Entero32> = ejecutar(Operacion.Division, a, c);
+    mostrar_resultado(a, c, Operacion.Division, res_div_cero);
+    imprimir_linea("");
+    
+    // Probar operacion desconocida
+    imprimir_linea("--- Operacion desconocida (prueba de error) ---");
+    imprimir_linea("");
+    el res_desconocida: Resultado<Entero32, Entero32> = ejecutar(Operacion.Desconocida, a, b);
+    mostrar_resultado(a, b, Operacion.Desconocida, res_desconocida);
+    imprimir_linea("");
+    
+    // Probar conversion de entero a operacion
+    imprimir_linea("--- Conversion de entero a operacion ---");
+    imprimir_linea("");
+    
+    para i en 1..6 {
+        el op: Operacion = entero_a_opcion(i);
+        el nombre: Texto = nombre_operacion(op);
+        imprimir_linea("Opcion {i}: {nombre}");
+        nombre.liberar();
+    }
+    
+    imprimir_linea("");
+    imprimir_linea("=== FIN ===");
+    
+    retornar 0;
+}
