@@ -30,6 +30,11 @@ deps/
 # Plugins/Config local
 .opencode/
 
+# VS Code Extension
+falcato-vscode/node_modules/
+falcato-vscode/*.vsix
+falcato-vscode/package-lock.json
+
 # Temp / test output
 tmp_*
 test_out.txt
