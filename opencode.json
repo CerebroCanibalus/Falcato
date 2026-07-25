@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "lsp": {
+    "falcato": {
+      "command": ["D:\\Falcato\\target\\release\\falcato.exe", "lsp"],
+      "extensions": [".fc"],
+      "env": {
+        "RUST_LOG": "error",
+        "RUST_BACKTRACE": "0"
+      },
+      "initialization": {
+        "diagnostics": true,
+        "completion": true,
+        "hover": true,
+        "signatureHelp": true,
+        "documentSymbol": true,
+        "codeAction": true
+      }
+    }
+  },
+  "rules": {
+    "files": [
+      "D:/Falcato/AGENTS.md"
+    ]
+  }
+}
