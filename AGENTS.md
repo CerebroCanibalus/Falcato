@@ -303,6 +303,16 @@ src/
 - Error `[T061]` si falta método requerido
 - Base para bounds reales (`que Comparable` como trait lookup)
 
+### ✅ Método syntax generalizada + Operadores compuestos (Fase 15F)
+- `MetodoBitwise` → `Metodo` generalizado: `t.agregar()`, `t.tam()`, `t.liberar()`, `v.agregar()`, etc.
+- Tabla de dispatch por tipo: Texto, Vector, Enteros (bitwise)
+- `+` para Texto: `a + b` → `texto_concatenar(a, b)`
+- `[]` para Texto: `t[0]` → `texto_obtener_byte(t, 0)`, `t[0..5]` → `texto_subtexto(t, 0, 5)`
+- `[]` para Vector: `v[0]` → `vector_obtener(v, 0)`
+- Aliases: `devolver`/`retornar`, `emparejar`/`coincidir`, `decir`/`imprimir_linea`, `texto_tam`/`vector_tam`
+- Bypass polimórfico para `decir` en semántica
+- Removido `t.desde()` de tabla de métodos (sin sentido semántico)
+
 ### ✅ Bitwise + I/O + Interpolación (Fase 14A)
 - Operadores bitwise type-safe: `& | ^ << >> ~ >>>`
 - Precedencia C estándar: `|| < && < | < ^ < & < == < < < << < + < *`
@@ -369,6 +379,17 @@ condicionales, bucles, ownership básico, **arrays**, **structs**, **enums**,
 y servidor LSP completo.
 Backend Cranelift generando binarios nativos x86_64.
 
+y **método syntax generalizada** (`.agregar()`, `.tam()`, `.liberar()` en Texto/Vector),
+**operadores compuestos** (`a + b` concatena Texto, `t[0]`/`t[0..5]` indexa Texto, `v[0]` indexa Vector),
+**aliases** (`devolver`/`emparejar`/`decir`/`texto_tam`/`vector_tam`),
+**i18n completa de "array" → "arreglo"** en docs y errores de compilador,
+y servidor LSP completo.
+Backend Cranelift generando binarios nativos x86_64.
+
+**Documentación completa de usuario:** GUIA.md (hub) + 15 capítulos en GUIA/ (03-15),
+INSTALL.md, REFERENCIA.md (built-ins), ERRORES.md (códigos de error),
+más skill `falcato-language` para LLMs en OpenCode.
+
 **40/40 tests pasan. 50+ ejemplos funcionando. Auditoría completa: 0 crashes.**
 
 ### Estado de distribución (v0.1.0 — pre-release)
@@ -379,7 +400,7 @@ Backend Cranelift generando binarios nativos x86_64.
 | Dependencias DLL | ⚠️ Requiere `VCRUNTIME140.dll` (local: bundle, CI: static) |
 | CRT estático | ⏳ Pendiente — funciona en GitHub Actions (VS completo), no en VS Insiders local |
 | GitHub repo | ✅ `CerebroCanibalus/falcato` (privado) |
-| GitHub Actions CI | ❌ Pendiente |
+| GitHub Actions CI | ✅ build + test en push |
 | VS Code Extension | ✅ VSIX instalable, Falcato Dorado theme |
 | Falso positivo Defender | ⚠️ Riesgo alto sin firma digital |
 | Instalador script | ❌ Pendiente |
@@ -666,18 +687,19 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 
 **Resultado:** Syntax highlighting + LSP + tema único "Falcato Dorado". Instalar vía VSIX.
 
-### Fase R3 — Documentación completa + Skills para IA
-| # | Tarea | Archivos | Esfuerzo |
-|---|-------|----------|----------|
-| 1 | `INSTALL.md` — cómo instalar Falcato en 3 pasos | 1 | 30 min |
-| 2 | `QUICKSTART.md` — tutorial rápido (hola mundo → archivo → colecciones) | 1 | 1h |
-| 3 | `REFERENCIA.md` — catálogo completo de built-ins | 1 | 2h |
-| 4 | `ERRORES.md` — cada código [T###] explicado con causa y fix | 1 | 3h |
-| 5 | Skill `falcato-language` (OpenCode) — gramática compacta + tipos + ownership + patrones | 1 | 1h |
-| 6 | `AGENTS.md` genérico — workflow check→fix→build para cualquier LLM | 1 | 30 min |
-| 7 | Carpeta `falcato-skill/` con ejemplos de referencia anotados | varios | 1h |
+### Fase R3 — Documentación completa + Skills para IA ✅ COMPLETADA
+| # | Tarea | Archivos | Estado |
+|---|-------|----------|--------|
+| 1 | `INSTALL.md` — cómo instalar Falcato en 3 pasos | 1 | ✅ |
+| 2 | `QUICKSTART.md` — tutorial rápido | 1 | ⏳ (cubierto por GUIA/02, pendiente archivo separado) |
+| 3 | `REFERENCIA.md` — catálogo completo de built-ins | 1 | ✅ |
+| 4 | `ERRORES.md` — cada código [T###] explicado con causa y fix | 1 | ✅ |
+| 5 | Skill `falcato-language` (OpenCode) + reference/builtins.md | 2 | ✅ |
+| 6 | `AGENTS.md` como referencia de diseño del proyecto | 1 | ✅ |
+| 7 | Carpeta `GUIA/` con 15 capítulos + diagramas + ejemplos reales | 17 | ✅ |
+| 8 | i18n completa: "array" → "arreglo" en docs y errores del compilador | 7 | ✅ |
 
-**Resultado:** Un nuevo programador o cualquier LLM puede aprender y escribir Falcato productivamente sin haberlo visto antes.
+**Resultado:** Documentación completa de usuario (GUIA.md hub + 15 capítulos), referencia (REFERENCIA.md + ERRORES.md), skill para IA (falcato-language con reference/builtins.md), e i18n de términos.
 
 ### Fase R4 — Colecciones (Diccionario + Conjunto)
 | # | Tarea | Archivos | Líneas |
@@ -710,8 +732,9 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 - [x] GitHub Actions CI (build + test)
 - [ ] GitHub Actions Release (tag → ZIP) — probar con tag
 - [x] VS Code Extension (syntax + LSP + theme Falcato Dorado)
-- [ ] Documentación básica (INSTALL + QUICKSTART)
-- [ ] Skill `falcato-language` para LLMs
+- [x] Documentación básica (INSTALL + REFERENCIA + ERRORES)
+- [x] GUIA completa (15 capítulos, ownership, arreglos, funciones, errores)
+- [x] Skill `falcato-language` para LLMs (con reference/builtins.md)
 - [ ] AGENTS.md genérico para cualquier LLM
 - [ ] Diccionario + Conjunto implementados
 - [ ] Proyecto ejemplo >500 líneas funcionando
