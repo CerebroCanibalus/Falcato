@@ -1206,6 +1206,51 @@ impl Codegen {
                 // Fallback a bitwise
                 self.compilar_metodo_bitwise(receptor, nombre, args, builder, variables)
             }
+            Tipo::Diccionario(_, _) => {
+                let builtin = match nombre {
+                    "insertar" => Some("diccionario_insertar"),
+                    "obtener" => Some("diccionario_obtener"),
+                    "existe" => Some("diccionario_existe"),
+                    "eliminar" => Some("diccionario_eliminar"),
+                    "tam" => Some("diccionario_longitud"),
+                    "liberar" => Some("diccionario_liberar"),
+                    _ => None,
+                };
+                if let Some(func) = builtin {
+                    let mut argumentos = vec![receptor.clone()];
+                    argumentos.extend(args.iter().cloned());
+                    let llamada = Llamada {
+                        funcion: func.to_string(),
+                        tipo_args: vec![],
+                        argumentos,
+                        span: receptor.span().clone(),
+                    };
+                    return self.compilar_llamada(&llamada, builder, variables);
+                }
+                self.compilar_metodo_bitwise(receptor, nombre, args, builder, variables)
+            }
+            Tipo::Conjunto(_) => {
+                let builtin = match nombre {
+                    "insertar" => Some("conjunto_insertar"),
+                    "contiene" => Some("conjunto_contiene"),
+                    "eliminar" => Some("conjunto_eliminar"),
+                    "tam" => Some("conjunto_longitud"),
+                    "liberar" => Some("conjunto_liberar"),
+                    _ => None,
+                };
+                if let Some(func) = builtin {
+                    let mut argumentos = vec![receptor.clone()];
+                    argumentos.extend(args.iter().cloned());
+                    let llamada = Llamada {
+                        funcion: func.to_string(),
+                        tipo_args: vec![],
+                        argumentos,
+                        span: receptor.span().clone(),
+                    };
+                    return self.compilar_llamada(&llamada, builder, variables);
+                }
+                self.compilar_metodo_bitwise(receptor, nombre, args, builder, variables)
+            }
             _ => {
                 // Bitwise methods u otros
                 self.compilar_metodo_bitwise(receptor, nombre, args, builder, variables)
@@ -3683,6 +3728,10 @@ impl Codegen {
             "abs" | "max" | "min" | "raiz" | "potencia" |
             "vector_nuevo" | "vector_agregar" | "vector_obtener" | "vector_longitud" | "vector_tam" | "vector_liberar" |
             "dormir" |
+            "diccionario_nuevo" | "diccionario_insertar" | "diccionario_obtener" |
+            "diccionario_existe" | "diccionario_eliminar" | "diccionario_longitud" | "diccionario_liberar" |
+            "conjunto_nuevo" | "conjunto_insertar" | "conjunto_contiene" |
+            "conjunto_eliminar" | "conjunto_longitud" | "conjunto_liberar" |
             "tcp_vincular" | "tcp_aceptar" | "tcp_leer" | "tcp_escribir" | "tcp_cerrar" |
             "canal_nuevo" | "canal_enviar" | "canal_recibir" | "canal_cerrar" | "canal_intentar" |
             "cancelar"
@@ -3734,6 +3783,19 @@ impl Codegen {
             "canal_cerrar" => self.builtin_canal_cerrar(builder, variables, &llamada.argumentos),
             "cancelar" => self.builtin_cancelar(builder, variables),
             "canal_intentar" => self.builtin_canal_intentar(builder, variables, &llamada.argumentos),
+            "diccionario_nuevo" => self.builtin_diccionario_nuevo(builder, &llamada.tipo_args),
+            "diccionario_insertar" => self.builtin_diccionario_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_obtener" => self.builtin_diccionario_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_existe" => self.builtin_diccionario_existe(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_eliminar" => self.builtin_diccionario_eliminar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_longitud" => self.builtin_diccionario_longitud(builder, variables, &llamada.argumentos),
+            "diccionario_liberar" => self.builtin_diccionario_liberar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "conjunto_nuevo" => self.builtin_conjunto_nuevo(builder, &llamada.tipo_args),
+            "conjunto_insertar" => self.builtin_conjunto_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "conjunto_contiene" => self.builtin_conjunto_contiene(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "conjunto_eliminar" => self.builtin_conjunto_eliminar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "conjunto_longitud" => self.builtin_conjunto_longitud(builder, variables, &llamada.argumentos),
+            "conjunto_liberar" => self.builtin_conjunto_liberar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             _ => {
                 self.errores.agregar(ErrorCompilador::nuevo(
                     CategoriaError::Interno,
@@ -5678,6 +5740,438 @@ impl Codegen {
         Ok(builder.ins().iconst(types::I32, 0))
     }
 
+    // ============================================================
+    // Diccionario<K, V> — implementación como array de pares (MVP)
+    // Cada bucket: hash(4) + occupied(1) + padding(3) + key(K) + value(V)
+    // ============================================================
+
+    fn diccionario_bucket_stride(&self, tipo_k: &Tipo, tipo_v: &Tipo) -> u32 {
+        let key_size = self.tamano_tipo(tipo_k);
+        let val_size = self.tamano_tipo(tipo_v);
+        let raw = 8 + key_size + val_size;
+        ((raw + 7) / 8) * 8
+    }
+
+    fn diccionario_guardar_valor(
+        &self,
+        builder: &mut FunctionBuilder,
+        addr: cranelift_codegen::ir::Value,
+        val: cranelift_codegen::ir::Value,
+        tipo: &Tipo,
+        flags: cranelift_codegen::ir::MemFlags,
+    ) {
+        let tam = self.tamano_tipo(tipo);
+        match tam {
+            1 => { let v = builder.ins().ireduce(types::I8, val); builder.ins().store(flags, v, addr, 0); }
+            4 => { let v = match builder.func.dfg.value_type(val) { types::I64 => builder.ins().ireduce(types::I32, val), _ => val }; builder.ins().store(flags, v, addr, 0); }
+            8 => { let v = match builder.func.dfg.value_type(val) { types::I32 => builder.ins().uextend(types::I64, val), _ => val }; builder.ins().store(flags, v, addr, 0); }
+            _ => {
+                for off in (0..tam).step_by(8) {
+                    let fv = builder.ins().load(types::I64, flags, val, off as i32);
+                    builder.ins().store(flags, fv, addr, off as i32);
+                }
+            }
+        }
+    }
+
+    fn diccionario_cargar_valor(
+        &self,
+        builder: &mut FunctionBuilder,
+        addr: cranelift_codegen::ir::Value,
+        tipo: &Tipo,
+        flags: cranelift_codegen::ir::MemFlags,
+    ) -> cranelift_codegen::ir::Value {
+        let tam = self.tamano_tipo(tipo);
+        match tam {
+            1 => {
+                let loaded = builder.ins().load(types::I8, flags, addr, 0);
+                builder.ins().uextend(types::I32, loaded)
+            }
+            4 => builder.ins().load(types::I32, flags, addr, 0),
+            8 => builder.ins().load(types::I64, flags, addr, 0),
+            _ => builder.ins().load(types::I64, flags, addr, 0),
+        }
+    }
+
+    fn compilar_hash(
+        &self,
+        tipo: &Tipo,
+        builder: &mut FunctionBuilder,
+        val: cranelift_codegen::ir::Value,
+    ) -> cranelift_codegen::ir::Value {
+        match tipo {
+            Tipo::Entero32 => {
+                let prime = builder.ins().iconst(types::I32, 0x45D9F3B);
+                builder.ins().imul(val, prime)
+            }
+            Tipo::Palabra | Tipo::Entero64 => {
+                let lo = builder.ins().ireduce(types::I32, val);
+                let shift_amt = builder.ins().iconst(types::I64, 32);
+                let hi_shifted = builder.ins().ushr(val, shift_amt);
+                let hi = builder.ins().ireduce(types::I32, hi_shifted);
+                let mixed = builder.ins().bxor(lo, hi);
+                let prime = builder.ins().iconst(types::I32, 0x45D9F3B);
+                builder.ins().imul(mixed, prime)
+            }
+            _ => {
+                if builder.func.dfg.value_type(val) == types::I64 {
+                    builder.ins().ireduce(types::I32, val)
+                } else { val }
+            }
+        }
+    }
+
+    fn compilar_comparar_claves(
+        &self,
+        tipo: &Tipo,
+        builder: &mut FunctionBuilder,
+        a: cranelift_codegen::ir::Value,
+        b: cranelift_codegen::ir::Value,
+    ) -> cranelift_codegen::ir::Value {
+        let cc = cranelift_codegen::ir::condcodes::IntCC::Equal;
+        builder.ins().icmp(cc, a, b)
+    }
+
+    /// Retorna I32: bucket index si existe, -1 si no
+    fn compilar_buscar_en_diccionario(
+        &self,
+        builder: &mut FunctionBuilder,
+        buckets_ptr: cranelift_codegen::ir::Value,
+        cap: cranelift_codegen::ir::Value,
+        tipo_k: &Tipo,
+        key_val: cranelift_codegen::ir::Value,
+        stride: u32,
+    ) -> cranelift_codegen::ir::Value {
+        let flags = cranelift_codegen::ir::MemFlags::new();
+        let zero_i64 = builder.ins().iconst(types::I64, 0);
+        let one_i64 = builder.ins().iconst(types::I64, 1);
+        let neg_one = builder.ins().iconst(types::I32, -1);
+        let stride_val = builder.ins().iconst(types::I64, stride as i64);
+        let four_i64 = builder.ins().iconst(types::I64, 4);
+        let eight_i64 = builder.ins().iconst(types::I64, 8);
+
+        let header_block = builder.create_block();
+        builder.append_block_param(header_block, types::I64);
+        let body_block = builder.create_block();
+        let found_block = builder.create_block();
+        let exit_block = builder.create_block();
+        let merge_block = builder.create_block();
+        builder.append_block_param(merge_block, types::I32);
+
+        builder.ins().jump(header_block, &[zero_i64]);
+
+        // Loop header: compare i < cap
+        builder.switch_to_block(header_block);
+        let i = builder.block_params(header_block)[0];
+        let done = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, i, cap);
+        builder.ins().brif(done, exit_block, &[], body_block, &[]);
+
+        // Body: check if bucket is occupied and key matches
+        builder.switch_to_block(body_block);
+        let offset = builder.ins().imul(i, stride_val);
+        let bucket_addr = builder.ins().iadd(buckets_ptr, offset);
+        let occupied_addr = builder.ins().iadd(bucket_addr, four_i64);
+        let occupied_i8 = builder.ins().load(types::I8, flags, occupied_addr, 0);
+        let occupied_i32 = builder.ins().uextend(types::I32, occupied_i8);
+        let uno = builder.ins().iconst(types::I32, 1);
+        let is_occupied = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::Equal, occupied_i32, uno);
+        
+        let check_block = builder.create_block();
+        let advance_block = builder.create_block();
+        builder.ins().brif(is_occupied, check_block, &[], advance_block, &[]);
+        builder.seal_block(check_block);
+        
+        // Occupied: check key match
+        builder.switch_to_block(check_block);
+        let key_addr = builder.ins().iadd(bucket_addr, eight_i64);
+        let stored_key = self.diccionario_cargar_valor(builder, key_addr, tipo_k, flags);
+        let keys_match = self.compilar_comparar_claves(tipo_k, builder, stored_key, key_val);
+        builder.ins().brif(keys_match, found_block, &[], advance_block, &[]);
+        builder.seal_block(advance_block);
+
+        // Advance: i++
+        builder.switch_to_block(advance_block);
+        let next_i = builder.ins().iadd(i, one_i64);
+        builder.ins().jump(header_block, &[next_i]);
+
+        // Seal header after back-edge
+        builder.seal_block(header_block);
+
+        // Found
+        builder.seal_block(found_block);
+        builder.switch_to_block(found_block);
+        let found_idx = builder.ins().ireduce(types::I32, i);
+        builder.ins().jump(merge_block, &[found_idx]);
+
+        // Exit (not found)
+        builder.seal_block(exit_block);
+        builder.switch_to_block(exit_block);
+        builder.ins().jump(merge_block, &[neg_one]);
+
+        builder.seal_block(merge_block);
+        builder.switch_to_block(merge_block);
+        builder.block_params(merge_block)[0]
+    }
+
+    fn builtin_diccionario_nuevo(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        Ok(self.descriptor_nuevo(builder))
+    }
+
+    fn builtin_diccionario_insertar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let tipo_k = &tipo_args[0];
+        let tipo_v = &tipo_args[1];
+        let dict_ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let key_val = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let val_val = self.compilar_expresion(&argumentos[2], builder, variables)?;
+        let flags = cranelift_codegen::ir::MemFlags::new();
+        let stride = self.diccionario_bucket_stride(tipo_k, tipo_v);
+        let buckets_ptr = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
+        let cap = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_CAP);
+
+        let existing_idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, stride);
+        
+        let found_block = builder.create_block();
+        let not_found_block = builder.create_block();
+        let merge_block = builder.create_block();
+        builder.append_block_param(merge_block, types::I64);
+        let neg_one = builder.ins().iconst(types::I32, -1);
+        let cmp = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::NotEqual, existing_idx, neg_one);
+        builder.ins().brif(cmp, found_block, &[], not_found_block, &[]);
+        builder.seal_block(found_block);
+        builder.seal_block(not_found_block);
+
+        // Found: overwrite value at existing_idx
+        builder.switch_to_block(found_block);
+        let stride_i64 = builder.ins().iconst(types::I64, stride as i64);
+        let idx_i64 = builder.ins().uextend(types::I64, existing_idx);
+        let offset_bytes = builder.ins().imul(idx_i64, stride_i64);
+        let bucket_addr = builder.ins().iadd(buckets_ptr, offset_bytes);
+        let val_offset_amt = (8 + self.tamano_tipo(tipo_k)) as i64;
+        let val_offset_val = builder.ins().iconst(types::I64, val_offset_amt);
+        let val_addr = builder.ins().iadd(bucket_addr, val_offset_val);
+        self.diccionario_guardar_valor(builder, val_addr, val_val, tipo_v, flags);
+        builder.ins().jump(merge_block, &[dict_ptr]);
+
+        // Not found: insert into first empty slot (at len position)
+        builder.switch_to_block(not_found_block);
+        let len = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_LEN);
+        let len_offset = builder.ins().imul(len, stride_i64);
+        let empty_addr = builder.ins().iadd(buckets_ptr, len_offset);
+        let hash_val = self.compilar_hash(tipo_k, builder, key_val);
+        builder.ins().store(flags, hash_val, empty_addr, 0);
+        let uno_i8 = builder.ins().iconst(types::I8, 1);
+        builder.ins().store(flags, uno_i8, empty_addr, 4);
+        let key_offset = builder.ins().iconst(types::I64, 8);
+        let key_addr = builder.ins().iadd(empty_addr, key_offset);
+        self.diccionario_guardar_valor(builder, key_addr, key_val, tipo_k, flags);
+        let val_addr2 = builder.ins().iadd(empty_addr, val_offset_val);
+        self.diccionario_guardar_valor(builder, val_addr2, val_val, tipo_v, flags);
+        let one_i64 = builder.ins().iconst(types::I64, 1);
+        let real_new_len = builder.ins().iadd(len, one_i64);
+        builder.ins().store(flags, real_new_len, dict_ptr, Self::OFFSET_LEN);
+        builder.ins().jump(merge_block, &[dict_ptr]);
+
+        builder.seal_block(merge_block);
+        builder.switch_to_block(merge_block);
+        Ok(builder.block_params(merge_block)[0])
+    }
+
+    fn builtin_diccionario_obtener(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let tipo_k = &tipo_args[0];
+        let tipo_v = &tipo_args[1];
+        let dict_ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let key_val = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let flags = cranelift_codegen::ir::MemFlags::new();
+        let stride = self.diccionario_bucket_stride(tipo_k, tipo_v);
+        let buckets_ptr = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
+        let cap = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_CAP);
+
+        let idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, stride);
+        let stride_i64 = builder.ins().iconst(types::I64, stride as i64);
+        let idx_i64 = builder.ins().uextend(types::I64, idx);
+        let offset_bytes = builder.ins().imul(idx_i64, stride_i64);
+        let bucket_addr = builder.ins().iadd(buckets_ptr, offset_bytes);
+        let val_offset_amt = (8 + self.tamano_tipo(tipo_k)) as i64;
+        let val_offset_val = builder.ins().iconst(types::I64, val_offset_amt);
+        let val_addr = builder.ins().iadd(bucket_addr, val_offset_val);
+        Ok(self.diccionario_cargar_valor(builder, val_addr, tipo_v, flags))
+    }
+
+    fn builtin_diccionario_existe(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let tipo_k = &tipo_args[0];
+        let dict_ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let key_val = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let stride = self.diccionario_bucket_stride(tipo_k, &Tipo::Booleano);
+        let buckets_ptr = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
+        let cap = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_CAP);
+
+        let idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, stride);
+        let found = builder.ins().icmp_imm(cranelift_codegen::ir::condcodes::IntCC::SignedGreaterThanOrEqual, idx, 0);
+        let uno = builder.ins().iconst(types::I32, 1);
+        let cero = builder.ins().iconst(types::I32, 0);
+        Ok(builder.ins().select(found, uno, cero))
+    }
+
+    fn builtin_diccionario_eliminar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let tipo_k = &tipo_args[0];
+        let dict_ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let key_val = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let flags = cranelift_codegen::ir::MemFlags::new();
+        let stride = self.diccionario_bucket_stride(tipo_k, &Tipo::Booleano);
+        let buckets_ptr = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
+        let cap = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_CAP);
+
+        let idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, stride);
+        let found_block = builder.create_block();
+        let not_found_block = builder.create_block();
+        let merge_block = builder.create_block();
+        builder.append_block_param(merge_block, types::I32);
+        let neg_one = builder.ins().iconst(types::I32, -1);
+        let found = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::NotEqual, idx, neg_one);
+        builder.ins().brif(found, found_block, &[], not_found_block, &[]);
+        builder.seal_block(found_block);
+        builder.seal_block(not_found_block);
+
+        builder.switch_to_block(found_block);
+        let stride_i64 = builder.ins().iconst(types::I64, stride as i64);
+        let idx_i64 = builder.ins().uextend(types::I64, idx);
+        let offset_bytes = builder.ins().imul(idx_i64, stride_i64);
+        let bucket_addr = builder.ins().iadd(buckets_ptr, offset_bytes);
+        let zero_i8 = builder.ins().iconst(types::I8, 0);
+        builder.ins().store(flags, zero_i8, bucket_addr, 4);
+        let len = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_LEN);
+        let uno_i64 = builder.ins().iconst(types::I64, 1);
+        let new_len = builder.ins().isub(len, uno_i64);
+        builder.ins().store(flags, new_len, dict_ptr, Self::OFFSET_LEN);
+        let uno_ret = builder.ins().iconst(types::I32, 1);
+        builder.ins().jump(merge_block, &[uno_ret]);
+
+        builder.switch_to_block(not_found_block);
+        let cero_ret = builder.ins().iconst(types::I32, 0);
+        builder.ins().jump(merge_block, &[cero_ret]);
+
+        builder.seal_block(merge_block);
+        builder.switch_to_block(merge_block);
+        Ok(builder.block_params(merge_block)[0])
+    }
+
+    fn builtin_diccionario_longitud(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let dict_ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let len = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_LEN);
+        Ok(builder.ins().ireduce(types::I32, len))
+    }
+
+    fn builtin_diccionario_liberar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        _tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let dict_ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let data = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
+        self.llamar_free(builder, data);
+        self.llamar_free(builder, dict_ptr);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    // Conjunto<T> — wrapper de Diccionario<T, Booleano>
+    fn builtin_conjunto_nuevo(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        Ok(self.descriptor_nuevo(builder))
+    }
+
+    fn builtin_conjunto_insertar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let mut dict_args = vec![argumentos[0].clone(), argumentos[1].clone()];
+        dict_args.push(Expresion::Literal(crate::ast::Literal::Entero(1, crate::span::Span::vacio())));
+        let dict_tipos = vec![tipo_args[0].clone(), Tipo::Booleano];
+        self.builtin_diccionario_insertar(builder, variables, &dict_args, &dict_tipos)
+    }
+
+    fn builtin_conjunto_contiene(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let dict_tipos = vec![tipo_args[0].clone(), Tipo::Booleano];
+        self.builtin_diccionario_existe(builder, variables, argumentos, &dict_tipos)
+    }
+
+    fn builtin_conjunto_eliminar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let dict_tipos = vec![tipo_args[0].clone(), Tipo::Booleano];
+        self.builtin_diccionario_eliminar(builder, variables, argumentos, &dict_tipos)
+    }
+
+    fn builtin_conjunto_longitud(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        self.builtin_diccionario_longitud(builder, variables, argumentos)
+    }
+
+    fn builtin_conjunto_liberar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        tipo_args: &Vec<Tipo>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let dict_tipos = vec![tipo_args[0].clone(), Tipo::Booleano];
+        self.builtin_diccionario_liberar(builder, variables, argumentos, &dict_tipos)
+    }
+
     /// Compila una llamada a función genérica con monomorfización
     fn compilar_llamada_generica(
         &mut self,
@@ -6163,6 +6657,8 @@ impl Codegen {
                 Tipo::Array(t, n) => format!("Array_{}_{}", self.nombre_tipo_instancia(t), n),
                 Tipo::ArrayGenerico(t, n) => format!("Array_{}_{}", self.nombre_tipo_instancia(t), n),
                 Tipo::Vector(t) => format!("Vector_{}", self.nombre_tipo_instancia(t)),
+                Tipo::Diccionario(k, v) => format!("Diccionario_{}_{}", self.nombre_tipo_instancia(k), self.nombre_tipo_instancia(v)),
+                Tipo::Conjunto(t) => format!("Conjunto_{}", self.nombre_tipo_instancia(t)),
                 Tipo::Resultado(t, e) => format!("Resultado_{}_{}", self.nombre_tipo_instancia(t), self.nombre_tipo_instancia(e)),
                 Tipo::Puntero(t) => format!("Ptr_{}", self.nombre_tipo_instancia(t)),
                 Tipo::Referencia(t) => format!("Ref_{}", self.nombre_tipo_instancia(t)),
@@ -6266,23 +6762,25 @@ impl Codegen {
             Tipo::Flotante64 => types::F64,
             Tipo::Booleano => types::I8,
             Tipo::Caracter => types::I8,
-            Tipo::Palabra |
-            Tipo::Texto |
-            Tipo::Vector(_) |
-            Tipo::Resultado(_, _) |
-            Tipo::Puntero(_) |
-            Tipo::Referencia(_) |
-            Tipo::ReferenciaMut(_) |
-            Tipo::ReferenciaConLifetime(_, _) |
-            Tipo::ReferenciaMutConLifetime(_, _) |
-            Tipo::ReferenciaSelf(_) |
-            Tipo::ReferenciaMutSelf(_) |
-            Tipo::Array(_, _) |
-            Tipo::ArrayGenerico(_, _) => types::I64, // Puntero de 64 bits
-            Tipo::Vacio => types::I32,
-            Tipo::Nombre(_) => types::I32,
-            Tipo::Generico(_) => types::I32, // Se resuelve en monomorfización
-            Tipo::NombreGenerico(_, _) => types::I32, // Se resuelve en monomorfización
+            Tipo::Palabra => types::I64,
+            Tipo::Texto => types::I64, // Puntero
+            Tipo::Vacio => types::I8,
+            Tipo::Puntero(_) => types::I64,
+            Tipo::Referencia(_) => types::I64,
+            Tipo::ReferenciaMut(_) => types::I64,
+            Tipo::ReferenciaConLifetime(_, _) => types::I64,
+            Tipo::ReferenciaMutConLifetime(_, _) => types::I64,
+            Tipo::ReferenciaSelf(_) => types::I64,
+            Tipo::ReferenciaMutSelf(_) => types::I64,
+            Tipo::Array(_, _) => types::I64, // Puntero
+            Tipo::ArrayGenerico(_, _) => types::I64,
+            Tipo::Vector(_) => types::I64, // Puntero
+            Tipo::Diccionario(_, _) => types::I64, // Puntero
+            Tipo::Conjunto(_) => types::I64, // Puntero
+            Tipo::Resultado(_, _) => types::I64, // Puntero
+            Tipo::Generico(n) => panic!("No se puede compilar tipo genérico '{}' sin concretar", n),
+            Tipo::Nombre(n) => panic!("No se puede compilar tipo Nombre '{}' sin resolver (¿olvidaste importarlo?)", n),
+            Tipo::NombreGenerico(n, _) => panic!("Tipo NombreGenerico '{}' no se pudo resolver (¿olvidaste concretar genéricos?)", n),
         }
     }
 
@@ -6306,6 +6804,8 @@ impl Codegen {
             Tipo::Palabra |
             Tipo::Texto |
             Tipo::Vector(_) |
+            Tipo::Diccionario(_, _) |
+            Tipo::Conjunto(_) |
             Tipo::Resultado(_, _) |
             Tipo::Puntero(_) |
             Tipo::Referencia(_) |

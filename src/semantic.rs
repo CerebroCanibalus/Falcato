@@ -69,6 +69,23 @@ fn metodo_a_builtin(tipo: &Tipo, metodo: &str) -> Option<&'static str> {
             "comparar" => Some("texto_comparar"),
             _ => None,
         },
+        Tipo::Diccionario(_, _) => match metodo {
+            "insertar" => Some("diccionario_insertar"),
+            "obtener" => Some("diccionario_obtener"),
+            "existe" => Some("diccionario_existe"),
+            "eliminar" => Some("diccionario_eliminar"),
+            "tam" => Some("diccionario_longitud"),
+            "liberar" => Some("diccionario_liberar"),
+            _ => None,
+        },
+        Tipo::Conjunto(_) => match metodo {
+            "insertar" => Some("conjunto_insertar"),
+            "contiene" => Some("conjunto_contiene"),
+            "eliminar" => Some("conjunto_eliminar"),
+            "tam" => Some("conjunto_longitud"),
+            "liberar" => Some("conjunto_liberar"),
+            _ => None,
+        },
         Tipo::Vector(_) => match metodo {
             "agregar" => Some("vector_agregar"),
             "tam" => Some("vector_longitud"),
@@ -678,6 +695,168 @@ impl AnalizadorSemantico {
             parametros_genericos: vec![t_generico.clone()],
             parametros: vec![
                 ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // Diccionario<K, V>: hash map
+        let k_generico = ParametroGenerico {
+            nombre: "K".to_string(),
+            tipo: None,
+            bounds: vec![],
+            span: span_vacio.clone(),
+        };
+        let v_generico = ParametroGenerico {
+            nombre: "V".to_string(),
+            tipo: None,
+            bounds: vec![],
+            span: span_vacio.clone(),
+        };
+        let tipo_k = Tipo::Generico("K".to_string());
+        let tipo_v = Tipo::Generico("V".to_string());
+
+        self.funciones.insert("diccionario_nuevo".to_string(), FirmaFuncion {
+            nombre: "diccionario_nuevo".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![],
+            retorno: Some(Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("diccionario_insertar".to_string(), FirmaFuncion {
+            nombre: "diccionario_insertar".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![
+                ("diccionario".to_string(), Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+                ("clave".to_string(), tipo_k.clone()),
+                ("valor".to_string(), tipo_v.clone()),
+            ],
+            retorno: Some(Tipo::Entero64), // devuelve el puntero al diccionario para chaining
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("diccionario_obtener".to_string(), FirmaFuncion {
+            nombre: "diccionario_obtener".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![
+                ("diccionario".to_string(), Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+                ("clave".to_string(), tipo_k.clone()),
+            ],
+            retorno: Some(tipo_v.clone()), // WARNING: si no existe, devuelve basura — usar existe() primero
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("diccionario_existe".to_string(), FirmaFuncion {
+            nombre: "diccionario_existe".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![
+                ("diccionario".to_string(), Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+                ("clave".to_string(), tipo_k.clone()),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("diccionario_eliminar".to_string(), FirmaFuncion {
+            nombre: "diccionario_eliminar".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![
+                ("diccionario".to_string(), Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+                ("clave".to_string(), tipo_k.clone()),
+            ],
+            retorno: Some(Tipo::Booleano), // true si se eliminó
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("diccionario_longitud".to_string(), FirmaFuncion {
+            nombre: "diccionario_longitud".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![
+                ("diccionario".to_string(), Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+            ],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("diccionario_liberar".to_string(), FirmaFuncion {
+            nombre: "diccionario_liberar".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![
+                ("diccionario".to_string(), Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // Alias de tipo para Conjunto = Diccionario<T, Booleano>
+        let s_generico = ParametroGenerico {
+            nombre: "T".to_string(),
+            tipo: None,
+            bounds: vec![],
+            span: span_vacio.clone(),
+        };
+        let tipo_s = Tipo::Generico("T".to_string());
+        let bool_tipo = Tipo::Booleano;
+
+        self.funciones.insert("conjunto_nuevo".to_string(), FirmaFuncion {
+            nombre: "conjunto_nuevo".to_string(),
+            parametros_genericos: vec![s_generico.clone()],
+            parametros: vec![],
+            retorno: Some(Tipo::Conjunto(Box::new(tipo_s.clone()))),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("conjunto_insertar".to_string(), FirmaFuncion {
+            nombre: "conjunto_insertar".to_string(),
+            parametros_genericos: vec![s_generico.clone()],
+            parametros: vec![
+                ("conjunto".to_string(), Tipo::Conjunto(Box::new(tipo_s.clone()))),
+                ("valor".to_string(), tipo_s.clone()),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("conjunto_contiene".to_string(), FirmaFuncion {
+            nombre: "conjunto_contiene".to_string(),
+            parametros_genericos: vec![s_generico.clone()],
+            parametros: vec![
+                ("conjunto".to_string(), Tipo::Conjunto(Box::new(tipo_s.clone()))),
+                ("valor".to_string(), tipo_s.clone()),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("conjunto_eliminar".to_string(), FirmaFuncion {
+            nombre: "conjunto_eliminar".to_string(),
+            parametros_genericos: vec![s_generico.clone()],
+            parametros: vec![
+                ("conjunto".to_string(), Tipo::Conjunto(Box::new(tipo_s.clone()))),
+                ("valor".to_string(), tipo_s.clone()),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("conjunto_longitud".to_string(), FirmaFuncion {
+            nombre: "conjunto_longitud".to_string(),
+            parametros_genericos: vec![s_generico.clone()],
+            parametros: vec![
+                ("conjunto".to_string(), Tipo::Conjunto(Box::new(tipo_s.clone()))),
+            ],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("conjunto_liberar".to_string(), FirmaFuncion {
+            nombre: "conjunto_liberar".to_string(),
+            parametros_genericos: vec![s_generico.clone()],
+            parametros: vec![
+                ("conjunto".to_string(), Tipo::Conjunto(Box::new(tipo_s.clone()))),
             ],
             retorno: Some(vacio.clone()),
             span: span_vacio.clone(),

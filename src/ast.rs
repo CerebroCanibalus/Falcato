@@ -433,6 +433,8 @@ pub enum Tipo {
     ArrayGenerico(Box<Tipo>, String), // tipo, nombre del parámetro const genérico
     Vector(Box<Tipo>),        // vector dinámico heap-allocado
     Resultado(Box<Tipo>, Box<Tipo>), // Resultado<T, E> para manejo de errores
+    Diccionario(Box<Tipo>, Box<Tipo>), // Diccionario<K, V> — hash map
+    Conjunto(Box<Tipo>), // Conjunto<T> — hash set (wrapper de Diccionario<T, Booleano>)
     Generico(String), // parámetro de tipo genérico (T)
     Nombre(String),
     NombreGenerico(String, Vec<Tipo>), // Enum<Tipo1, Tipo2> → nombre instanciado
