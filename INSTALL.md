@@ -1,4 +1,4 @@
-# ⚙️ Falcato — Instalación
+![Falcato Title](assets/images/falcato_title.png)
 
 > **Nivel:** Principiante  
 > **Tiempo:** 5-10 minutos  

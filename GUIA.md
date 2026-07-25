@@ -1,5 +1,7 @@
 # Falcato — Guía de usuario
 
+![Falcato Title](assets/images/falcato_title.png)
+
 > Un lenguaje de sistemas en español, construido sobre Cranelift.
 > Rápido de compilar, fácil de entender, difícil de romper.
 

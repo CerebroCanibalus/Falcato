@@ -1,5 +1,7 @@
 # 01 — ¿Qué es Falcato?
 
+![Falcato Title](../../assets/images/falcato_title.png)
+
 ← [Índice](../GUIA.md) | [Siguiente: Tu primer programa →](02-tu-primer-programa.md)
 
 ---

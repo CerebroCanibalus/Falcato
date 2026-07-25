@@ -1,4 +1,4 @@
-# ⚔️ Falcato
+![Falcato Banner](assets/images/falcato_banner.png)
 
 **Lenguaje de sistemas iberohablante.** Forjado sobre Cranelift. Compila a binarios nativos x86_64.
 

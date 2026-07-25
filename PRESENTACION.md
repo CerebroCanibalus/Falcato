@@ -1,4 +1,4 @@
-# ⚔️ Falcato — Lenguaje de Sistemas Iberohablante
+![Falcato Title](assets/images/falcato_title.png)
 
 **Archivo de presentación unificado — Todo lo que necesitas saber.**
 
@@ -6,7 +6,7 @@
 
 ## ¿Qué es Falcato?
 
-Un **lenguaje de programación de bajo nivel** construido **desde cero sobre LLVM**,
+Un **lenguaje de programación de bajo nivel** construido **desde cero sobre Cranelift**,
 cuya sintaxis y sistema de tipos explotan las **dimensiones semánticas del español**
 que el inglés no tiene (género gramatical, tiempos verbales, ser/estar, subjuntivo,
 prefijos productivos, voz pasiva, compuestos aglutinantes).
@@ -288,7 +288,7 @@ Fase 5: Maduración (macros, auto-hospedaje, forja)
 | Lexer | `logos` (Rust) |
 | Parser | `chumsky` (Rust) |
 | AST/IR propio | Structs Rust con Span |
-| Backend | LLVM IR via `inkwell` |
+| Backend | Cranelift (propio) |
 | LSP | `tower-lsp` |
 | Testing | `insta` (snapshots) |
 | Target inicial | x86_64 Windows / Linux |
@@ -317,7 +317,7 @@ función principal(): Entero32 {
 | **EsJS** | JavaScript con keywords español | ❌ | ❌ (traducción) |
 | **Rustico** | Proc-macro Rust español | 🟡 (sobre Rust) | ❌ (traducción) |
 | **Qriollo** | Funcional, rioplatense, compila a C | 🟡 | 🟡 (joda, no formal) |
-| **Falcato** | **Compilador propio sobre LLVM** | ✅ | ✅ **Explota género, tiempos, ser/estar, prefijos...** |
+| **Falcato** | **Compilador propio sobre Cranelift** | ✅ | ✅ **Explota género, tiempos, ser/estar, prefijos...** |
 
 Falcato es **el único** que no traduce keywords, sino que **diseña el sistema
 de tipos y ejecución desde las propiedades del español**.

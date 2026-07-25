@@ -6001,8 +6001,9 @@ impl Codegen {
         let stride = self.diccionario_bucket_stride(tipo_k, tipo_v);
         let buckets_ptr = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
         let cap = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_CAP);
+        let hash_val = self.compilar_hash(tipo_k, builder, key_val);
 
-        let idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, stride);
+        let idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, hash_val, stride);
         let stride_i64 = builder.ins().iconst(types::I64, stride as i64);
         let idx_i64 = builder.ins().uextend(types::I64, idx);
         let offset_bytes = builder.ins().imul(idx_i64, stride_i64);
@@ -6026,8 +6027,9 @@ impl Codegen {
         let stride = self.diccionario_bucket_stride(tipo_k, &Tipo::Booleano);
         let buckets_ptr = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
         let cap = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_CAP);
+        let hash_val = self.compilar_hash(tipo_k, builder, key_val);
 
-        let idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, stride);
+        let idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, hash_val, stride);
         let found = builder.ins().icmp_imm(cranelift_codegen::ir::condcodes::IntCC::SignedGreaterThanOrEqual, idx, 0);
         let uno = builder.ins().iconst(types::I32, 1);
         let cero = builder.ins().iconst(types::I32, 0);
@@ -6048,8 +6050,9 @@ impl Codegen {
         let stride = self.diccionario_bucket_stride(tipo_k, &Tipo::Booleano);
         let buckets_ptr = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
         let cap = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_CAP);
+        let hash_val = self.compilar_hash(tipo_k, builder, key_val);
 
-        let idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, stride);
+        let idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, hash_val, stride);
         let found_block = builder.create_block();
         let not_found_block = builder.create_block();
         let merge_block = builder.create_block();
