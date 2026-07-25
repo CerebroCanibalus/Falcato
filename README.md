@@ -13,6 +13,33 @@
 
 ---
 
+## 🚀 Inicio rápido (3 pasos)
+
+### 1. Descargar
+Ve a [Releases](https://github.com/CerebroCanibalus/falcato/releases) y descarga `falcato-v0.2.0-x86_64-windows.zip` (o la versión más reciente).
+
+### 2. Instalar
+Extrae el ZIP y ejecuta `install.cmd`:
+```cmd
+falcato-v0.2.0-x86_64-windows.zip  →  Extraer aquí
+install.cmd
+```
+Esto instala `falcato.exe` en `%USERPROFILE%\.falcato\bin` y lo agrega al PATH.
+
+### 3. Probar
+Abre una **terminal nueva** y escribe:
+```cmd
+falcato version
+# → Falcato v0.2.0
+
+falcato run ejemplos\hola_mundo.fc
+# → ¡Hola, mundo!
+```
+
+> **¿Prefieres compilar desde fuente?** Ver [INSTALL.md](INSTALL.md#opción-2-compilar-desde-código-fuente)
+
+---
+
 ## ¿Qué es Falcato?
 
 Falcato es un **lenguaje de programación de sistemas** construido desde cero donde la gramática española no es azúcar sintáctico — **es el sistema de tipos y el modelo de ejecución**.
@@ -234,35 +261,38 @@ Falcato + Cranelift + WASM = toolchain nativa para código generado por IA. Comp
 
 ---
 
-## Quick start
+## 📦 Instalación alternativa: Compilar desde fuente
 
-### 1. Instalar
+Si quieres contribuir o necesitas la última versión:
+
+### Requisitos
+- [Rust](https://rustup.rs/) (stable)
+- [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) → "Desktop development with C++"
+
+### Compilar
 ```powershell
-# Desde D:\Falcato
+git clone https://github.com/CerebroCanibalus/falcato.git
+cd falcato
 cargo build --release
 # falcato.exe está en target/release/
 ```
 
-### 2. Escribir tu primer programa
-```falcato
-fn principal() -> Entero32 {
-    el nombre: Palabra = "mundo";
-    imprimir_linea("Hola, {nombre}!");
-    retornar 0;
-}
+### Probar
+```powershell
+.\target\release\falcato.exe version
 ```
 
-### 3. Compilar y ejecutar
-```powershell
-falcato run hola_mundo.fc
-# → Hola, mundo!
-```
+---
 
-### 4. Solo verificar (sin compilar)
-```powershell
-falcato check mi_programa.fc
-# → [OK] o errores con span + sugerencia
-```
+## 🎨 VS Code Extension
+
+Resaltado de sintaxis, LSP integrado y tema **"Falcato Dorado"**:
+
+1. Descarga el `.vsix` desde [Releases](https://github.com/CerebroCanibalus/falcato/releases)
+2. `Ctrl+Shift+P` → "Extensions: Install from VSIX..."
+3. Selecciona el archivo `.vsix`
+4. Abre un `.fc` → sintaxis + diagnósticos en tiempo real
+5. `Ctrl+K Ctrl+T` → busca "Falcato Dorado" para el tema
 
 ---
 

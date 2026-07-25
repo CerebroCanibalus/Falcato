@@ -11,7 +11,7 @@ use crate::backend::BackendFalcato;
 use crate::error::{Errores, ErrorCompilador, CategoriaError};
 use crate::span::Span;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Información de layout de un struct para codegen
 #[derive(Debug, Clone)]
@@ -59,7 +59,6 @@ pub struct Codegen {
     hilos_pendientes: Vec<HiloPendiente>, // Hilos (lanzar) por compilar después
     executor_pool_var: Option<String>, // Variable con pool ptr si estamos dentro de con_executor
     executor_worker_generado: bool, // __executor_worker ya fue generado
-    funciones_sret: HashSet<String>, // Funciones que usan sret (retorno de enum/struct por puntero oculto)
 }
 
 /// Info para compilar un closure diferidamente
@@ -118,7 +117,6 @@ impl Codegen {
             closures_pendientes: Vec::new(),
             hilos_pendientes: Vec::new(),
             executor_pool_var: None,
-            funciones_sret: HashSet::new(),
             executor_worker_generado: false,
         }.registrar_builtins_codegen())
     }
@@ -607,36 +605,19 @@ impl Codegen {
         );
     }
 
-    /// Determina si un tipo de retorno necesita sret (struct return por puntero oculto).
-    /// Enums y structs se retornan escribiendo en un buffer del caller.
-    fn necesita_sret(&self, tipo: &Tipo) -> bool {
-        matches!(tipo, Tipo::Resultado(_, _) | Tipo::Nombre(_))
-    }
-
     fn declarar_funcion(
         &mut self,
         func: &FuncionDecl,
     ) {
         let mut sig = Signature::new(self.call_conv_default());
 
-        // sret: si retorna enum/struct, el primer parámetro es un puntero oculto al buffer del caller
-        let usa_sret = func.retorno.as_ref().map_or(false, |r| self.necesita_sret(r));
-        if usa_sret {
-            sig.params.push(AbiParam::new(types::I64)); // puntero sret
-            self.funciones_sret.insert(func.nombre.clone());
-        }
-
-        // Tipo de retorno (para sret, retornamos el mismo puntero como convención Windows)
+        // Tipo de retorno
         if let Some(ref ret) = func.retorno {
-            if usa_sret {
-                sig.returns.push(AbiParam::new(types::I64)); // eco del puntero sret
-            } else {
-                let tipo = self.tipo_a_cranelift(ret);
-                sig.returns.push(AbiParam::new(tipo));
-            }
+            let tipo = self.tipo_a_cranelift(ret);
+            sig.returns.push(AbiParam::new(tipo));
         }
 
-        // Parámetros normales
+        // Parámetros
         for param in &func.parametros {
             let tipo = self.tipo_a_cranelift(&param.tipo);
             sig.params.push(AbiParam::new(tipo));
@@ -1369,14 +1350,8 @@ impl Codegen {
         let mut ctx = self.module.make_context();
         let mut func_ctx = FunctionBuilderContext::new();
 
-        let usa_sret = self.funciones_sret.contains(&func.nombre);
-
         let mut sig = Signature::new(self.call_conv_default());
-        // sret: primer parámetro oculto (puntero al buffer del caller)
-        if usa_sret {
-            sig.params.push(AbiParam::new(types::I64));
-            sig.returns.push(AbiParam::new(types::I64)); // eco del puntero
-        } else if let Some(ref ret) = func.retorno {
+        if let Some(ref ret) = func.retorno {
             sig.returns.push(AbiParam::new(self.tipo_a_cranelift(ret)));
         }
         for param in &func.parametros {
@@ -1387,10 +1362,6 @@ impl Codegen {
         let mut builder = FunctionBuilder::new(&mut ctx.func, &mut func_ctx);
         let entry_block = builder.create_block();
 
-        // sret: primer block param es el puntero oculto
-        if usa_sret {
-            builder.append_block_param(entry_block, types::I64);
-        }
         for param in &func.parametros {
             let tipo = self.tipo_a_cranelift(&param.tipo);
             builder.append_block_param(entry_block, tipo);
@@ -1401,25 +1372,8 @@ impl Codegen {
 
         let mut variables: HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)> = HashMap::new();
 
-        // Guardar puntero sret en variable especial "__sret"
-        let param_offset = if usa_sret {
-            let sret_val = builder.block_params(entry_block)[0];
-            let sret_slot = builder.create_sized_stack_slot(
-                cranelift_codegen::ir::StackSlotData::new(
-                    cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-                    8,
-                    0,
-                )
-            );
-            builder.ins().stack_store(sret_val, sret_slot, 0);
-            variables.insert("__sret".to_string(), (sret_slot, Tipo::Entero64, crate::ast::Articulo::La));
-            1 // los params normales empiezan en índice 1
-        } else {
-            0
-        };
-
         for (i, param) in func.parametros.iter().enumerate() {
-            let val = builder.block_params(entry_block)[i + param_offset];
+            let val = builder.block_params(entry_block)[i];
             let tamano = self.tamano_tipo(&param.tipo);
             let slot = builder.create_sized_stack_slot(
                 cranelift_codegen::ir::StackSlotData::new(
@@ -1678,9 +1632,7 @@ impl Codegen {
                         (slot, tamano)
                     }
                     Tipo::Resultado(_, _) => {
-                        // Resultado<T,E>: struct en stack (tag I32 + data I32 = 8 bytes)
-                        // compilar_expresion retorna un PUNTERO al struct (de ConstructorEnum o sret)
-                        // Copiamos los datos al slot de la variable para evitar doble indirección
+                        // Resultado como valor I64 empaquetado (tag en low 32, data en high 32)
                         let tamano = self.tamano_tipo(&tipo);
                         let slot = builder.create_sized_stack_slot(
                             cranelift_codegen::ir::StackSlotData::new(
@@ -1689,11 +1641,8 @@ impl Codegen {
                                 0,
                             )
                         );
-                        let src_ptr = self.compilar_expresion(&decl.valor, builder, variables)?;
-                        // Copiar 8 bytes (tag + data) desde src_ptr al slot de la variable
-                        let dst_ptr = builder.ins().stack_addr(types::I64, slot, 0);
-                        let datos = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_ptr, 0);
-                        builder.ins().store(cranelift_codegen::ir::MemFlags::new(), datos, dst_ptr, 0);
+                        let valor = self.compilar_expresion(&decl.valor, builder, variables)?;
+                        builder.ins().stack_store(valor, slot, 0);
                         (slot, tamano)
                     }
                     _ => {
@@ -1829,19 +1778,18 @@ impl Codegen {
             }
             Sentencia::Retornar(expr, span) => {
                 if let Some(expr) = expr {
-                    // Si la función usa sret, copiar el struct al buffer del caller
-                    if let Some((sret_slot, _, _)) = variables.get("__sret") {
-                        let sret_ptr = builder.ins().stack_load(types::I64, *sret_slot, 0);
-                        let val = self.compilar_expresion(expr, builder, variables)?;
-                        // val es un puntero al struct local — copiar 8 bytes al buffer del caller
-                        let datos = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), val, 0);
-                        builder.ins().store(cranelift_codegen::ir::MemFlags::new(), datos, sret_ptr, 0);
-                        // Retornar el puntero sret (convención Windows x64)
-                        builder.ins().return_(&[sret_ptr]);
-                    } else {
-                        let val = self.compilar_expresion(expr, builder, variables)?;
-                        builder.ins().return_(&[val]);
+                    let val = self.compilar_expresion(expr, builder, variables)?;
+                    // Si la expresión accede a una variable de tipo Resultado o enum pequeño,
+                    // el valor es un puntero al struct en stack → dereferenciar para retornar
+                    if matches!(expr, Expresion::Identificador(_, _)) {
+                        let tipo_expr = self.inferir_tipo(expr, variables);
+                        if matches!(tipo_expr, Tipo::Resultado(_, _) | Tipo::Nombre(_)) && self.tamano_tipo(&tipo_expr) <= 8 {
+                            let datos = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), val, 0);
+                            builder.ins().return_(&[datos]);
+                            return Ok(());
+                        }
                     }
+                    builder.ins().return_(&[val]);
                 } else {
                     builder.ins().return_(&[]);
                 }
@@ -3228,45 +3176,70 @@ impl Codegen {
                     }
                 };
 
-                // Crear stack slot para el enum (siempre por puntero)
-                let slot = builder.create_sized_stack_slot(
-                    cranelift_codegen::ir::StackSlotData::new(
-                        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-                        layout.tamano,
-                        0,
-                    )
-                );
-
-                let base_ptr = builder.ins().stack_addr(types::I64, slot, 0);
-
-                // Almacenar tag
-                let tag = *layout.variantes.get(variante_nombre).unwrap_or(&0);
-                let tag_val = builder.ins().iconst(types::I32, tag as i64);
-                builder.ins().store(
-                    cranelift_codegen::ir::MemFlags::new(),
-                    tag_val,
-                    base_ptr,
-                    0,
-                );
-
-                // Almacenar datos si hay argumentos
-                if !argumentos.is_empty() {
-                    let datos_ptr = builder.ins().iadd_imm(base_ptr, layout.datos_offset as i64);
-                    let mut offset = 0i64;
-                    for arg in argumentos {
-                        let val = self.compilar_expresion(arg, builder, variables)?;
-                        let arg_ptr = builder.ins().iadd_imm(datos_ptr, offset);
-                        builder.ins().store(
-                            cranelift_codegen::ir::MemFlags::new(),
-                            val,
-                            arg_ptr,
-                            0,
-                        );
-                        offset += 4;
+                // Para enums pequeños (≤ 8 bytes): empaquetar tag+data en I64
+                // Layout little-endian: bytes 0-3 = tag (low 32), bytes 4-7 = data (high 32)
+                // Esto coincide con el layout de struct (tag en offset 0, data en offset 4)
+                // Así EsVariante, Propagacion e Identificador funcionan sin cambios
+                if layout.tamano <= 8 {
+                    let tag = *layout.variantes.get(variante_nombre).unwrap_or(&0);
+                    let tag_iconst = builder.ins().iconst(types::I32, tag as i64);
+                    let tag_ext = builder.ins().uextend(types::I64, tag_iconst);
+                    
+                    if !argumentos.is_empty() {
+                        let data_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+                        let data_i64 = builder.ins().uextend(types::I64, data_val);
+                        // Shift data to occupy high bytes: data << (datos_offset * 8)
+                        let shift_bits = (layout.datos_offset * 8) as i64;
+                        if shift_bits > 0 {
+                            let shift_val = builder.ins().iconst(types::I64, shift_bits);
+                            let data_shifted = builder.ins().ishl(data_i64, shift_val);
+                            let packed = builder.ins().bor(tag_ext, data_shifted);
+                            Ok(packed)
+                        } else {
+                            Ok(builder.ins().bor(tag_ext, data_i64))
+                        }
+                    } else {
+                        Ok(tag_ext)
                     }
-                }
+                } else {
+                    // Para enums grandes: mantener stack slot + puntero
+                    let slot = builder.create_sized_stack_slot(
+                        cranelift_codegen::ir::StackSlotData::new(
+                            cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+                            layout.tamano,
+                            0,
+                        )
+                    );
 
-                Ok(base_ptr)
+                    let base_ptr = builder.ins().stack_addr(types::I64, slot, 0);
+
+                    let tag = *layout.variantes.get(variante_nombre).unwrap_or(&0);
+                    let tag_val = builder.ins().iconst(types::I32, tag as i64);
+                    builder.ins().store(
+                        cranelift_codegen::ir::MemFlags::new(),
+                        tag_val,
+                        base_ptr,
+                        0,
+                    );
+
+                    if !argumentos.is_empty() {
+                        let datos_ptr = builder.ins().iadd_imm(base_ptr, layout.datos_offset as i64);
+                        let mut offset = 0i64;
+                        for arg in argumentos {
+                            let val = self.compilar_expresion(arg, builder, variables)?;
+                            let arg_ptr = builder.ins().iadd_imm(datos_ptr, offset);
+                            builder.ins().store(
+                                cranelift_codegen::ir::MemFlags::new(),
+                                val,
+                                arg_ptr,
+                                0,
+                            );
+                            offset += 4;
+                        }
+                    }
+
+                    Ok(base_ptr)
+                }
             }
             Expresion::EsVariante(expr, enum_nombre, variante_nombre, _binding, span) => {
                 let layout = match self.enums.get(enum_nombre) {
@@ -3749,44 +3722,19 @@ impl Codegen {
         
         let func_ref = self.module.declare_func_in_func(func_id, builder.func);
 
-        // sret: si la función retornar enum/struct, alocar buffer y pasar puntero como primer arg
-        let es_sret = self.funciones_sret.contains(&llamada.funcion);
-
         let mut args = Vec::new();
-        let sret_slot = if es_sret {
-            // Alocar buffer para el resultado (8 bytes para Resultado<E32,E32>)
-            let slot = builder.create_sized_stack_slot(
-                cranelift_codegen::ir::StackSlotData::new(
-                    cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
-                    8, // tamaño de Resultado<Entero32, Entero32>
-                    0,
-                )
-            );
-            let ptr = builder.ins().stack_addr(types::I64, slot, 0);
-            args.push(ptr); // primer argumento oculto: puntero al buffer
-            Some(slot)
-        } else {
-            None
-        };
-
         for arg in &llamada.argumentos {
             let val = self.compilar_expresion(arg, builder, variables)?;
             args.push(val);
         }
 
         let call = builder.ins().call(func_ref, &args);
-
-        if es_sret {
-            // El resultado ya está en el buffer sret — retornar puntero al slot
-            let slot = sret_slot.unwrap();
-            Ok(builder.ins().stack_addr(types::I64, slot, 0))
+        let results = builder.inst_results(call);
+        
+        if results.is_empty() {
+            Ok(builder.ins().iconst(types::I32, 0))
         } else {
-            let result = builder.inst_results(call);
-            if result.is_empty() {
-                Ok(builder.ins().iconst(types::I32, 0))
-            } else {
-                Ok(result[0])
-            }
+            Ok(results[0])
         }
     }
 
@@ -3809,7 +3757,9 @@ impl Codegen {
             "conjunto_eliminar" | "conjunto_longitud" | "conjunto_liberar" |
             "tcp_vincular" | "tcp_aceptar" | "tcp_leer" | "tcp_escribir" | "tcp_cerrar" |
             "canal_nuevo" | "canal_enviar" | "canal_recibir" | "canal_cerrar" | "canal_intentar" |
-            "cancelar"
+            "cancelar" |
+            "texto_a_puntero" |
+            "como_entero64"
         )
     }
 
@@ -3833,6 +3783,8 @@ impl Codegen {
             "texto_subtexto" => self.builtin_texto_subtexto(builder, variables, &llamada.argumentos),
             "texto_comparar" => self.builtin_texto_comparar(builder, variables, &llamada.argumentos),
             "texto_obtener_byte" => self.builtin_texto_obtener_byte(builder, variables, &llamada.argumentos),
+            "texto_a_puntero" => self.builtin_texto_a_puntero(builder, variables, &llamada.argumentos),
+            "como_entero64" => self.builtin_como_entero64(builder, variables, &llamada.argumentos),
             "archivo_leer" => self.builtin_archivo_leer(builder, variables, &llamada.argumentos),
             "archivo_escribir" => self.builtin_archivo_escribir(builder, variables, &llamada.argumentos),
             "archivo_existe" => self.builtin_archivo_existe(builder, variables, &llamada.argumentos),
@@ -5349,6 +5301,31 @@ impl Codegen {
         let addr = builder.ins().iadd(ptr, idx_64);
         let byte = builder.ins().load(types::I8, cranelift_codegen::ir::MemFlags::new(), addr, 0);
         Ok(byte)
+    }
+
+    /// Fase GUI-1: texto_a_puntero(texto: Palabra) -> Entero64
+    /// Retorna la dirección de memoria de un literal de cadena.
+    /// Útil para pasar punteros a string en structs FFI (ej: WNDCLASSEXA).
+    fn builtin_texto_a_puntero(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        Ok(ptr)
+    }
+
+    /// Fase GUI-1: como_entero64(valor: Entero32) -> Entero64
+    /// Extiende Entero32 a Entero64 con signo. Para pasar NULL (0) como puntero en FFI.
+    fn builtin_como_entero64(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        Ok(builder.ins().sextend(types::I64, val))
     }
 
     /// Fase 15D: archivo_leer(ruta: Palabra) -> Texto

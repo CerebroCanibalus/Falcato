@@ -1,0 +1,81 @@
+// Fase GUI-1: Ventana nativa — Registro + Creacion
+// Demuestra RegisterClassExA con struct WNDCLASSEXA + direccion_de
+//
+// Compilar: .\target\debug\falcato.exe build ejemplos\ventana_simple.fc
+// Ejecutar: .\ventana_simple.exe
+//
+// NOTA: CreateWindowExA requiere 12 parametros (stack params en x64).
+// Cranelift tiene un bug con llamadas de >6 params. Se resolvió
+// moviendo la llamada a un helper (crear_ventana). GUI-2 arreglará
+// esto con el message loop completo.
+
+estructural WNDCLASSEXA {
+    tamano: Entero32, estilo: Entero32, proc: Entero64,
+    extra_clase: Entero32, extra_ventana: Entero32,
+    instancia: Entero64, icono: Entero64, cursor: Entero64,
+    fondo: Entero64, menu: Entero64, nombre_clase: Entero64,
+}
+
+inseguro funcion GetModuleHandleA(el mod: Entero32) -> Entero64;
+inseguro funcion RegisterClassExA(el clase: Entero64) -> Entero32;
+inseguro funcion CreateWindowExA(el ex: Entero32, el clase: Entero64, el titulo: Palabra,
+    el estilo: Entero32, el x: Entero32, el y: Entero32,
+    el ancho: Entero32, el alto: Entero32, el padre: Entero64,
+    el menu: Entero64, el instancia: Entero64, el param: Entero64) -> Entero64;
+inseguro funcion ShowWindow(el hwnd: Entero64, el cmd: Entero32) -> Entero32;
+inseguro funcion UpdateWindow(el hwnd: Entero64) -> Entero32;
+inseguro funcion DefWindowProcA(el hwnd: Entero64, el msg: Entero64, el w: Entero64, el l: Entero64) -> Entero64;
+inseguro funcion PostQuitMessage(el codigo: Entero32);
+inseguro funcion puts(el mensaje: Palabra);
+
+funcion proc_ventana(el hwnd: Entero64, el msg: Entero64, el w: Entero64, el l: Entero64) -> Entero64 {
+    si msg == como_entero64(2) {
+        PostQuitMessage(0);
+    }
+    retornar DefWindowProcA(hwnd, msg, w, l);
+}
+
+// Helper: llama a CreateWindowExA (12 params — bug Cranelift conocido)
+funcion crear_ventana(el instancia: Entero64, el cero: Entero64) -> Entero64 {
+    el nc = texto_a_puntero("FalcatoVentana");
+    el ws: Entero32 = 13565952;
+    retornar CreateWindowExA(0, nc, "Falcato - Ventana Nativa",
+        ws, 100, 100, 800, 600,
+        cero, cero, instancia, cero);
+}
+
+funcion principal() -> Entero32 {
+    el cero = como_entero64(0);
+    el cinco = como_entero64(5);
+    el instancia = GetModuleHandleA(0);
+
+    // Registrar clase de ventana
+    el clase = WNDCLASSEXA {
+        tamano: 72, estilo: 3, proc: direccion_de(proc_ventana),
+        extra_clase: 0, extra_ventana: 0,
+        instancia: instancia, icono: cero, cursor: cero,
+        fondo: cinco, menu: cero,
+        nombre_clase: texto_a_puntero("FalcatoVentana"),
+    };
+
+    el reg = RegisterClassExA(&clase);
+    si reg == 0 {
+        puts("Error: RegisterClassExA fallo");
+        retornar 1;
+    }
+    puts("RegisterClassExA OK! Clase registrada.");
+
+    // Crear ventana (usa helper por bug Cranelift con 12 params)
+    el hwnd = crear_ventana(instancia, cero);
+    si hwnd == cero {
+        puts("Error: CreateWindowExA fallo");
+        retornar 1;
+    }
+
+    ShowWindow(hwnd, 5);
+    UpdateWindow(hwnd);
+    puts("Ventana creada! Visible 3 segundos...");
+
+    dormir(3000);
+    retornar 0;
+}

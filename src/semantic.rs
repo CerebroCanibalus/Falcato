@@ -552,6 +552,25 @@ impl AnalizadorSemantico {
             span: span_vacio.clone(),
             es_publica: true,
         });
+        // Fase GUI-1: como_entero64(e: Entero32) -> Entero64
+        // Convierte un Entero32 a Entero64 con signo. Útil para FFI donde se esperan punteros NULL.
+        self.funciones.insert("como_entero64".to_string(), FirmaFuncion {
+            nombre: "como_entero64".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("valor".to_string(), Tipo::Entero32)],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        // Fase GUI-1: texto_a_puntero — obtiene la dirección de un literal de cadena
+        self.funciones.insert("texto_a_puntero".to_string(), FirmaFuncion {
+            nombre: "texto_a_puntero".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Palabra)],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
         // Fase 15D: File I/O
         self.funciones.insert("archivo_leer".to_string(), FirmaFuncion {
             nombre: "archivo_leer".to_string(),
@@ -2745,6 +2764,14 @@ No puedes modificar algo que no es 'tuyo'.",
             (Tipo::ReferenciaConLifetime(_, p), Tipo::ReferenciaSelf(a)) => self.tipos_compatibles(p, a),
             (Tipo::ReferenciaMutSelf(p), Tipo::ReferenciaMutConLifetime(_, a)) => self.tipos_compatibles(p, a),
             (Tipo::ReferenciaMutConLifetime(_, p), Tipo::ReferenciaMutSelf(a)) => self.tipos_compatibles(p, a),
+            // FFI/GUI: Referencia(T) ≡ Entero64 (ambos son puntero de 8 bytes en x64)
+            // &expr produce stack_addr → I64, compatible con parámetros Entero64 de FFI
+            (Tipo::Entero64, Tipo::Referencia(_)) |
+            (Tipo::Entero64, Tipo::ReferenciaMut(_)) |
+            (Tipo::Entero64, Tipo::ReferenciaConLifetime(_, _)) |
+            (Tipo::Entero64, Tipo::ReferenciaMutConLifetime(_, _)) |
+            (Tipo::Entero64, Tipo::ReferenciaSelf(_)) |
+            (Tipo::Entero64, Tipo::ReferenciaMutSelf(_)) => true,
             _ => false,
         }
     }
