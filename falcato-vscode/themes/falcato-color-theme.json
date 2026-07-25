@@ -1,0 +1,207 @@
+{
+    "name": "Falcato Dorado",
+    "type": "dark",
+    "colors": {
+        "editor.background": "#0D0D1A",
+        "editor.foreground": "#E6E6FA",
+        "editor.lineHighlightBackground": "#1A1A3E",
+        "editor.selectionBackground": "#33339944",
+        "editor.selectionHighlightBackground": "#4444AA44",
+        "editorCursor.foreground": "#FFB800",
+        "editorLineNumber.foreground": "#3D3D5C",
+        "editorLineNumber.activeForeground": "#FFB800",
+        "editorBracketMatch.background": "#FFB80022",
+        "editorBracketMatch.border": "#FFB800",
+        "editorWidget.background": "#1A1A2E",
+        "editorWidget.border": "#FFB80044",
+        "editor.findMatchBackground": "#FFB80044",
+        "editor.findMatchHighlightBackground": "#FFB80022",
+        "editor.hoverHighlightBackground": "#33339933",
+        "editorSuggestWidget.background": "#1A1A2E",
+        "editorSuggestWidget.border": "#FFB80044",
+        "editorSuggestWidget.selectedBackground": "#333399",
+        "editorIndentGuide.background": "#2D2D4E",
+        "editorIndentGuide.activeBackground": "#FFB80022",
+        "editorRuler.foreground": "#2D2D4E",
+        "editorWhitespace.foreground": "#2D2D4E33",
+        "editorError.foreground": "#FF5555",
+        "editorWarning.foreground": "#FFB800",
+        "editorInfo.foreground": "#00E5FF",
+        "activityBar.background": "#0D0D1A",
+        "activityBar.foreground": "#E6E6FA",
+        "activityBar.activeBorder": "#FFB800",
+        "activityBarBadge.background": "#FFB800",
+        "activityBarBadge.foreground": "#0D0D1A",
+        "sideBar.background": "#111128",
+        "sideBar.foreground": "#E6E6FA",
+        "sideBar.border": "#2D2D4E",
+        "sideBarTitle.foreground": "#FFB800",
+        "sideBarSectionHeader.background": "#1A1A3E",
+        "sideBarSectionHeader.foreground": "#FFB800",
+        "list.activeSelectionBackground": "#333399",
+        "list.activeSelectionForeground": "#FFFFFF",
+        "list.inactiveSelectionBackground": "#2D2D4E",
+        "list.hoverBackground": "#1A1A3E",
+        "list.focusBackground": "#33339944",
+        "list.highlightForeground": "#FFB800",
+        "titleBar.activeBackground": "#0D0D1A",
+        "titleBar.activeForeground": "#E6E6FA",
+        "titleBar.border": "#2D2D4E",
+        "statusBar.background": "#0D0D1A",
+        "statusBar.foreground": "#E6E6FA",
+        "statusBar.border": "#2D2D4E",
+        "statusBarItem.activeBackground": "#333399",
+        "statusBarItem.hoverBackground": "#1A1A3E",
+        "statusBarItem.prominentBackground": "#FFB80022",
+        "statusBarItem.prominentHoverBackground": "#FFB80044",
+        "statusBarBadge.background": "#FFB800",
+        "statusBarBadge.foreground": "#0D0D1A",
+        "tab.activeBackground": "#0D0D1A",
+        "tab.activeForeground": "#FFB800",
+        "tab.activeBorder": "#FFB800",
+        "tab.inactiveBackground": "#111128",
+        "tab.inactiveForeground": "#5C5C8A",
+        "tab.border": "#2D2D4E",
+        "tab.hoverBackground": "#1A1A3E",
+        "input.background": "#1A1A3E",
+        "input.foreground": "#E6E6FA",
+        "input.border": "#2D2D4E",
+        "input.placeholderForeground": "#5C5C8A",
+        "inputOption.activeBorder": "#FFB800",
+        "dropdown.background": "#1A1A3E",
+        "dropdown.foreground": "#E6E6FA",
+        "dropdown.border": "#2D2D4E",
+        "button.background": "#FFB800",
+        "button.foreground": "#0D0D1A",
+        "button.hoverBackground": "#FFC933",
+        "panel.background": "#0D0D1A",
+        "panel.border": "#2D2D4E",
+        "panelTitle.activeForeground": "#FFB800",
+        "panelTitle.inactiveForeground": "#5C5C8A",
+        "panelTitle.border": "#FFB800",
+        "terminal.background": "#0D0D1A",
+        "terminal.foreground": "#E6E6FA",
+        "terminal.ansiBrightYellow": "#FFB800",
+        "terminalCursor.foreground": "#FFB800",
+        "scrollbarSlider.background": "#FFB80022",
+        "scrollbarSlider.hoverBackground": "#FFB80044",
+        "scrollbarSlider.activeBackground": "#FFB80066",
+        "editorGutter.background": "#0D0D1A",
+        "editorGutter.modifiedBackground": "#FFB800",
+        "editorGutter.addedBackground": "#A6E22E",
+        "editorGutter.deletedBackground": "#FF5555",
+        "diffEditor.insertedTextBackground": "#A6E22E22",
+        "diffEditor.removedTextBackground": "#FF555522"
+    },
+    "tokenColors": [
+        {
+            "scope": "comment.line.double-slash.falcato",
+            "settings": { "foreground": "#6272A4", "fontStyle": "italic" }
+        },
+        {
+            "scope": "comment.block.falcato",
+            "settings": { "foreground": "#6272A4", "fontStyle": "italic" }
+        },
+        {
+            "scope": "string.quoted.double.falcato",
+            "settings": { "foreground": "#A6E22E" }
+        },
+        {
+            "scope": "constant.character.escape.falcato",
+            "settings": { "foreground": "#FF79C6" }
+        },
+        {
+            "scope": "variable.parameter.falcato",
+            "settings": { "foreground": "#FFD866", "fontStyle": "italic" }
+        },
+        {
+            "scope": "constant.numeric.float.falcato",
+            "settings": { "foreground": "#FF79C6" }
+        },
+        {
+            "scope": "constant.numeric.integer.falcato",
+            "settings": { "foreground": "#FF79C6" }
+        },
+        {
+            "scope": "keyword.control.falcato",
+            "settings": { "foreground": "#FF9D00" }
+        },
+        {
+            "scope": "keyword.declaration.falcato",
+            "settings": { "foreground": "#FF5555", "fontStyle": "bold" }
+        },
+        {
+            "scope": "keyword.other.falcato",
+            "settings": { "foreground": "#FF9D00" }
+        },
+        {
+            "scope": "keyword.modifier.falcato",
+            "settings": { "foreground": "#FF5555", "fontStyle": "italic" }
+        },
+        {
+            "scope": "constant.language.boolean.falcato",
+            "settings": { "foreground": "#FF79C6", "fontStyle": "bold" }
+        },
+        {
+            "scope": "storage.type.primitive.falcato",
+            "settings": { "foreground": "#00E5FF" }
+        },
+        {
+            "scope": "storage.type.generic.falcato",
+            "settings": { "foreground": "#00E5FF", "fontStyle": "bold" }
+        },
+        {
+            "scope": "storage.type.any.falcato",
+            "settings": { "foreground": "#6272A4", "fontStyle": "italic" }
+        },
+        {
+            "scope": "entity.name.function.falcato",
+            "settings": { "foreground": "#FFD866" }
+        },
+        {
+            "scope": "keyword.article.falcato",
+            "settings": { "foreground": "#FFB800", "fontStyle": "bold" }
+        },
+        {
+            "scope": "keyword.operator.directive.falcato",
+            "settings": { "foreground": "#FF79C6" }
+        },
+        {
+            "scope": "keyword.operator.propagation.falcato",
+            "settings": { "foreground": "#FF79C6", "fontStyle": "bold" }
+        },
+        {
+            "scope": "keyword.operator.logical.falcato",
+            "settings": { "foreground": "#FF9D00" }
+        },
+        {
+            "scope": "keyword.operator.comparison.falcato",
+            "settings": { "foreground": "#FF9D00" }
+        },
+        {
+            "scope": "keyword.operator.bitwise.falcato",
+            "settings": { "foreground": "#FF9D00" }
+        },
+        {
+            "scope": "keyword.operator.arithmetic.falcato",
+            "settings": { "foreground": "#FF9D00" }
+        },
+        {
+            "scope": "keyword.operator.reference.falcato",
+            "settings": { "foreground": "#00E5FF", "fontStyle": "bold" }
+        },
+        {
+            "scope": "keyword.operator.dereference.falcato",
+            "settings": { "foreground": "#00E5FF", "fontStyle": "bold" }
+        },
+        {
+            "scope": "support.class.falcato",
+            "settings": { "foreground": "#00E5FF" }
+        },
+        {
+            "scope": "variable.other.falcato",
+            "settings": { "foreground": "#E6E6FA" }
+        }
+    ],
+    "semanticHighlighting": true
+}

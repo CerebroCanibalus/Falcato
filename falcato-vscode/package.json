@@ -15,6 +15,11 @@
     "categories": [
         "Programming Languages"
     ],
+    "capabilities": {
+        "untrustedWorkspaces": {
+            "supported": true
+        }
+    },
     "activationEvents": [
         "onLanguage:falcato"
     ],
@@ -35,6 +40,13 @@
                 "path": "./syntaxes/falcato.tmLanguage.json"
             }
         ],
+        "themes": [
+            {
+                "label": "Falcato Dorado",
+                "uiTheme": "vs-dark",
+                "path": "./themes/falcato-color-theme.json"
+            }
+        ],
         "commands": [
             {
                 "command": "falcato.version",
@@ -43,14 +55,12 @@
         ]
     },
     "scripts": {
-        "postinstall": "node ./node_modules/vscode/bin/install",
         "package": "vsce package"
     },
     "dependencies": {
         "vscode-languageclient": "^9.0.1"
     },
     "devDependencies": {
-        "vscode": "^1.90.2",
         "@types/vscode": "^1.90.0",
         "vsce": "^2.15.0"
     }
