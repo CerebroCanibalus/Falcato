@@ -24,10 +24,21 @@ param(
 
 # Configuracion
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+
+# Detectar si corre desde el ZIP (bin/falcato.exe) o desde source (target/release/falcato.exe)
 $FalcaoExe = Join-Path $ScriptDir "bin\falcato.exe"
 $VSIXPath = Join-Path $ScriptDir "bin\falcato-language-*.vsix"
 $SkillsDir = Join-Path $ScriptDir "skills\falcato-language"
 $AgentPath = Join-Path $ScriptDir "agents\falcato.md"
+$ExamplesSrc = Join-Path $ScriptDir "ejemplos"
+
+if (-not (Test-Path $FalcaoExe)) {
+    $FalcaoExe = Join-Path $ScriptDir "target\release\falcato.exe"
+    $VSIXPath = Join-Path $ScriptDir "falcato-vscode\falcato-language-*.vsix"
+}
+if (-not (Test-Path $ExamplesSrc)) {
+    $ExamplesSrc = $null  # No examples to copy
+}
 
 $InstallDir = "$env:USERPROFILE\.falcato"
 $BinDir = Join-Path $InstallDir "bin"
@@ -153,9 +164,8 @@ Copy-Item -Path $FalcaoExe -Destination $BinDir -Force
 Write-OK "falcato.exe -> $BinDir"
 
 # Copiar ejemplos
-$examplesSrc = Join-Path $ScriptDir "ejemplos"
-if (Test-Path $examplesSrc) {
-    Copy-Item -Path (Join-Path $examplesSrc "*.fc") -Destination $ExamplesDir -Force
+if ($ExamplesSrc -and (Test-Path $ExamplesSrc)) {
+    Copy-Item -Path (Join-Path $ExamplesSrc "*.fc") -Destination $ExamplesDir -Force
     Write-OK "Ejemplos copiados a $ExamplesDir"
 }
 
