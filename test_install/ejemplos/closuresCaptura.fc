@@ -1,0 +1,15 @@
+// closuresCaptura.fc — Prueba de closures con captura de variables
+// Fase 14C: |x| x + base (captura 'base' del scope externo)
+
+función principal() -> Entero32 {
+    el base: Entero32 = 100;
+
+    // Closure que captura 'base'
+    el sumar_base: Entero64 = |x| x + base;
+
+    // Llamar al closure con captura
+    el resultado: Entero32 = sumar_base(42);
+    imprimir_linea("sumar_base(42) = {resultado}");
+
+    retornar 0;
+}

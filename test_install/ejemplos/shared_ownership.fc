@@ -1,0 +1,16 @@
+// Ejemplo de artículos extendidos: los/las (shared ownership)
+// los = shared ownership (reference-counted, como Arc en Rust)
+// las = shared borrowed (referencia a shared, solo lectura)
+
+función principal() -> Entero32 {
+    // 'los' = shared ownership: múltiples dueños posibles
+    los contador: Entero32 = 40;
+    
+    // 'las' = shared borrowed: solo lectura
+    las ref: Entero32 = contador;
+    
+    // 'los' es mutable (shared ownership permite mutación)
+    contador = contador + 2;
+    
+    retornar contador;  // 42
+}

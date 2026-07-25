@@ -1,0 +1,32 @@
+fut función productor(la canal: Entero64) {
+    el i: Entero32 = 0;
+    mientras i < 5 {
+        canal_enviar(canal, i * 10);
+        imprimir_linea("Productor envio dato");
+        i = i + 1;
+        esperar dormir(100);
+    }
+    canal_enviar(canal, -1);
+}
+
+fut función consumidor(la canal: Entero64) {
+    el activo: Entero32 = 1;
+    mientras activo == 1 {
+        la valor: Entero32 = canal_recibir(canal);
+        si valor == -1 {
+            activo = 0;
+        }
+        sino {
+            imprimir_linea("Consumidor recibio dato");
+        }
+    }
+}
+
+fut función principal() -> Entero32 {
+    la canal: Entero64 = canal_nuevo(16);
+    lanzar productor(canal);
+    lanzar consumidor(canal);
+    esperar dormir(1500);
+    canal_cerrar(canal);
+    retornar 0;
+}

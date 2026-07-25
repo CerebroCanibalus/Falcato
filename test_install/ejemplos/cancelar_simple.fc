@@ -1,0 +1,21 @@
+fut función tarea_lenta(la id: Entero32) {
+    imprimir_linea("Tarea lenta iniciada");
+    esperar dormir(500);
+    imprimir_linea("Tarea lenta terminada");
+}
+
+fut función principal() -> Entero32 {
+    imprimir_linea("=== Cancelacion estructurada ===");
+
+    con_executor(2) {
+        lanzar tarea_lenta(1);
+        lanzar tarea_lenta(2);
+        lanzar tarea_lenta(3);
+        esperar dormir(100);
+        imprimir_linea("Cancelando executor...");
+        cancelar();
+    }
+
+    imprimir_linea("=== Executor cancelado y limpiado ===");
+    retornar 0;
+}

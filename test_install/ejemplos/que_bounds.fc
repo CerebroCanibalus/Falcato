@@ -1,0 +1,15 @@
+fn máximo<T que Comparable>(el a: T, el b: T) -> T {
+    si a > b {
+        retornar a;
+    } sino {
+        retornar b;
+    }
+}
+
+función principal() -> Entero32 {
+    el m: Entero32 = máximo(5, 3);
+    si m > 4 {
+        retornar 0;
+    }
+    retornar 1;
+}

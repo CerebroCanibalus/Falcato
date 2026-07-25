@@ -1,0 +1,17 @@
+// Ejemplo de enum con datos (variantes que llevan valores)
+// NOTA: No usar 'Resultado' como nombre (es keyword reservada para Resultado<T,E>)
+
+enumeración Respuesta {
+    Exito(valor: Entero32),
+    Fallo(codigo: Entero32)
+}
+
+función principal() -> Entero32 {
+    el r: Respuesta = Respuesta.Exito(42);
+    
+    si r es Respuesta.Exito {
+        retornar 1;
+    }
+    
+    retornar 0;
+}

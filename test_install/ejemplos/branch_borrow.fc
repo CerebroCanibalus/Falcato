@@ -1,0 +1,21 @@
+// Ejemplo de branch-aware borrowing
+// Los borrows creados dentro de una rama mueren al final de esa rama
+// Esto permite re-borrowing en ramas distintas sin conflicto
+
+función principal() -> Entero32 estricto {
+    el x: Entero32 = 42;
+    el resultado: Entero32 = 0;
+    
+    si x es 42 {
+        // Borrow en rama 'entonces'
+        la ref: &x Entero32 = &x;
+        resultado = *ref;
+    } sino {
+        // Borrow en rama 'sino' — NO conflictúa con el de 'entonces'
+        // porque el borrow de 'entonces' murió al final de su rama
+        la ref2: &x Entero32 = &x;
+        resultado = *ref2;
+    }
+    
+    retornar resultado;  // 42
+}

@@ -1,0 +1,33 @@
+// Fase 15A: Métodos bitwise en enteros
+función principal() {
+    el x: Entero32 = 0;
+
+    // poner_bit: x |= (1 << n)
+    el a: Entero32 = x.poner_bit(3);
+    imprimir_linea("poner_bit(3): {a}");
+
+    // alternar_bit: x ^ (1 << n)
+    el b: Entero32 = a.alternar_bit(0);
+    imprimir_linea("alternar_bit(0): {b}");
+
+    // quitar_bit: x & ~(1 << n)
+    el c: Entero32 = b.quitar_bit(3);
+    imprimir_linea("quitar_bit(3): {c}");
+
+    // extraer_bits(offset, cantidad)
+    el d: Entero32 = 255;
+    el e: Entero32 = d.extraer_bits(4, 4);
+    imprimir_linea("255.extraer_bits(4,4): {e}");
+
+    // unos() = popcount
+    el f: Entero32 = 7;
+    el g: Entero32 = f.unos();
+    imprimir_linea("7.unos(): {g}");
+
+    // ceros_izquierda() = clz
+    el h: Entero32 = 1;
+    el i: Entero32 = h.ceros_izquierda();
+    imprimir_linea("1.ceros_izquierda(): {i}");
+
+    imprimir_linea("=== Bitwise OK ===");
+}

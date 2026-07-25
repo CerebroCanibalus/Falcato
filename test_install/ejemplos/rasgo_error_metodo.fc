@@ -1,0 +1,12 @@
+// Test: método faltante en impl
+rasgo MiRasgo {
+    función req1() -> Entero32;
+    función req2() -> Entero32;
+}
+
+implementar MiRasgo para Entero32 {
+    función req1() -> Entero32 { retornar 0; }
+    // falta req2
+}
+
+función principal() -> Entero32 { retornar 0; }

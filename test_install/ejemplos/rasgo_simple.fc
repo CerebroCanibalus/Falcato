@@ -1,0 +1,22 @@
+// Ejemplo de rasgo (trait) + implementar (impl)
+// Define una interfaz que tipos pueden implementar
+
+rasgo Saludador {
+    función saludar(la quien: Texto) -> Entero32;
+}
+
+// Usamos Entero32 como tipo simple para probar
+// (no podemos pasar Texto fácilmente sin runtime)
+rasgo Sumador {
+    función sumar(la a: Entero32, la b: Entero32) -> Entero32;
+}
+
+implementar Sumador para Entero32 {
+    función sumar(la a: Entero32, la b: Entero32) -> Entero32 {
+        retornar a + b;
+    }
+}
+
+función principal() -> Entero32 {
+    retornar 42;
+}

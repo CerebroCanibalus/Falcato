@@ -1,0 +1,74 @@
+// Calculadora Falcato — Demo completa: Resultado<T,E>, loops, arrays, Texto
+//
+// falcato build calculadora.fc -o calculadora.exe
+// .\calculadora.exe
+//
+// 1=Suma, 2=Resta, 3=Multiplicacion, 4=Division
+
+funcion ejecutar(la opcion: Entero32, el a: Entero32, el b: Entero32) -> Resultado<Entero32, Entero32> {
+    si opcion es 1 { retornar Resultado.Exito(a + b); }
+    si opcion es 2 { retornar Resultado.Exito(a - b); }
+    si opcion es 3 { retornar Resultado.Exito(a * b); }
+    si opcion es 4 {
+        si b es 0 { retornar Resultado.Error(-1); }
+        retornar Resultado.Exito(a / b);
+    }
+    retornar Resultado.Error(-2);
+}
+
+funcion principal() -> Entero32 {
+    imprimir_linea("=== CALCULADORA FALCATO ===");
+    imprimir_linea("");
+
+    el a: Entero32 = 42;
+    el b: Entero32 = 6;
+    el ceros: Entero32 = 0;
+
+    // Loop con arreglo de operaciones
+    imprimir_linea("--- 42 y 6 con Resultado<T,E> ---");
+    imprimir_linea("");
+
+    el ops: [Entero32; 4] = [1, 2, 3, 4];
+    para i en 0..4 {
+        el op: Entero32 = ops[i];
+        el res: Resultado<Entero32, Entero32> = ejecutar(op, a, b);
+
+        si res es Resultado.Exito {
+            el valor: Entero32 = res?;
+            imprimir_linea("  Opcion {op}: ");
+            imprimir(valor);
+            imprimir_linea("");
+        }
+        si res es Resultado.Error {
+            imprimir_linea("  Opcion {op}: ERROR");
+        }
+    }
+
+    // Division entre cero
+    imprimir_linea("");
+    imprimir_linea("--- Error: division entre cero ---");
+    imprimir_linea("");
+    el r_div: Resultado<Entero32, Entero32> = ejecutar(4, a, ceros);
+    si r_div es Resultado.Error {
+        imprimir_linea("  Bien: capturada");
+    }
+
+    // Opcion invalida
+    imprimir_linea("");
+    imprimir_linea("--- Error: opcion 99 ---");
+    imprimir_linea("");
+    el r_inv: Resultado<Entero32, Entero32> = ejecutar(99, a, b);
+    si r_inv es Resultado.Error {
+        imprimir_linea("  Bien: capturada");
+    }
+
+    // Reutilizar variable Resultado (retornar variable)
+    imprimir_linea("");
+    imprimir_linea("--- Retornar variable Resultado ---");
+    imprimir_linea("");
+    el res_exito: Resultado<Entero32, Entero32> = ejecutar(1, 100, 200);
+    retornar res_exito?;
+}
+
+// NOTA: probar con .\calculadora.exe; el codigo de salida es el resultado
+// de 100 + 200 = 300

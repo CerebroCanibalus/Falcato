@@ -1,0 +1,6 @@
+función principal() -> Entero32 {
+    afirmar(1 + 1 == 2);
+    afirmar(2 + 2 == 5);
+    imprimir_linea("Esto no debería imprimirse");
+    retornar 0;
+}

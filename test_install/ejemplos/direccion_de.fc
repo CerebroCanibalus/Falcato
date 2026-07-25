@@ -1,0 +1,23 @@
+// GUI Fase 1 — direccion_de(funcion) / dir_de(funcion)
+// Obtiene la direccion/puntero de una funcion en tiempo de compilacion.
+// Necesario para registrar callbacks en Win32 (WNDPROC, timers, hooks).
+
+inseguro función puts(el mensaje: Palabra);
+
+función mi_callback(el x: Entero32) -> Entero32 {
+    retornar x + 1;
+}
+
+función principal() -> Entero32 {
+    // Obtener puntero a funcion con direccion_de
+    el ptr1 = direccion_de(mi_callback);
+
+    // dir_de es alias abreviado
+    el ptr2 = dir_de(mi_callback);
+
+    // Ambas direcciones son Entero64, listas para pasar a Win32
+    puts("direccion_de(mi_callback) compila correctamente!");
+    puts("Listo para usar como WNDPROC en RegisterClassExA.");
+
+    retornar 0;
+}

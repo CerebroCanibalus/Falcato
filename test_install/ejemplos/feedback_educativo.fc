@@ -1,0 +1,16 @@
+// Ejemplo de feedback educativo: errores con múltiples opciones de fix
+// Ejecutar con: falcato check ejemplos/feedback_educativo.fc
+
+función procesar(el x: Entero32) -> Entero32 {
+    retornar x + 1;
+}
+
+función principal() -> Entero32 verificado {
+    el dato: Entero32 = 41;
+    
+    // Move explícito
+    mover dato a procesar;
+    
+    // ERROR [O001]: use-after-move con 3 opciones de fix
+    retornar dato;
+}

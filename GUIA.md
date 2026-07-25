@@ -28,6 +28,8 @@ Bienvenido. Cada capítulo son 5-10 minutos y empieza desde lo más básico.
 | 13 | [Async](GUIA/13-async.md) | Hilos, canales, TCP, thread pool |
 | 14 | [Ownership](GUIA/14-ownership.md) | Mover, copiar, prestar, regiones |
 | 15 | [Glosario](GUIA/15-glosario.md) | Términos rápidos |
+| — | — | — |
+| 🖼️ | [GUI Nativa (docs)](docs/diseno_gui.md) | Ventanas Win32, MessageBox, GDI |
 
 ## Otras guías
 
@@ -37,6 +39,7 @@ Bienvenido. Cada capítulo son 5-10 minutos y empieza desde lo más básico.
 | [REFERENCIA.md](REFERENCIA.md) | Catálogo de funciones built-in |
 | [ERRORES.md](ERRORES.md) | Códigos de error y soluciones |
 | [AGENTS.md](AGENTS.md) | Para contribuidores del compilador |
+| 🖼️ [GUI Nativa](docs/diseno_gui.md) | Ventanas Win32, MessageBox, GDI (en desarrollo) |
 
 ---
 

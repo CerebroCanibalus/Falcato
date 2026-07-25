@@ -1,0 +1,14 @@
+// closures.fc — Prueba de closures con llamada indirecta
+// Fase 14C: |x| expr + captura + call_indirect
+
+función principal() -> Entero32 {
+    // Closure sin captura: función anónima que duplica
+    // El tipo es Entero64 (function pointer)
+    el doble: Entero64 = |x| x * 2;
+
+    // Llamar al closure (llamada indirecta via function pointer)
+    el resultado: Entero32 = doble(21);
+    imprimir_linea("doble(21) = {resultado}");
+
+    retornar 0;
+}

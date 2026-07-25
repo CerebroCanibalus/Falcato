@@ -1,0 +1,15 @@
+// Ejemplo de manejo de errores con Resultado<T, E>
+// Pattern matching básico sin funciones que retornen Resultado
+
+función principal() -> Entero32 {
+    // Crear un Resultado exitoso
+    el resultado = Resultado.Exito(42);
+    
+    // Pattern matching para verificar la variante
+    si resultado es Resultado.Exito {
+        retornar 0;  // Éxito
+    }
+    
+    // Si no es Exito, es Error
+    retornar 1;
+}

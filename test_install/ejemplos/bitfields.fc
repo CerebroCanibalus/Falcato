@@ -1,0 +1,29 @@
+// Fase 15B: Campos de bits como tipos
+// reg.baud_div = 868 → compiler genera shifts+masks
+
+estructural RegistroUART {
+    bits {
+        habilitado: Natural8,   // bits 0-7 (8 bits)
+        modo_tx: Natural8,      // bits 8-15 (8 bits)
+        baud_div: Natural16,    // bits 16-31 (16 bits)
+    }
+}
+
+función principal() {
+    el reg: RegistroUART = RegistroUART { habilitado: 0, modo_tx: 0, baud_div: 0 };
+
+    // Escribir campos
+    reg.habilitado = 1;
+    reg.modo_tx = 3;
+    reg.baud_div = 868;
+
+    // Leer campos
+    el h: Entero32 = reg.habilitado;
+    el m: Entero32 = reg.modo_tx;
+    el b: Entero32 = reg.baud_div;
+
+    imprimir_linea("habilitado: {h}");
+    imprimir_linea("modo_tx: {m}");
+    imprimir_linea("baud_div: {b}");
+    imprimir_linea("=== Bitfields OK ===");
+}

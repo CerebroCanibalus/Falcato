@@ -1,0 +1,11 @@
+// Ejemplo del operador ? (propagación de errores)
+
+función principal() -> Entero32 {
+    el resultado = Resultado.Exito(42);
+    
+    // Usar ? para extraer el valor (si es Exito)
+    // Si es Error, retornaría inmediatamente
+    el valor = resultado?;
+    
+    retornar valor;
+}

@@ -1,0 +1,10 @@
+// imprimir_simple.fc — Prueba de built-ins de I/O
+// Fase 14A: imprimir / imprimir_linea sin FFI manual
+
+función principal() -> Entero32 {
+    imprimir_linea("Hola desde Falcato!");
+    imprimir("Sin newline... ");
+    imprimir_linea("y con newline.");
+    imprimir_linea("Bitwise: 12 & 10 = 8");
+    retornar 0;
+}

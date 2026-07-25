@@ -1,0 +1,29 @@
+// Fase GUI-1: Ventana nativa completa via trampolin C
+// Usa lib/trampolin_win32.obj (C precompilado) para sortear
+// limitaciones de Cranelift con llamadas Win32 complejas.
+//
+// Compilar: .\target\debug\falcato.exe build ejemplos\ventana_simple.fc
+// Ejecutar: .\ventana_simple.exe
+
+// --- FFI al trampolin C ---
+inseguro funcion fc_CrearVentana() -> Entero64;
+inseguro funcion fc_BucleMensajes();
+
+// --- FFI a CRT ---
+inseguro funcion puts(el mensaje: Palabra);
+
+funcion principal() -> Entero32 {
+    puts("Falcato GUI - Creando ventana nativa...");
+
+    el hwnd: Entero64 = fc_CrearVentana();
+    si hwnd == como_entero64(0) {
+        puts("Error: fc_CrearVentana fallo");
+        retornar 1;
+    }
+
+    puts("Ventana creada! Cierra con X o Alt+F4...");
+    fc_BucleMensajes();
+
+    puts("Ventana cerrada. Adios!");
+    retornar 0;
+}

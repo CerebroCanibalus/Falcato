@@ -314,6 +314,92 @@ función al_pintar(el self: &MiApp, el dc: &DC) {
 
 ---
 
+## 3.7 El patrón Trampolín C
+
+### ¿Por qué un trampolín?
+
+El codegen de Cranelift en Falcato soporta llamadas FFI a funciones C individuales,
+pero tiene limitaciones prácticas con **structs complejos** como `WNDCLASSEXA` (72 bytes,
+múltiples campos de diferentes tipos y alineaciones). Inicializar un struct de este
+tamaño byte a byte en Cranelift IR es frágil, verboso y propenso a errores de layout.
+
+La solución: **un trampolín C precompilado** (`lib/trampolin_win32.c` → `.obj`) que
+envuelve la lógica Win32 compleja en funciones simples que Falcato puede llamar.
+
+### Arquitectura del patrón
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Falcato (.fc)                                              │
+│  ventana_simple.fc — 4 declaraciones, 77 tokens             │
+│                                                             │
+│  inseguro fn fc_CrearVentana() -> Entero64;                 │
+│  inseguro fn fc_BucleMensajes();                            │
+│  → Llamadas FFI directas a símbolos C exportados            │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ C ABI (WindowsFastcall)
+┌──────────────────────▼──────────────────────────────────────┐
+│  Trampolín C (.c → .obj)                                    │
+│  lib/trampolin_win32.c                                      │
+│                                                             │
+│  fc_CrearVentana() {                                        │
+│      WNDCLASSEXA wc = {0};          // struct en C, fácil   │
+│      RegisterClassExA(&wc);         // Win32 API directa    │
+│      CreateWindowExA(...);          // sin intermediarios    │
+│      ShowWindow(hwnd);                                      │
+│      return hwnd;                                           │
+│  }                                                          │
+│  fc_BucleMensajes() {                                       │
+│      while (GetMessageA(...)) { ... }  // message loop      │
+│  }                                                          │
+├─────────────────────────────────────────────────────────────┤
+│  Linker (link.exe)                                          │
+│  falcato.exe build → .o + trampolin_win32.obj → .exe       │
+│  → src/main.rs auto-incluye lib/trampolin_win32.obj         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### ¿Qué va en el trampolín y qué en Falcato?
+
+| En el trampolín (C) | En Falcato (FFI directa) |
+|---------------------|--------------------------|
+| RegisterClassExA | MessageBoxA |
+| CreateWindowExA | GetModuleHandleA |
+| WNDPROC con switch de mensajes | LoadCursorA |
+| WNDCLASSEXA, MSG structs | SetLastError/GetLastError |
+| CreateWindowExA con CW_USEDEFAULT | puts, printf |
+| Bucle de mensajes completo | Funciones aritméticas simples |
+
+**Regla de decisión:** Si la función Win32 necesita un struct > 32 bytes o tiene
+más de 6 parámetros → trampolín C. Si es una llamada simple con tipos escalares
+→ FFI directa desde Falcato.
+
+### Auto-link del trampolín
+
+En `src/main.rs`, el linker incluye automáticamente `lib/trampolin_win32.obj`
+si existe (no requiere flags ni configuración):
+
+```rust
+let trampolin = std::path::Path::new("lib/trampolin_win32.obj");
+if trampolin.exists() {
+    cmd.arg(trampolin);
+}
+```
+
+Esto significa que si no usas GUI, el `.obj` opcional no se linkea.
+Si usas GUI, el compilador lo incluye sin configuración extra.
+
+### Ventajas del patrón
+
+1. **Cero overhead en runtime** — el trampolín es código máquina nativo linkeado directamente
+2. **Structs en C, no en IR** — evitamos bugs de layout en Cranelift
+3. **Familiar para desarrolladores Win32** — el C se ve igual que la documentación de MSDN
+4. **Evolución gradual** — a medida que Cranelift madure, podemos migrar funciones del trampolín
+   a Falcato puro sin cambiar la API
+5. **Múltiples archivos .c** — se pueden añadir más trampolines para Direct2D, D3D11, etc.
+
+---
+
 ## 4. Plan de implementación por fases
 
 ### Fase GUI-1: Núcleo + MessageBox ✅ (ESTA SESIÓN)
@@ -447,18 +533,22 @@ stdlib/
 
 ## 6. Integración con el compilador
 
-### 6.1 Linker automático
+### 6.1 Linker — librerías siempre presentes
 
-Cuando el compilador detecta funciones `inseguro` que referencian símbolos Win32
-(user32, gdi32, dwmapi), añade automáticamente las librerías correspondientes:
+Las librerías Win32 (`user32.lib` + `gdi32.lib`) se linkean **siempre** en `src/main.rs`,
+sin detección automática (son < 1 MB y es más simple que escanear símbolos):
 
 ```rust
-// En main.rs — detección automática de libs Win32
-let has_user32 = objeto.importa("user32");
-let has_gdi32 = objeto.importa("gdi32");
-if has_user32 { cmd.arg("user32.lib"); }
-if has_gdi32 { cmd.arg("gdi32.lib"); }
+// En main.rs — librerías Win32 siempre disponibles
+cmd.arg("user32.lib")
+   .arg("gdi32.lib");
 ```
+
+A futuro (Fase GUI-5+), se añadirán también:
+- `dwmapi.lib` — DWM (compositor de escritorio)
+- `d2d1.lib` — Direct2D
+- `d3d11.lib` — Direct3D 11
+- `ws2_32.lib` — Winsock (ya presente para async)
 
 ### 6.2 Funciones `inseguro` reservadas para stdlib
 

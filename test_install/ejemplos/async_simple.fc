@@ -1,0 +1,13 @@
+fut función contador(la nombre: Palabra, la veces: Entero32) {
+    para i en 0..veces {
+        imprimir_linea(nombre);
+        esperar dormir(200);
+    }
+}
+
+fut función principal() -> Entero32 {
+    lanzar contador("A", 5);
+    lanzar contador("B", 5);
+    esperar dormir(1200);
+    retornar 0;
+}

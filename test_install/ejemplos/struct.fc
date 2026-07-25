@@ -1,0 +1,17 @@
+// Ejemplo de structs en Falcato
+// Los structs se declaran con 'estructural'
+
+estructural Punto {
+    x: Entero32,
+    y: Entero32,
+}
+
+función principal() -> Entero32 {
+    // Inicializar struct con sintaxis de constructor
+    el p: Punto = Punto { x: 10, y: 20 };
+    
+    // Acceder a campos
+    el suma: Entero32 = p.x + p.y;
+    
+    retornar suma;
+}

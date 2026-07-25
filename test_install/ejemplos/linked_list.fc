@@ -1,0 +1,22 @@
+// Linked list con regiones (arena allocation)
+// Demuestra: región + structs + referencias
+// NOTA: Self-referential structs completos requieren null/Option (Fase futura)
+
+estructural Nodo {
+    valor: Entero32,
+}
+
+función principal() -> Entero32 {
+    región mi_lista {
+        // Construir "lista" de nodos en la región
+        el nodo1: Nodo = Nodo { valor: 10 };
+        el nodo2: Nodo = Nodo { valor: 20 };
+        el nodo3: Nodo = Nodo { valor: 12 };
+        
+        // Sumar valores
+        el total: Entero32 = nodo1.valor + nodo2.valor + nodo3.valor;
+        
+        retornar total;  // 10 + 20 + 12 = 42
+    }
+    // Todos los nodos se liberan juntos aquí (determinístico)
+}

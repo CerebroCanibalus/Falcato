@@ -1,0 +1,53 @@
+// Fase 15C: String ops — concatenar, subtexto, comparar, obtener_byte
+función principal() -> Entero32 {
+    // Crear dos textos
+    el a: Texto = texto_desde("Hola");
+    el b: Texto = texto_desde(" Mundo");
+
+    // Concatenar
+    el c: Texto = texto_concatenar(a, b);
+    imprimir_linea("concatenar: ");
+    imprimir_linea(c);
+
+    // Longitud
+    el len: Entero32 = texto_longitud(c);
+    imprimir_linea("longitud de c: ");
+    imprimir(len);
+    imprimir_linea("");
+
+    // Subtexto [0, 4) = "Hola"
+    el sub: Texto = texto_subtexto(c, 0, 4);
+    imprimir_linea("subtexto [0,4): ");
+    imprimir_linea(sub);
+
+    // Subtexto [5, 11) = "Mundo"
+    el sub2: Texto = texto_subtexto(c, 5, 11);
+    imprimir_linea("subtexto [5,11): ");
+    imprimir_linea(sub2);
+
+    // Comparar
+    el cmp1: Entero32 = texto_comparar(a, a);
+    imprimir_linea("comparar(a, a) = ");
+    imprimir(cmp1);
+    imprimir_linea("");
+
+    el cmp2: Entero32 = texto_comparar(a, b);
+    imprimir_linea("comparar(a, b) = ");
+    imprimir(cmp2);
+    imprimir_linea("");
+
+    // Obtener byte
+    el byte0: Entero8 = texto_obtener_byte(a, 0);
+    imprimir_linea("byte[0] de 'Hola' = ");
+    imprimir(byte0);
+    imprimir_linea("");
+
+    // Liberar
+    texto_liberar(a);
+    texto_liberar(b);
+    texto_liberar(c);
+    texto_liberar(sub);
+    texto_liberar(sub2);
+
+    retornar 0;
+}

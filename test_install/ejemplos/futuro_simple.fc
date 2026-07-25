@@ -1,0 +1,17 @@
+// Fase 18E: State machine transform para fut función
+// Cada `esperar dormir(ms)` es un punto de suspensión
+
+fut función tarea_async(el id: Entero32) -> Entero32 {
+    imprimir_linea("Tarea iniciada");
+    esperar dormir(100);
+    imprimir_linea("Tarea paso 2");
+    esperar dormir(100);
+    imprimir_linea("Tarea completada");
+    retornar id;
+}
+
+función principal() {
+    imprimir_linea("=== State Machine Futures ===");
+    el resultado: Entero32 = tarea_async(1);
+    imprimir_linea("=== Fin ===");
+}

@@ -79,6 +79,7 @@ Ocurren cuando mezclas tipos que no deberían mezclarse.
 | `T060` | Rasgo no existe | El nombre del rasgo está mal escrito |
 | `T061` | Falta método requerido | El rasgo exige implementar ese método |
 | `T080` | `esperar` fuera de `fut función` | Usa `esperar` solo dentro de funciones `fut` |
+| `T085` | `direccion_de` requiere función local o importada | El nombre debe ser una función visible en el scope actual |
 
 **Ejemplo:**
 ```

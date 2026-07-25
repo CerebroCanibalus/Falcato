@@ -28,6 +28,16 @@ jobs:
       env:
         RUSTFLAGS: -C target-feature=+crt-static
 
+    - name: Build VS Code extension (VSIX)
+      shell: pwsh
+      run: |
+        cd falcato-vscode
+        npm ci
+        npx vsce package --no-dependencies
+        $vsix = Get-Item *.vsix | Select-Object -First 1
+        Write-Host "VSIX built: $($vsix.Name)"
+        Copy-Item $vsix.FullName ..\release\bin\
+
     - name: Prepare release artifacts
       shell: pwsh
       run: |
@@ -35,6 +45,8 @@ jobs:
         New-Item -ItemType Directory -Force -Path release\bin
         New-Item -ItemType Directory -Force -Path release\ejemplos
         New-Item -ItemType Directory -Force -Path release\docs
+        New-Item -ItemType Directory -Force -Path release\skills
+        New-Item -ItemType Directory -Force -Path release\agents
 
         # Copy binary
         Copy-Item target\release\falcato.exe release\bin\
@@ -46,32 +58,12 @@ jobs:
         Copy-Item README.md release\
         if (Test-Path LICENSE) { Copy-Item LICENSE release\ }
 
-        # Create install.cmd
-        @"
-        @echo off
-        chcp 65001 >nul
-        echo.
-        echo ╔═══════════════════════════════════════╗
-        echo ║      Falcato - Instalación            ║
-        echo ╚═══════════════════════════════════════╝
-        echo.
-        set "FALCATO_DIR=%USERPROFILE%\.falcato"
-        if not exist "%FALCATO_DIR%" mkdir "%FALCATO_DIR%"
-        if not exist "%FALCATO_DIR%\bin" mkdir "%FALCATO_DIR%\bin"
-        if not exist "%FALCATO_DIR%\ejemplos" mkdir "%FALCATO_DIR%\ejemplos"
-        copy "%~dp0bin\falcato.exe" "%FALCATO_DIR%\bin\" >nul
-        copy "%~dp0ejemplos\*.fc" "%FALCATO_DIR%\ejemplos\" >nul
-        echo Agregando a PATH...
-        setx PATH "%FALCATO_DIR%\bin;%PATH%" >nul
-        echo.
-        echo ✅ Falcato instalado en %FALCATO_DIR%
-        echo.
-        echo Ejecuta esto para verificar:
-        echo   falcato version
-        echo   falcato run ejemplos\hola_mundo.fc
-        echo.
-        pause
-        "@ | Out-File -FilePath release\install.cmd -Encoding ASCII
+        # Copy skills & agents
+        Copy-Item skills\* release\skills\ -Recurse
+        Copy-Item agents\* release\agents\ -Recurse
+
+        # Copy install.ps1
+        Copy-Item install.ps1 release\
 
     - name: Create release ZIP
       shell: pwsh
@@ -91,8 +83,15 @@ jobs:
           ### Instalación
           1. Descarga `falcato-${{ github.ref_name }}.zip`
           2. Extrae en cualquier carpeta
-          3. Ejecuta `install.cmd`
+          3. Ejecuta `install.ps1` (PowerShell) — menú interactivo con opciones
           4. Abre una terminal nueva y escribe `falcato version`
+
+          ### Qué instala install.ps1 (opcional, eliges cada uno):
+          - ✅ falcato.exe en PATH (siempre)
+          - 🔌 Extensión VS Code (syntax + LSP + tema Falcato Dorado)
+          - 🤖 Agent + Skill para OpenCode
+          - 🤖 Agent + Skill para Claude Code
+          - 💡 Cursor: usa la misma extensión VS Code
 
           ### Requisitos
           - Windows 10 o superior (x86_64)

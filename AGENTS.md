@@ -398,6 +398,13 @@ Backend Cranelift generando binarios nativos x86_64.
 INSTALL.md, REFERENCIA.md (built-ins), ERRORES.md (códigos de error),
 más skill `falcato-language` para LLMs en OpenCode.
 
+**🖼️ GUI-1: Ventana nativa Win32 operativa.** MessageBox via FFI directo,
+ventana completa con RegisterClassExA + CreateWindowExA + message loop via
+[trampolín C](lib/trampolin_win32.c) precompilado. `direccion_de`/`dir_de`
+para obtener punteros a funciones. `texto_a_puntero` y `como_entero64` built-ins.
+Auto-link de `lib/trampolin_win32.obj` desde `src/main.rs`.
+Diseño completo en [`docs/diseno_gui.md`](docs/diseno_gui.md).
+
 **40/40 tests pasan. 50+ ejemplos funcionando. Auditoría completa: 0 crashes.**
 
 ### Estado de distribución (v0.1.0 — pre-release)

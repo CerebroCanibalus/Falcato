@@ -1,0 +1,33 @@
+// rangos.fc — Prueba de rangos y para sobre rangos
+// Fase 14B: para i en 0..10 { ... }
+
+función principal() -> Entero32 {
+    // Rango exclusivo: 0..5 → 0, 1, 2, 3, 4
+    imprimir("Exclusivo 0..5: ");
+    para i en 0..5 {
+        imprimir_linea("{i}");
+    }
+
+    // Rango inclusivo: 0..=3 → 0, 1, 2, 3
+    imprimir("Inclusivo 0..=3: ");
+    para j en 0..=3 {
+        imprimir_linea("{j}");
+    }
+
+    // Rango con variables
+    el inicio: Entero32 = 10;
+    el fin: Entero32 = 13;
+    imprimir("Variable 10..13: ");
+    para k en inicio..fin {
+        imprimir_linea("{k}");
+    }
+
+    // Suma con rango
+    el suma: Entero32 = 0;
+    para n en 1..=100 {
+        suma = suma + n;
+    }
+    imprimir_linea("Suma 1..=100 = {suma}");
+
+    retornar 0;
+}

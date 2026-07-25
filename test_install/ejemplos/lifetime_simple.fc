@@ -1,0 +1,16 @@
+// Ejemplo de lifetimes léxicos
+// &dato Texto significa: "referencia que vive mientras 'dato' exista"
+
+función procesar(la x: &x Entero32) -> Entero32 {
+    // El retorno vive mientras 'x' viva
+    retornar *x;
+}
+
+función principal() -> Entero32 {
+    el dato: Entero32 = 42;
+    
+    // &dato Entero32: referencia con lifetime léxico
+    la ref: &dato Entero32 = &dato;
+    
+    retornar procesar(ref);
+}

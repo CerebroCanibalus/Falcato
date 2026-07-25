@@ -1,0 +1,33 @@
+// Fase GUI-1: MessageBox nativo en Windows
+// FFI directo a user32!MessageBoxA
+//
+// Compilar: .\target\debug\falcato.exe build ejemplos\messagebox.fc
+// Ejecutar: .\messagebox.exe
+
+// --- FFI a user32.dll ---
+// MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType) -> int
+inseguro función MessageBoxA(el hwnd: Entero32, el texto: Palabra, el titulo: Palabra, el tipo_flags: Entero32) -> Entero32;
+
+// -- Constantes Win32 para MessageBox --
+// MB_OK              = 0x00000000
+// MB_YESNO           = 0x00000004
+// MB_ICON_INFORMATION = 0x00000040
+// MB_ICON_QUESTION   = 0x00000020
+// MB_ICON_ERROR      = 0x00000010
+// IDYES = 6, IDNO = 7
+
+función principal() -> Entero32 {
+    // Mensaje informativo simple
+    el r1 = MessageBoxA(0, "Hola desde Falcato!\n\nWin32 MessageBox nativo\nvia FFI directo a user32.dll", "Falcato GUI Fase 1", 0 | 64);
+
+    // Pregunta con Si/No
+    el r2 = MessageBoxA(0, "Deseas ver otro mensaje?", "Pregunta", 4 | 32);
+
+    si r2 == 6 {
+        MessageBoxA(0, "Elegiste Si! El FFI funciona correctamente.", "Resultado", 0 | 64);
+    } sino {
+        MessageBoxA(0, "Elegiste No. Hasta luego!", "Resultado", 0 | 16);
+    }
+
+    retornar 0;
+}

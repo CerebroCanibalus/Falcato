@@ -1,0 +1,28 @@
+// Fase 15E: Matemáticas — abs, max, min
+función principal() -> Entero32 {
+    el a: Entero32 = abs(-42);
+    imprimir(a);
+    imprimir_linea("");
+
+    el b: Entero32 = abs(7);
+    imprimir(b);
+    imprimir_linea("");
+
+    el c: Entero32 = max(10, 20);
+    imprimir(c);
+    imprimir_linea("");
+
+    el d: Entero32 = min(10, 20);
+    imprimir(d);
+    imprimir_linea("");
+
+    el e: Entero32 = max(-5, -3);
+    imprimir(e);
+    imprimir_linea("");
+
+    el f: Entero32 = min(-5, -3);
+    imprimir(f);
+    imprimir_linea("");
+
+    retornar 0;
+}

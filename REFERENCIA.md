@@ -138,6 +138,28 @@ el tam = tamaño_de::<Entero32>(); // 4
 
 ---
 
+## GUI / FFI — System pointers
+
+| Función | Firma | Qué hace |
+|---------|-------|----------|
+| `direccion_de(fn)` | `(nombre función) -> Entero64` | Obtiene la dirección en memoria de una función (para WNDPROC, callbacks Win32) |
+| `dir_de(fn)` | `(nombre función) -> Entero64` | Alias de `direccion_de` |
+| `texto_a_puntero(s)` | `(Palabra) -> Entero64` | Convierte un literal string a puntero (para `GetModuleHandle`, `LoadCursor`, etc.) |
+| `como_entero64(x)` | `(Entero32) -> Entero64` | Convierte `Entero32` a `Entero64` sin pérdida de signo |
+
+> **Nota sobre punteros Win32:** En Falcato, los `HANDLE`, `HWND`, `HINSTANCE` y punteros
+> a funciones se representan como `Entero64` (8 bytes, mismo tamaño que un puntero
+> en x86_64). Las funciones Win32 se declaran como `inseguro función` para llamadas
+> FFI.
+>
+> Para structs Win32 complejos (WNDCLASSEXA, MSG, etc.), se usa el
+> [patrón Trampolín C](docs/diseno_gui.md#37-el-patrón-trampolín-c):
+> un archivo `.c` precompilado a `.obj` que el compilador linkea automáticamente.
+>
+> Ver: [`docs/diseno_gui.md`](docs/diseno_gui.md) — diseño completo del sistema gráfico.
+
+---
+
 ## Async / Hilos
 
 | Función | Firma | Qué hace |

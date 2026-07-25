@@ -1,0 +1,25 @@
+fut función manejar_cliente(la conn: Entero64) {
+    el buffer: [Entero32; 256] = todos 0;
+    el activo: Entero32 = 1;
+    mientras activo == 1 {
+        la n: Entero32 = tcp_leer(conn, buffer, 1024);
+        si n <= 0 {
+            activo = 0;
+        }
+        sino {
+            tcp_escribir(conn, buffer, n);
+        }
+    }
+    tcp_cerrar(conn);
+}
+
+fut función principal() -> Entero32 {
+    la listener: Entero64 = tcp_vincular(9000);
+    imprimir_linea("Escuchando en :9000");
+    el activo: Entero32 = 1;
+    mientras activo == 1 {
+        la conn: Entero64 = tcp_aceptar(listener);
+        lanzar manejar_cliente(conn);
+    }
+    retornar 0;
+}

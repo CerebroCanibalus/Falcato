@@ -1,0 +1,23 @@
+función sumar(el a: Entero32, el b: Entero32) -> Entero32 {
+    retornar a + b;
+}
+
+función multiplicar(el a: Entero32, el b: Entero32) -> Entero32 {
+    retornar a * b;
+}
+
+prueba "suma básica" {
+    afirmar(sumar(2, 3) == 5);
+    afirmar(sumar(0, 0) == 0);
+    afirmar(sumar(-1, 1) == 0);
+}
+
+prueba "multiplicación" {
+    afirmar(multiplicar(3, 4) == 12);
+    afirmar(multiplicar(0, 100) == 0);
+}
+
+función principal() -> Entero32 {
+    imprimir_linea("Funciones definidas. Usa 'falcato test' para ejecutar pruebas.");
+    retornar 0;
+}
