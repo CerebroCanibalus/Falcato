@@ -10,6 +10,7 @@ use std::collections::HashMap;
 /// Códigos de error de tipo [T###]
 pub mod codigos {
     // T001-T009: Declaración y asignación
+    pub const CLAVE_SOBREESCRITA: u32 = 100;
     pub const DISCONCORDANCIA_TIPO: u32 = 1;
     pub const DISCONCORDANCIA_RETORNO: u32 = 2;
     pub const RETORNO_FALTANTE: u32 = 3;

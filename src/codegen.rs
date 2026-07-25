@@ -5840,15 +5840,20 @@ impl Codegen {
         cap: cranelift_codegen::ir::Value,
         tipo_k: &Tipo,
         key_val: cranelift_codegen::ir::Value,
+        hash_val: cranelift_codegen::ir::Value,
         stride: u32,
     ) -> cranelift_codegen::ir::Value {
         let flags = cranelift_codegen::ir::MemFlags::new();
-        let zero_i64 = builder.ins().iconst(types::I64, 0);
         let one_i64 = builder.ins().iconst(types::I64, 1);
         let neg_one = builder.ins().iconst(types::I32, -1);
         let stride_val = builder.ins().iconst(types::I64, stride as i64);
         let four_i64 = builder.ins().iconst(types::I64, 4);
         let eight_i64 = builder.ins().iconst(types::I64, 8);
+
+        // Compute initial index = hash % cap
+        let cap_i32 = builder.ins().ireduce(types::I32, cap);
+        let start_idx = builder.ins().urem(hash_val, cap_i32);
+        let start_idx_i64 = builder.ins().uextend(types::I64, start_idx);
 
         let header_block = builder.create_block();
         builder.append_block_param(header_block, types::I64);
@@ -5858,7 +5863,7 @@ impl Codegen {
         let merge_block = builder.create_block();
         builder.append_block_param(merge_block, types::I32);
 
-        builder.ins().jump(header_block, &[zero_i64]);
+        builder.ins().jump(header_block, &[start_idx_i64]);
 
         // Loop header: compare i < cap
         builder.switch_to_block(header_block);
@@ -5892,7 +5897,11 @@ impl Codegen {
         // Advance: i++
         builder.switch_to_block(advance_block);
         let next_i = builder.ins().iadd(i, one_i64);
-        builder.ins().jump(header_block, &[next_i]);
+        let wrapped = builder.ins().urem(next_i, cap);
+        // Check if wrapped back to start → full circle, exit
+        let full_circle = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::Equal, wrapped, start_idx_i64);
+        builder.ins().brif(full_circle, exit_block, &[], header_block, &[wrapped]);
+        // NOTE: header_block sealed AFTER this brif (in back-edge)
 
         // Seal header after back-edge
         builder.seal_block(header_block);
@@ -5937,8 +5946,9 @@ impl Codegen {
         let stride = self.diccionario_bucket_stride(tipo_k, tipo_v);
         let buckets_ptr = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
         let cap = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_CAP);
+        let hash_insert = self.compilar_hash(tipo_k, builder, key_val);
 
-        let existing_idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, stride);
+        let existing_idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, hash_insert, stride);
         
         let found_block = builder.create_block();
         let not_found_block = builder.create_block();
