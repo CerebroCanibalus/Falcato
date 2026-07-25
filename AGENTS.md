@@ -380,6 +380,7 @@ y servidor LSP completo.
 Backend Cranelift generando binarios nativos x86_64.
 
 y **método syntax generalizada** (`.agregar()`, `.tam()`, `.liberar()` en Texto/Vector),
+**Diccionario<K,V> + Conjunto<T>** (hash map/set con resize automático y hash probe),
 **operadores compuestos** (`a + b` concatena Texto, `t[0]`/`t[0..5]` indexa Texto, `v[0]` indexa Vector),
 **aliases** (`devolver`/`emparejar`/`decir`/`texto_tam`/`vector_tam`),
 **i18n completa de "array" → "arreglo"** en docs y errores de compilador,
@@ -701,16 +702,18 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 
 **Resultado:** Documentación completa de usuario (GUIA.md hub + 15 capítulos), referencia (REFERENCIA.md + ERRORES.md), skill para IA (falcato-language con reference/builtins.md), e i18n de términos.
 
-### Fase R4 — Colecciones (Diccionario + Conjunto)
-| # | Tarea | Archivos | Líneas |
+### Fase R4 — Colecciones (Diccionario + Conjunto) ✅ COMPLETADA
+| # | Tarea | Archivos | Estado |
 |---|-------|----------|--------|
-| 1 | `Tipo::Diccionario(K,V)` + `Tipo::Conjunto(T)` en AST | `ast.rs` | 2 |
-| 2 | Hash FNV-1a en codegen | `codegen.rs` | 30 |
-| 3 | Built-ins: `diccionario_nuevo/insertar/obtener/existe/eliminar/longitud/liberar` | 2 (semantic + codegen) | ~250 |
-| 4 | Built-ins: `conjunto_nuevo/insertar/contiene/eliminar/liberar` | 2 (semantic + codegen) | ~120 |
-| 5 | LSP autocompletado | `lsp.rs` | 10 |
+| 1 | `Tipo::Diccionario(K,V)` + `Tipo::Conjunto(T)` en AST | `ast.rs` | ✅ |
+| 2 | Hash multiplicativo + probe loop en codegen | `codegen.rs` | ✅ (FNV-1a pendiente) |
+| 3 | Built-ins: `diccionario_nuevo/insertar/obtener/existe/eliminar/longitud/liberar` | `semantic.rs`, `codegen.rs` | ✅ + método syntax |
+| 4 | Built-ins: `conjunto_nuevo/insertar/contiene/eliminar/liberar` | `semantic.rs`, `codegen.rs` | ✅ (wrapper de diccionario) |
+| 5 | Resize automático (realloc + memset) | `codegen.rs` | ✅ (duplica al llenar) |
+| 6 | Hash probe con wrap-around | `codegen.rs` | ✅ (open addressing) |
+| 7 | LSP autocompletado | `lsp.rs` | ⏳ Pendiente |
 
-**Resultado:** Programas reales con hash maps y conjuntos.
+**Resultado:** Diccionario<K,V> y Conjunto<T> funcionales con resize y hash probe. ~700 líneas de código nuevo.
 
 ### Fase R5 — Proyecto ejemplo 500+ líneas
 - Word counter: lee archivo, tokeniza, cuenta frecuencia con Diccionario, ordena con Vector
@@ -736,7 +739,7 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 - [x] GUIA completa (15 capítulos, ownership, arreglos, funciones, errores)
 - [x] Skill `falcato-language` para LLMs (con reference/builtins.md)
 - [ ] AGENTS.md genérico para cualquier LLM
-- [ ] Diccionario + Conjunto implementados
+- [x] Diccionario + Conjunto implementados
 - [ ] Proyecto ejemplo >500 líneas funcionando
 - [ ] Falso positivo reportado a Microsoft Security Center
 - [ ] Script `install.ps1` probado en máquina limpia
