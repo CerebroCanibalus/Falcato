@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versión (ej: v0.2.0)'
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -58,7 +64,9 @@ jobs:
     - name: Create release ZIP
       shell: pwsh
       run: |
-        Compress-Archive -Path release\* -DestinationPath "falcato-$($env:GITHUB_REF_NAME).zip"
+        $ver = "${{ github.event.inputs.version }}"
+        if (-not $ver) { $ver = "${{ github.ref_name }}" }
+        Compress-Archive -Path release\* -DestinationPath "falcato-$ver.zip"
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
@@ -66,12 +74,12 @@ jobs:
         files: falcato-*.zip
         generate_release_notes: true
         body: |
-          ## Falcato ${{ github.ref_name }}
+          ## Falcato ${{ github.event.inputs.version || github.ref_name }}
 
           Lenguaje de programación de sistemas iberohablante sobre Cranelift.
 
           ### Instalación
-          1. Descarga `falcato-${{ github.ref_name }}.zip`
+          1. Descarga `falcato-${{ github.event.inputs.version || github.ref_name }}.zip`
           2. Extrae en cualquier carpeta
           3. Ejecuta `install.ps1` (PowerShell) — menú interactivo con opciones
           4. Abre una terminal nueva y escribe `falcato version`
