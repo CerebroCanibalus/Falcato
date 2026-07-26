@@ -150,17 +150,118 @@ Si hablas español, ya entiendes la diferencia entre *"el libro"* (lo tengo yo, 
 
 ## ¿En qué se diferencia de otros lenguajes?
 
-| | Falcato | Rust | C | Otros lenguajes en español |
-|---|---------|------|---|---------------------------|
-| **Compila a** | Binario nativo x86_64 | Binario nativo | Binario nativo | Interpretado / bytecode |
-| **Backend** | Cranelift (propio) | LLVM | Ninguno (GCC/Clang) | Varios |
-| **Sistema de tipos** | Gramática española | Algebraic types | Débil/dinámico | Básico |
-| **Ownership** | Artículos (`el`/`la`/`un`) | Borrow checker | Manual | No existe |
-| **Errores** | Español con span + sugerencia | Inglés técnico | Compilados | Varios |
-| **ABI** | C por defecto | Rust (propia) | C | Depende |
-| **Async** | Threads reales + canales | async/await (futures) | No nativo | No existe |
-| **Curva de aprendizaje** | Gradual (Nivel 0→2) | Empinada | Baja pero insegura | Baja pero limitada |
-| **IA-friendly** | Nivel 0 siempre compila | Nivel 2 rechaza mucho | Sin verificación | No diseñado para IA |
+| | Falcato | Rust | C |
+|---|---------|------|---|
+| **Compila a** | Binario nativo x86_64 | Binario nativo | Binario nativo |
+| **Backend** | Cranelift (propio) | LLVM | GCC/Clang |
+| **Sistema de tipos** | Gramática española + affine types | Algebraic types | Débil |
+| **Ownership** | Artículos (`el`/`la`/`un`) | Borrow checker | Manual (malloc/free) |
+| **Errores** | Español con span + sugerencia | Inglés técnico | Cripticos |
+| **ABI** | C por defecto | Rust (propia) | C |
+| **Async** | Threads reales + canales | async/await (futures) | No nativo |
+| **Curva de aprendizaje** | Gradual (Nivel 0→2) | Empinada | Baja pero insegura |
+| **IA-friendly** | Nivel 0 siempre compila | Nivel 2 rechaza mucho | Sin verificación |
+
+---
+
+### 🔍 ¿Y qué hay de los "otros lenguajes en español"?
+
+De vez en cuando alguien compara Falcato con **Latino**, **PSeInt**, **EsJS** o proyectos similares.
+La comparación es natural — todos usan español. Pero técnicamente no pertenecen ni a la misma
+**categoría** de lenguaje. Veamos:
+
+#### 🇪🇸 El ecosistema de lenguajes en español (investigado a fondo)
+
+| Lenguaje | Año | Categoría real | Implementación | ¿Compila a nativo? | ¿Ownership? | ¿Sistemas? |
+|----------|-----|----------------|----------------|--------------------|-------------|---|
+| **PSeInt** | 2003 | Pseudocódigo educativo | Intérprete en C++ | ❌ Interpreta pseudocódigo | ❌ | ❌ |
+| **Latino** | 2015 | Scripting dinámico | Intérprete en C (bytecode VM) | ❌ Interpreta bytecode | ❌ | ❌ |
+| **EsJS** | 2023 | Transpilador | JS → JS (reescritura de tokens) | ❌ Transpila a JavaScript | ❌ | ❌ |
+| **Sí** | 2023 | Preprocesador | Python → C++/Python (cambia keywords) | ❌ Traduce a C++ | ❌ | ❌ |
+| **Falcato** | 2025 | Lenguaje de sistemas | Compilador Rust → Cranelift → .o | ✅ Binario nativo x86_64 | ✅ Artículos + affine | ✅ C ABI + FFI |
+
+#### 🧩 ¿Por qué no tiene sentido compararlos?
+
+**PSeInt** — Es una **herramienta educativa** que ejecuta pseudocódigo paso a paso. No produce
+binarios. No tiene tipos reales. No tiene memoria dinámica. No puede llamar al sistema operativo.
+No está diseñado para producir software — está diseñado para **enseñar lógica** a principiantes.
+
+```pseudocodigo
+// PSeInt — pseudocódigo educativo, no ejecutable fuera del intérprete
+Escribir "Hola mundo"
+Leer nombre
+```
+
+**Latino** — Es un **lenguaje interpretado** con bytecode VM, como Lua o Python pero en español.
+Sus tipos son dinámicos. No tiene compilación a nativo. No tiene control de memoria. Es
+perfectamente válido como lenguaje de scripting educativo, pero está **en las antípodas**
+de un lenguaje de sistemas que corre sobre el metal.
+
+```latino
+// Latino — scripting dinámico, interpretado, sin tipos estáticos
+escribir("Hola mundo")
+```
+
+**EsJS** — Es un **transpilador** que reemplaza keywords de JavaScript por sus equivalentes
+en español (`si` → `if`, `mientras` → `while`). No tiene su propio parser, no tiene su propio
+sistema de tipos, no tiene su propio backend. Es JavaScript con un **diccionario de sinónimos**.
+
+```esjs
+// EsJS — transpila 1:1 a JavaScript. Sigue siendo JS.
+si (verdadero) {
+    consola.escribir("Hola")
+}
+```
+
+**Sí** — Es un **preprocesador** que traduce keywords al español y genera código en C++ o Python.
+No tiene implementación propia. No añade semántica nueva. Es un `sed` con esteroides.
+
+```sí
+// Sí — preprocesador que genera C++. No aporta semántica nueva.
+imprimir("Hola")
+```
+
+#### 🏗️ Ahora, Falcato
+
+```falcato
+// Falcato — compilador propio, backend Cranelift, tipos reales, ownership, C ABI
+el mensaje: Texto = texto_desde("Hola mundo");
+imprimir_linea(mensaje);
+mensaje.liberar();
+
+inseguro función MessageBoxA(hwnd: Entero64, texto: Palabra,
+    titulo: Palabra, tipo: Entero32) -> Entero32;
+
+función principal() -> Entero32 {
+    MessageBoxA(0, "Falcato compila a binario nativo", "Falcato", 0);
+    retornar 0;
+}
+```
+
+**La diferencia no es de grado — es de categoría:**
+
+| Dimensión | Latino / PSeInt / EsJS / Sí | Falcato |
+|-----------|---------------------------|---------|
+| **Backend propio** | ❌ (usan C, JS, C++) | ✅ **Cranelift** (Bytecode Alliance) |
+| **Compilación a nativo** | ❌ | ✅ **.exe sin runtime** |
+| **Sistema de tipos estático** | ❌ (dinámico o pseudotipos) | ✅ **Concordancia Lingüística** |
+| **Ownership en tiempo de compilación** | ❌ | ✅ **Artículos + affine types** |
+| **ABI de C** | ❌ | ✅ **Llamada directa a Win32/C** |
+| **Async real con threads del SO** | ❌ | ✅ **CreateThread + canales + thread pool** |
+| **FFI a C sin glue code** | ❌ | ✅ **`inseguro fn` directo** |
+| **Manejo de errores con `Resultado<T,E>` + `?`** | ❌ | ✅ |
+| **Genéricos con monomorfización** | ❌ | ✅ |
+| **Rasgos/Traits** | ❌ | ✅ |
+| **LSP con hover, goto-def, find-refs** | ❌ | ✅ |
+| **Bitfields para hardware** | ❌ | ✅ |
+| **Self-referential structs** | ❌ | ✅ |
+
+> **Falcato no compite con Latino, PSeInt, EsJS o Sí.** Compite con **Rust, C, Go y Zig**.
+> Los proyectos en español existentes son herramientas educativas o transpiladores ligeros —
+> perfectamente válidos en su nicho, pero conceptualmente ortogonales a Falcato.
+>
+> Sería como comparar **Python** con **C**: ambos son lenguajes de programación, pero están
+> diseñados para problemas fundamentalmente distintos.
 
 ---
 
