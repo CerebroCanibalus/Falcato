@@ -1,7 +1,7 @@
 función principal() -> Entero32 {
     el t: Texto = texto_desde("Hola");
     texto_agregar(t, ", mundo");
-    el len: Entero32 = texto_longitud(t);
+    el largo: Entero32 = texto_longitud(t);
     texto_liberar(t);
-    retornar len;
+    retornar largo;
 }

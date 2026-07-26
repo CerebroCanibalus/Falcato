@@ -10,20 +10,20 @@ función principal() -> Entero32 {
     imprimir_linea(c);
 
     // Longitud
-    el len: Entero32 = texto_longitud(c);
+    el largo: Entero32 = texto_longitud(c);
     imprimir_linea("longitud de c: ");
-    imprimir(len);
+    imprimir(largo);
     imprimir_linea("");
 
     // Subtexto [0, 4) = "Hola"
-    el sub: Texto = texto_subtexto(c, 0, 4);
+    el trozo: Texto = texto_subtexto(c, 0, 4);
     imprimir_linea("subtexto [0,4): ");
-    imprimir_linea(sub);
+    imprimir_linea(trozo);
 
     // Subtexto [5, 11) = "Mundo"
-    el sub2: Texto = texto_subtexto(c, 5, 11);
+    el trozo2: Texto = texto_subtexto(c, 5, 11);
     imprimir_linea("subtexto [5,11): ");
-    imprimir_linea(sub2);
+    imprimir_linea(trozo2);
 
     // Comparar
     el cmp1: Entero32 = texto_comparar(a, a);
@@ -46,8 +46,8 @@ función principal() -> Entero32 {
     texto_liberar(a);
     texto_liberar(b);
     texto_liberar(c);
-    texto_liberar(sub);
-    texto_liberar(sub2);
+    texto_liberar(trozo);
+    texto_liberar(trozo2);
 
     retornar 0;
 }

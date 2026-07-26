@@ -21,9 +21,9 @@ función principal() -> Entero32 {
     imprimir_linea(leido);
 
     // Longitud del texto leido
-    el len: Entero32 = texto_longitud(leido);
+    el largo: Entero32 = texto_longitud(leido);
     imprimir_linea("longitud: ");
-    imprimir(len);
+    imprimir(largo);
     imprimir_linea("");
 
     // Verificar archivo que no existe
