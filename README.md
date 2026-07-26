@@ -85,6 +85,97 @@ Falcato responde a tres preguntas:
 
 ---
 
+## 🤔 ¿Pero por qué español DE VERDAD?
+
+Esta es la pregunta que más nos hacen, y merece una respuesta clara:
+
+**Falcato no usa español porque "hay que traducir keywords para que los latinos aprendan".**
+Falcato usa español porque **el español tiene herramientas gramaticales que el inglés no tiene**,
+y esas herramientas permiten construir **sistemas de verificación de compilación más expresivos**.
+
+No es inclusión. Es **ingeniería**.
+
+### 🧠 Las 3 razones de fondo
+
+#### 1. El español tiene más dimensiones semánticas que el inglés
+
+El inglés es un lenguaje analítico y minimalista. El español es **flexivo y sintético** —
+transmite mucha más información en cada palabra mediante desinencias, género, número,
+tiempo, modo y aspecto. En programación, **más dimensiones gramaticales = más ejes de verificación**.
+
+| Dimensión | En inglés | En español | Qué permite en Falcato |
+|-----------|-----------|------------|----------------------|
+| **Género** | No existe para objetos | Masculino/femenino para **todo** | Ownership: `el` (owned) vs `la` (borrowed) |
+| **Ser/Estar** | Traduce ambos como "to be" | Dos verbos de existencia | Const (`es`) vs Mut (`está`) |
+| **Subjuntivo** | Casi extinto ("If I were...") | Vivo y productivo | Cold paths, incertidumbre, fallo esperado |
+| **Prefijos** | Limitados (re-, un-, pre-) | Productivos: re-, des-, pre-, entre-, contra- | Semántica de sistema: retry, free, comptime |
+| **Artículos** | the/a/an (3) | el/la/un/una/los/las/unos/unas (8) | 5+ niveles de ownership y visibilidad |
+
+#### 2. La brecha semántica LLM → código se reduce drásticamente
+
+Un LLM genera texto en lenguaje natural. Cuando el lenguaje de programación **es** lenguaje
+natural (estructurado), la distancia entre lo que el LLM "piensa" y lo que escribe se acorta.
+
+```falcato
+// Lo que un LLM "piensa" en español:
+// "Guarda este texto en una variable. El texto es mutable (el).
+// Si está vacío, retorna error."
+
+// Lo que genera en Falcato:
+el contenido: Texto = texto_desde("datos");
+si contenido.tam() está 0 { retornar Resultado.Error(-1); }
+
+// En Rust tendría que "traducir" su pensamiento al inglés:
+// "Store this text in a variable. The text is mutable (let mut).
+// If it's empty, return an error."
+let mut contents: String = String::from("data");
+if contents.len() == 0 { return Err(-1); }
+```
+
+Esa **fricción de traducción** no es anecdótica. Es el motivo principal por el que la
+programación tiene una barrera de entrada artificial para 600M de hispanohablantes.
+Y es también el motivo por el que los LLM generan código con más errores semánticos
+en lenguajes inglés-nativos: el modelo tiene que traducir dos veces
+(idea → lenguaje natural → código) en vez de una (idea → código en su idioma).
+
+#### 3. No es "keywords en español" — es el sistema de TYPES en español
+
+La diferencia crucial entre Falcato y todos los demás lenguajes en español:
+
+| Proyecto | Qué hace en español | Qué NO puede hacer |
+|----------|-------------------|-------------------|
+| **Latino, EsJS, Sí, Águila** | Traducir keywords (`if` → `si`, `function` → `funcion`) | Nada semánticamente nuevo. El backend (JS, Python, Node) no cambia. |
+| **WN++** | Keywords + identidad cultural chilena | Intérprete educativo. Tipado dinámico. Sin verificación en compilación. |
+| **Falcato** | **El español es el sistema de tipos** | `el`/`la`/`un` = affine types. `es`/`está` = const/mut. `fuese` = cold path. Concordancia = type checking. |
+
+En Falcato, cambiar el artículo cambia **las garantías de compilación**:
+
+```falcato
+la x: Entero32 = 10;    // Prestado, inmutable — no se puede modificar
+el x: Entero32 = 10;    // Owned, mutable — se puede modificar
+x = 20;                  // ✅ si es 'el', ❌ si es 'la'
+```
+
+Eso no es decoración. Es **el sistema de affine types integrado en la gramática**.
+
+En WN++, `pega` en vez de `fn` es un cambio léxico. El intérprete trata `pega` exactamente
+como cualquier otro lenguaje trata `function` o `def`. En Falcato, `el` vs `la` no es léxico —
+es semántico. El compilador **razona** sobre esa diferencia.
+
+### 🎯 La tesis, clara
+
+> **Falcato existe porque el español tiene recursos gramaticales que permiten construir
+> un lenguaje de sistemas más expresivo, más verificable y más cercano al pensamiento humano
+> que cualquier lenguaje diseñado exclusivamente en inglés.**
+
+No estamos "traduciendo Rust al español". Estamos explorando una pregunta que nadie
+en la industria del software se ha tomado en serio:
+
+**¿Y si 500 años de evolución lingüística pudieran informar el diseño de lenguajes
+de programación, en vez de ignorarse porque "el inglés es el estándar"?**
+
+---
+
 ## Lo que nos hace verdaderamente únicos
 
 ### 🧬 El español ES el sistema de tipos
@@ -176,8 +267,10 @@ La comparación es natural — todos usan español. Pero técnicamente no perten
 |----------|-----|----------------|----------------|--------------------|-------------|---|
 | **PSeInt** | 2003 | Pseudocódigo educativo | Intérprete en C++ | ❌ Interpreta pseudocódigo | ❌ | ❌ |
 | **Latino** | 2015 | Scripting dinámico | Intérprete en C (bytecode VM) | ❌ Interpreta bytecode | ❌ | ❌ |
+| **Águila** | 2025 | Scripting dinámico | Node.js (npm), núcleo privado | ❌ Transpila/interpreta | ❌ | ❌ |
 | **EsJS** | 2023 | Transpilador | JS → JS (reescritura de tokens) | ❌ Transpila a JavaScript | ❌ | ❌ |
 | **Sí** | 2023 | Preprocesador | Python → C++/Python (cambia keywords) | ❌ Traduce a C++ | ❌ | ❌ |
+| **WN++** | 2025 | Intérprete educativo | Rust (tree-walking, bytecode VM en ruta) | ❌ Interpreta AST/bytecode | ❌ | ❌ |
 | **Falcato** | 2025 | Lenguaje de sistemas | Compilador Rust → Cranelift → .o | ✅ Binario nativo x86_64 | ✅ Artículos + affine | ✅ C ABI + FFI |
 
 #### 🧩 ¿Por qué no tiene sentido compararlos?
@@ -221,6 +314,34 @@ No tiene implementación propia. No añade semántica nueva. Es un `sed` con est
 imprimir("Hola")
 ```
 
+**Águila** — Se presenta como "lenguaje profesional compilado de alto rendimiento", pero se instala
+vía `npm install -g aguila-lang` y su núcleo es privado (no hay compilador real que auditar).
+Es un lenguaje de **scripting dinámico** sobre Node.js con keywords y métodos nativos en español.
+Tiene 54 estrellas en GitHub, un gestor de paquetes, y funcionalidades de ciencia de datos.
+Su mérito no está en el backend — es esencialmente Node.js con sintaxis en español.
+
+```aguila
+# Águila — scripting dinámico sobre Node.js
+funcion saludar(nombre) {
+    retornar a"Hola, {nombre}!"
+}
+imprime(saludar("Mundo"))
+```
+
+**WN++** — Es un **intérprete tree-walking** escrito en Rust con identidad **chilena** (`pega` para
+fn, `cachai` para if, `lorea` para print). Es explícitamente educativo: su propósito es que alguien
+pueda leer el código fuente y entender cómo funciona un intérprete por dentro. Tiene 53 estrellas,
+es código abierto real, y es honesto sobre no ser un lenguaje de producción (todavía).
+
+```wn
+// WN++ — intérprete educativo chileno, tipado dinámico
+pega fibonacci(n) {
+  cachai (n <= 1) { n }
+  si no { fibonacci(n - 1) + fibonacci(n - 2) }
+}
+lorea(fibonacci(10))  // 55
+```
+
 #### 🏗️ Ahora, Falcato
 
 ```falcato
@@ -240,8 +361,8 @@ función principal() -> Entero32 {
 
 **La diferencia no es de grado — es de categoría:**
 
-| Dimensión | Latino / PSeInt / EsJS / Sí | Falcato |
-|-----------|---------------------------|---------|
+| Dimensión | Latino / PSeInt / EsJS / Sí / Águila / WN++ | Falcato |
+|-----------|----------------------------------------------|---------|
 | **Backend propio** | ❌ (usan C, JS, C++) | ✅ **Cranelift** (Bytecode Alliance) |
 | **Compilación a nativo** | ❌ | ✅ **.exe sin runtime** |
 | **Sistema de tipos estático** | ❌ (dinámico o pseudotipos) | ✅ **Concordancia Lingüística** |
@@ -256,7 +377,7 @@ función principal() -> Entero32 {
 | **Bitfields para hardware** | ❌ | ✅ |
 | **Self-referential structs** | ❌ | ✅ |
 
-> **Falcato no compite con Latino, PSeInt, EsJS o Sí.** Compite con **Rust, C, Go y Zig**.
+> **Falcato no compite con Latino, PSeInt, EsJS, Águila, WN++ o Sí.** Compite con **Rust, C, Go y Zig**.
 > Los proyectos en español existentes son herramientas educativas o transpiladores ligeros —
 > perfectamente válidos en su nicho, pero conceptualmente ortogonales a Falcato.
 >
