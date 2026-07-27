@@ -1,4 +1,4 @@
-﻿![Falcato Banner](assets/images/falcato_banner.png)
+﻿﻿![Falcato Banner](assets/images/falcato_banner.png)
 
 **Lenguaje de sistemas iberohablante.** Forjado sobre Cranelift. Compila a binarios nativos x86_64.
 
@@ -69,6 +69,7 @@ Falcato responde a tres preguntas:
 |----------|-----------|
 | **¿Y si el español pudiera expresar garantías de compilación?** | Los artículos (`el`/`la`/`un`) codifican posesión. Los tiempos verbales codifican modos de ejecución. El subjuntivo codifica caminos fríos. |
 | **¿Y si un LLM pudiera generar código que compila en Nivel 0?** | Nivel 0 (permisivo) siempre compila. El compilador sugiere, no rechaza. Un LLM genera → compiler sugiere → LLM refina → <3 iteraciones a Nivel 2. |
+| **¿Y si un LLM pudiera generar código que compila en Nivel 0?** | Nivel 0 (permisivo) siempre compila. El compilador sugiere, no rechaza. Un LLM genera → compilador sugiere → LLM refina → <3 iteraciones a Nivel 2. |
 | **¿Y si la ingeniería de lenguajes pudiera explorar una dimensión lingüística distinta?** | 500+ años de evolución del español ofrecen dimensiones que el inglés no tiene: género, ser/estar, subjuntivo, prefijos productivos, voz activa/pasiva. Falcato las convierte en garantías de compilación. |
 
 ---
@@ -393,6 +394,7 @@ Si piensas en español cuando programas, Falcato elimina la fricción mental de 
 
 ### 🤖 Generadores de código por IA
 Nivel 0 siempre compila. El compilador sugiere con códigos + intervalo + corrección concreto. Un LLM genera → compiler sugiere → LLM refina → compila. Menos iteraciones, más confianza.
+Nivel 0 siempre compila. El compilador sugiere con códigos + intervalo + corrección concreto. Un LLM genera → compilador sugiere → LLM refina → compila. Menos iteraciones, más confianza.
 
 ### 🔧 Programadores de sistemas
 C ABI por defecto. Cranelift para compilación rápida. Bitfields para hardware. Regiones para asignación de arena. Sin GC, sin ejecución oculta.
@@ -402,6 +404,105 @@ La concordancia lingüística hace que los errores sean intuitivos. Un estudiant
 
 ### 🏗️ Proyectos de IA + sistemas
 Falcato + Cranelift + WASM = toolchain nativa para código generado por IA. Compilación ultra-rápida, sandbox WASM para ejecución segura, binarios nativos para rendimiento.
+
+---
+
+## 🛠️ ¿Qué puedes construir con Falcato?
+
+Falcato no es solo un experimento lingüístico — es un lenguaje de sistemas listo para
+**problemas que otros lenguajes abordan con fricción**. Aquí hay categorías donde Falcato
+tiene ventajas reales hoy:
+
+### 🖥️ Aplicaciones Win32 nativas con GUI
+
+Sin Electron, sin webview, sin ejecución externa. MessageBox, ventanas, controles — vía FFI directo
+a `user32.dll` + `gdi32.dll`. El trampolín C precompilado maneja el message loop.
+
+```falcato
+inseguro fn CreateWindowExA(...) -> Entero64;
+inseguro fn DispatchMessageA(msg: &MSG) -> Entero64;
+// Ventana nativa en <100 líneas, sin dependencias
+```
+
+**Qué puedes hacer:** asistentes de escritorio, herramientas de sistema, monitores en tiempo real,
+prototipos de UI sin el peso de un framework web. **[Ver guía completa](docs/diseno_gui.md)**
+
+### 🔌 Drivers y herramientas de kernel-mode (preparado)
+
+C ABI + `inseguro fn` + bitfields para registros hardware + `región` para asignación de arena
+determinística + sin recolector de basura. El perfil perfecto para código de sistema.
+
+```falcato
+estructural RegistroUART {
+    bits {
+        habilitado: Natural1,   // bit 0
+        modo_tx: Natural2,      // bits 1-2
+        baud_div: Natural12,    // bits 3-14
+    }
+}
+// reg.baud_div = 868; → el compilador genera shifts + máscaras
+```
+
+**Qué puedes hacer:** drivers de dispositivo, firmware embebido, controladores de hardware,
+código de arranque, manipulación de registros MMIO con verificación de rangos en tiempo
+de compilación (ningún otro lenguaje de sistemas ofrece esto sin macros).
+
+### ⚡ Middleware de alto rendimiento para IA
+
+Compilación ultra-rápida (Cranelift AOT) + sandbox WASM + Nivel 0 siempre compila.
+El caso de uso que define Falcato: código generado por agentes de IA que debe
+ejecutarse rápido, seguro, y sin fricción.
+
+```
+LLM genera Falcato → falcato check (Nivel 0) → falcato build → .exe nativo
+    ~100ms por iteración            No rechaza          Sin ejecución externa
+```
+
+**Qué puedes hacer:** plugins de inferencia, middlewares de datos, funciones de scoring,
+clasificadores en tiempo real, transformadores ETL, workers de procesamiento —
+todo generado por IA, compilado a nativo, ejecutado en sandbox.
+
+### 🌐 Servidores TCP concurrentes (async real)
+
+No es async fingido con event loop — son hilos del SO reales. `lanzar` = CreateThread.
+`canal_nuevo` = mutex + semaphore. `con_executor(N)` = grupo de hilos con cancelación.
+
+```falcato
+con_executor(4) {
+    lanzar manejar_cliente(socket);
+    lanzar manejar_cliente(socket);
+}
+```
+
+**Qué puedes hacer:** servidores de chat, balanceadores simples, proxies,
+procesamiento paralelo de datos, workers de cola — con cancelación estructurada
+que no deja fugas.
+
+### 📊 Herramientas de línea de comandos
+
+Compilación a .exe único sin dependencias DLL. Sin ejecución externa, sin VM, sin Node.
+Un binario de 15KB que funciona en cualquier Windows x64 desde 2010.
+
+```falcato
+función principal() -> Entero32 {
+    el args: Vector<Texto> = ambiente::args();
+    // args.tam(), args[0], args[1]...
+}
+```
+
+**Qué puedes hacer:** procesadores de logs, generadores de informes, renombradores batch,
+analizadores de archivos, asistentes CLI, herramientas de DevOps — un solo .exe, cero
+dependencias, cero sorpresas.
+
+### 🧩 Lo que NADIE más puede hacer (combinaciones únicas)
+
+| Combinación | Falcato | Rust | C | Go |
+|------------|---------|------|---|----|
+| **Artículos = affine types + compilación gradual** | ✅ Nativo | ❌ Nivel 2 o nada | ❌ Sin verificación | ❌ Sin affine types |
+| **Self-referential structs sin workarounds** | ✅ `&yo T` | ❌ Pin + unsafe | ✅ (pero inseguro) | ❌ |
+| **Bitfields como tipos (no macros)** | ✅ `bits { }` | ❌ Macros o crate | ❌ Manual | ❌ |
+| **Arena asignación lexically scoped** | ✅ `región { }` | ❌ Crate externo | ❌ Manual | ❌ |
+| **100% español en tipos, errores, y sintaxis** | ✅ Primer lenguaje de sistemas | ❌ | ❌ | ❌ |
 
 ---
 
@@ -431,6 +532,7 @@ Falcato + Cranelift + WASM = toolchain nativa para código generado por IA. Comp
 - vidas léxicos: `&nombre T`
 - Field-level préstamo (`&mut punto.x` vs `&mut punto.y`)
 - Branch-aware liveness (borrows mueren por rama del CFG)
+- Branch-aware liveness (préstamos mueren por rama del CFG)
 - Artículos extendidos: `los` = Posesión compartida, `las` = Prestado compartido
 
 ### Estructuras de datos
@@ -502,7 +604,7 @@ cargo build --release
 
 ### Probar
 ```powershell
-.\target\\release\\falcato.exe version
+.\target\release\falcato.exe version
 ```
 
 ---
