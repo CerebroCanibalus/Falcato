@@ -29,7 +29,11 @@ jobs:
     - name: Cache cargo dependencies
       uses: Swatinem/rust-cache@v2
 
-    - name: Build release binary
+    - name: Build runtime library (release)
+      run: cargo build --release --verbose
+      working-directory: lib/falcato_runtime
+
+    - name: Build compiler (release)
       run: cargo build --release --verbose
 
     - name: Create release directory structure
@@ -37,6 +41,7 @@ jobs:
       run: |
         New-Item -ItemType Directory -Force -Path release\bin
         New-Item -ItemType Directory -Force -Path release\ejemplos
+        New-Item -ItemType Directory -Force -Path release\runtime
         New-Item -ItemType Directory -Force -Path release\skills
         New-Item -ItemType Directory -Force -Path release\agents
 
@@ -46,16 +51,18 @@ jobs:
         # Copy binary
         Copy-Item target\release\falcato.exe release\bin\
 
+        # Copy runtime library
+        Copy-Item lib\falcato_runtime\target\release\falcato_runtime.lib release\runtime\
+
         # Copy examples
         Copy-Item ejemplos\*.fc release\ejemplos\
 
         # Copy docs
-        Copy-Item README.md, LICENSE, INSTALL.md, GUIA.md, REFERENCIA.md, ERRORES.md, CHANGELOG.md release\
-        Copy-Item GUIA release\GUIA -Recurse
+        Copy-Item README.md, LICENSE, INSTALL.md, GUIA.md, REFERENCIA.md, ERRORES.md release\
 
         # Copy skills & agents
-        Copy-Item skills\* release\skills\ -Recurse
-        Copy-Item agents\* release\agents\ -Recurse
+        Copy-Item skills\* release\skills\ -Recurse -ErrorAction SilentlyContinue
+        Copy-Item agents\* release\agents\ -Recurse -ErrorAction SilentlyContinue
 
         # Copy installers
         Copy-Item install.ps1 release\
