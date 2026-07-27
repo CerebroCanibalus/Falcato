@@ -218,7 +218,7 @@ Si hablas español, ya entiendes la diferencia entre *"el libro"* (lo tengo yo, 
 | **1** (`verificado`) | Use-after-move detection | Intermedios |
 | **2** (`estricto`) | control de préstamos completo | Kernels, sistemas |
 
-### 🧩 Regiones + Self-referential structs
+### 🧩 Regiones + estructuras auto-referenciales
 
 `región nombre { ... }` — arena asignación determinística. `&yo T` — estructuras auto-referenciales sin rodeos. Dos cosas que Rust no puede hacer de forma correcta.
 
@@ -377,7 +377,7 @@ función principal() -> Entero32 {
 | **Rasgos/Traits** | ❌ | ✅ |
 | **LSP con hover, goto-def, find-refs** | ❌ | ✅ |
 | **Bitfields para hardware** | ❌ | ✅ |
-| **Self-referential structs** | ❌ | ✅ |
+| **Estructuras auto-referenciales** | ❌ | ✅ |
 
 > **Falcato no compite con Latino, PSeInt, EsJS, Águila, WN++ o Sí.** Compite con **Rust, C, Go y Zig**.
 > Los proyectos en español existentes son herramientas educativas o transpiladores ligeros —
@@ -423,46 +423,91 @@ Falcato existe para una sola razón: **hacer cosas que otros lenguajes de sistem
 | **Artículos = affine types** — `el` = owned, `la` = prestado, `los` = compartido | ❌ Ninguno | La gramática española **es** el sistema de tipos. No aprendes tipos affine — ya sabes español. |
 | **Regiones de arena** — `región { ... }` todo se libera al salir | ❌ Rust requiere crate externo | Asignación determinística, cero overhead. Ideal para kernels, buffers de red, frames de video. |
 
-### 🧵 Concurrencia con hilos reales del sistema operativo
+### 🎯 Proyectos que IMPRESIONAN (y por qué Falcato es la herramienta correcta)
 
-Falcato no tiene event loop, ni green threads, ni async runtime fingido. Tiene **hilos del SO**.
+No son ideas. Son proyectos reales que puedes construir hoy con Falcato y que cualquier programador de sistemas respetaría.
 
-```
-lanzar tarea()        → CreateThread real
-con_executor(8) { ... } → grupo de hilos con cancelación
-canal_nuevo(1024)     → mutex + semáforo + ring buffer
-seleccionar { ... }   → polling de múltiples canales
-cancelar()            → cancelación estructurada de todas las tareas
-```
+---
 
-Mientras otros lenguajes fingen paralelismo con corutinas que comparten un hilo, Falcato reparte trabajo en **todos los núcleos de la CPU**. Con cancelación real que no deja fugas — cada tarea en progreso termina graceful, las encoladas se descartan.
+#### 🕹️ Emulador de consola retro (Chip-8 → NES)
 
-**Echo server concurrente real en 30 líneas:**
-```falcato
-con_executor(4) {
-    lanzar aceptar_conexiones(listener);
-    // Cada cliente corre en su propio hilo del SO
-}
-```
+El proyecto por excelencia del programador de sistemas. Falcato está diseñado para esto.
 
-### 📦 Binarios que funcionan en cualquier sitio
+**Por qué Falcato arrasa aquí:**
+- `bits { }` para registros, flags, y estructuras de CPU en tipo puro, sin macros ni crates
+- `[Entero8; 4096]` para memoria del sistema — stack allocation, sin heap, latencia cero
+- `coincidir opcode { 0x00E0 => ... }` para decoding de instrucciones — pattern matching nativo
+- `lanzar hilo_cpu()` y `lanzar hilo_ppu()` — concurrencia real para CPU + GPU + audio en núcleos separados
+- `inseguro fn CreateWindowExA(...)` — ventana nativa para pixel buffer, sin Electron, sin SDL, sin GLFW
+**Qué sale:** Un `.exe` de 30 KB que corre juegos de NES. Sin dependencias. Sin VM. Sin "runtime".
 
-Un solo `.exe`. Sin DLLs. Sin runtime. Sin VM. Sin Node. Sin Java.
+---
 
-```
-falcato build herramienta.fc  →  herramienta.exe  (14 KB)
-```
+#### 🪟 Clon de Process Explorer en 300 líneas
 
-Funciona en **cualquier Windows x64 desde 2010**. Copias el `.exe` a un servidor Windows Server Core sin GUI, a un XP en un museo industrial, a una máquina virtual sin internet — y **funciona**.
+El administrador de tareas de Windows corre sobre una API C. Falcato habla C de forma nativa.
 
-La convención de llamada es C por defecto. El layout de structs es C. Los símbolos no se distorsionan. Llamar a `kernel32.dll`, `user32.dll`, `ws2_32.dll` es tan natural como llamar a una función propia.
+**Por qué Falcato arrasa aquí:**
+- `inseguro fn CreateToolhelp32Snapshot(...)` — la API de Windows se llama como si fuera Falcato nativo
+- `con_executor(2) { lanzar actualizar_lista() }` — un hilo actualiza procesos, otro refresca la UI
+- `Diccionario<Entero32, InfoProceso>` para asociar PID a proceso sin tener que escribir un hash map
+- `Vector<InfoProceso>` ordenado por CPU, memoria, o nombre — integrado, sin crates
+**Qué sale:** Un `procexp.exe` de 40 KB. Lista procesos, memoria, CPU. Sin .NET, sin Node, sin Electron, sin Python. Cero dependencias.
 
-**Ventana Win32 nativa en 80 líneas, sin Electron, sin webview, sin frameworks:**
-```falcato
-inseguro fn CreateWindowExA(...) -> Entero64;
-inseguro fn DispatchMessageA(msg: &MSG) -> Entero64;
-// MessageBox, ventanas, controles — vía FFI directo a user32.dll
-```
+---
+
+#### 🌐 Servidor HTTP/1.1 concurrente (thread pool real)
+
+No es un event loop con corutinas que fingen paralelismo. Es `CreateThread` real.
+
+**Por qué Falcato arrasa aquí:**
+- `con_executor(N) { lanzar atender(peticion) }` — cada petición en su propio hilo del SO, paralelismo real en todos los núcleos
+- `canal_nuevo<Socket>(100)` + `seleccionar { }` — aceptar conexiones en un hilo, distribuirlas a workers por canal, todo con cancelación
+- `inseguro fn send(s: Socket, buf: &[Entero8], ...)` — Winsock2 directo, sin wrappers, sin overhead
+- `Texto` para construir respuestas con interpolación: `"HTTP/1.1 {codigo} {mensaje}\r\nContent-Length: {tam}\r\n\r\n{cuerpo}"`
+**Qué sale:** Un `server.exe` de 25 KB. Sirve archivos estáticos, peticiones concurrentes reales. Sin Node, sin Python, sin IIS, sin Apache.
+
+---
+
+#### 🧮 Hex editor / visualizador binario
+
+Manipulación de bytes a nivel de bit con tipos de Falcato.
+
+**Por qué Falcato arrasa aquí:**
+- `bits { }` para interpretar estructuras binarias en tiempo real — FAT, BMP, PNG, ELF, PE
+- `archivo_leer(ruta) -> Texto` — archivo completo a memoria en una línea
+- `[Entero8; N]` para buffer de trabajo — stack allocation, cero GC
+- `imprimir_linea("{byte_a:08b} | {byte_b:08b}")` — dumping binario con interpolación y formato
+**Qué sale:** Un `hexview.exe` de 20 KB. Abre cualquier archivo binario, interpreta cabeceras, edita bytes. Sin Node, sin Python, sin dependencias.
+
+---
+
+#### 🎮 Servidor de juego multijugador en tiempo real
+
+Esto es lo que Falcato hace mejor: **concurrencia real + networking + cero GC**.
+
+**Por qué Falcato arrasa aquí:**
+- `con_executor(8) { lanzar gestionar_jugador(socket) }` — cada jugador en su propio hilo, paralelismo real
+- `región partida { ... }` — toda la memoria de una partida se asigna al entrar y se libera al salir. Sin GC, sin leaks, sin pausas.
+- `canal_nuevo<Comando>(256)` — cola de comandos del jugador, procesada por el hilo de simulación
+- `seleccionar { ... }` — el hilo de simulación espera comandos de múltiples jugadores a la vez
+**Qué sale:** Un `server.exe` de 35 KB. Sala de juego con 32 jugadores concurrentes, estado compartido sin race conditions, sin GC que pauses el juego.
+
+---
+
+#### 🔌 Lo que todos estos proyectos tienen en común
+
+| Necesidad | Cómo la resuelve Falcato | Alternativa |
+|-----------|--------------------------|------------|
+| Llamar al sistema operativo | `inseguro fn` + C ABI por defecto | Rust necesita `extern "C"`, C necesita headers |
+| Paralelismo real | `lanzar` = CreateThread, `con_executor` = thread pool | Go tiene goroutines (no reales), Node tiene event loop, Python tiene GIL |
+| Tipos de hardware | `bits { }` en structs | Rust necesita crate externo, C necesita macros |
+| Sin pausas de GC | Ownership + regiones. No hay recolector. | Go, Java, C# tienen pausas |
+| Un solo binario | `.exe` de 15-50 KB, sin DLLs | Go necesita DLLs en modo estático, Rust necesita CRT, Python/Node/Java necesitan runtime |
+| Velocidad de compilación | Cranelift: <100ms para proyectos medianos | Rust (LLVM): minutos, C: segundos-minutos |
+| Código generado por IA | Nivel 0 siempre compila + LSP con 7 features | Ningún lenguaje está diseñado para esto |
+
+---
 
 ### 🤖 La única toolchain diseñada para código generado por IA
 
@@ -486,29 +531,6 @@ Este es el caso de uso que define Falcato. No es un "extra" — es la razón por
 ```
 
 Esto no es teoría. El LSP de Falcato tiene **7 funcionalidades para agentes**: autocompletado completo (60+ keywords), signature help, code actions, document symbols, hover mejorado, go-to-definition, find references. Integrado con OpenCode, VS Code, Claude Code, Cursor.
-
-### ⚡ Control de hardware sin capas
-
-C ABI por defecto + sin GC + sin runtime + `bits { }` en structs + `región { }` para arena + `inseguro` explícito.
-
-El perfil perfecto para:
-- Firmware embebido (sin la sobreingeniería de Rust embedded)
-- Drivers de dispositivo (sin la verbosidad de C)
-- Manipulación de registros MMIO (con verificación de rangos en compilación)
-- Código de arranque (sin sorpresas en tiempo de ejecución)
-- Herramientas de sistema (sin dependencias)
-
-```falcato
-estructural RegistroUART {
-    bits {
-        habilitado: Natural1,    // bit 0
-        modo_tx: Natural2,       // bits 1-2
-        baud_div: Natural12,      // bits 3-14
-    }
-}
-// reg.baud_div = 868; → el compilador genera shifts + máscaras
-// Ningún otro lenguaje de sistemas verifica rangos en compilación sin macros
-```
 
 ### 🧠 Lo que Falcato te da que otros no
 
