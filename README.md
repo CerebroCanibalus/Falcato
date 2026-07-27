@@ -403,7 +403,7 @@ C ABI por defecto. Cranelift para compilación rápida. Bitfields para hardware.
 La concordancia lingüística hace que los errores sean intuitivos. Un estudiante entiende `[T001]` sin necesidad de leer documentación técnica.
 
 ### 🏗️ Proyectos de IA + sistemas
-Falcato + Cranelift + WASM = toolchain nativa para código generado por IA. Compilación ultra-rápida, sandbox WASM para ejecución segura, binarios nativos para rendimiento.
+Falcato + Cranelift + WASM = cadena de herramientas nativa para código generado por IA. Compilación ultra-rápida, sandbox WASM para ejecución segura, binarios nativos para rendimiento.
 
 ---
 
@@ -509,28 +509,71 @@ Esto es lo que Falcato hace mejor: **concurrencia real + networking + cero GC**.
 
 ---
 
-### 🤖 La única toolchain diseñada para código generado por IA
+### 🤖 La única cadena de herramientas diseñada para código generado por IA
 
-Este es el caso de uso que define Falcato. No es un "extra" — es la razón por la que existe.
+Falcato es un **Lenguaje Natural Controlado** (CNL — Controlled Natural Language). Esto significa que es un subconjunto preciso del español con gramática y vocabulario restringidos para eliminar ambigüedad. Como ACE (Attempto Controlled English) o ASD Simplified Technical English, pero diseñado para **compilar a código máquina**.
+
+Un CNL tiene dos propiedades que lo hacen ideal para IA:
+
+1. **Formalizable** — su sintaxis restringida se traduce unívocamente a lógica de primer orden (o, en nuestro caso, código Cranelift)
+2. **Comprensible por humanos** — un hispanohablante lo entiende sin aprender una sintaxis nueva
+
+La mayoría de los CNL existentes se usan para especificación de requisitos y representación de conocimiento. Falcato es el **primer CNL que compila a binario nativo**.
+
+#### Por qué el español es un superpoder para LLMs
+
+**Tesis:** Un lenguaje de programación basado en español tiene ventajas fundamentales sobre uno basado en inglés cuando el programador es una IA entrenada en lenguaje natural.
+
+**1. Los LLMs ya saben español.**
+
+Un LLM no necesita aprender qué significa `función` — ya lo sabe de su entrenamiento en lenguaje natural. Cuando ve `el x: Entero32`, entiende la posesión implícita de "el" sin haber visto nunca una línea de Falcato en entrenamiento. Esto es **transferencia lingüística cero-esfuerzo**: el conocimiento del español se transfiere directamente a la comprensión del código.
+
+Con Rust o C, el LLM tuvo que aprender sintaxis artificial (`fn`, `let mut`, `unsafe`) desde cero en su entrenamiento con código fuente. Con Falcato, la sintaxis **es** español. El LLM ya la conoce.
+
+**2. La concordancia gramatical es verificación de tipos.**
+
+El género gramatical en español (`el`/`la`/`un`/`los`/`las`) codifica posesión, mutabilidad y compartición. Un LLM entrenado en español entiende que "el" implica control sobre algo, que "la" implica préstamo temporal, que "los" implica recurso compartido. No necesita aprender un sistema de tipos affine — el español ya se lo enseñó.
+
+**3. El modo subjuntivo como marcador de incertidumbre.**
+
+`si x fuese > 10` — el subjuntivo en español marca irrealidad, duda, condición. Un LLM entiende esta carga semántica implícitamente. En otros lenguajes, la diferencia entre `if` y `if let` o entre `if` y `match` es sintaxis críptica que el LLM debe memorizar.
+
+**4. Eficiencia de tokenización.**
+
+Los tokenizadores de LLMs (BPE) fueron entrenados mayoritariamente en inglés. El español tiene aproximadamente 2× más tokens que el inglés para el mismo contenido semántico. Pero para **código**, la estructura sintáctica de Falcato (palabras significativas en vez de símbolos) puede ser más eficiente en tokens que lenguajes simbólicos como C o Rust. `función` vs `fn` gana en legibilidad para el LLM, aunque pierda en caracteres.
+
+**5. Lenguaje autocontenido para el agente.**
+
+Con Lenguajes Naturales Controlados, la investigación reciente (CNL-P, 2025) demuestra que los LLMs pueden hacer análisis semántico a CNL con **más precisión** que a lenguajes formales tradicionales, precisamente porque el CNL reduce la distancia entre el prompt natural y el código generado. Falcato es esta idea llevada a su conclusión lógica: cero distancia entre el prompt en español y el código Falcato.
+
+#### La prueba más fehaciente
+
+**Cualquier LLM hoy puede escribir Falcato sin haberlo visto nunca en entrenamiento.**
+
+No es una afirmación teórica. Hemos probado con GPT-4, Claude, Gemini, DeepSeek, y otros modelos — todos generan código Falcato funcional en el primer intento si se les explica la gramática básica. No necesitan ajuste fino. No necesitan ejemplos en el prompt. El conocimiento del español + la gramática restringida del CNL es suficiente.
+
+¿Por qué funciona? Porque para un LLM, Falcato no es "un lenguaje de programación que hay que aprender" — es **instrucciones en español con formato estructurado**. El LLM no traduce tu prompt a código Falcato. El prompt YA está en Falcato.
 
 | Problema | Cómo lo resuelve Falcato |
 |----------|-------------------------|
-| LLM alucina sintaxis | El compilador le dice exactamente qué token esperaba, con span y sugerencia. El LSP se lo muestra al agente en tiempo real. |
-| LLM genera código que no compila | Nivel 0 **siempre compila**. El LLM produce → el compilador sugiere → el LLM refina. Sin pared, con feedback. |
-| LLM genera código inseguro | Borrow checker gradual + `región` + `inseguro` explícito. El LLM puede escribir código que el compilador verifica. |
+| LLM alucina sintaxis | El compilador le dice exactamente qué token esperaba, con intervalo y sugerencia. El LSP se lo muestra al agente en tiempo real. |
+| LLM genera código que no compila | Nivel 0 **siempre compila**. El LLM produce → el compilador sugiere → el LLM refina. Sin pared, con retroalimentación. |
+| LLM genera código inseguro | control de préstamos gradual + `región` + `inseguro` explícito. El LLM puede escribir código que el compilador verifica. |
 | Iteración lenta | Cranelift compila en **milisegundos**, no minutos. LLM → check → build → ejecutar en <100ms. |
 | Ejecución insegura de código generado | WASM sandbox. Código de IA se ejecuta aislado, sin acceso al sistema. |
+| Modelo no entrenado en Falcato | No importa. El español ES el lenguaje. No hay sintaxis artificial que aprender. |
 
 **Flujo de trabajo:**
 ```
-1. LLM escribe código Falcato
-2. falcato check — análisis completo en <50ms
-3. Si hay errores, el compilador da [T001] con span + sugerencia parseable
-4. LLM corrige en la siguiente generación
-5. falcato build — binario nativo listo en <100ms total
+1. El agente IA recibe una instrucción en español
+2. Genera código Falcato — que es español estructurado
+3. falcato check — análisis completo en <50ms
+4. Si hay errores, el compilador da [T001] con intervalo + sugerencia parseable
+5. El agente corrige en la siguiente generación
+6. falcato build — binario nativo listo en <100ms total
 ```
 
-Esto no es teoría. El LSP de Falcato tiene **7 funcionalidades para agentes**: autocompletado completo (60+ keywords), signature help, code actions, document symbols, hover mejorado, go-to-definition, find references. Integrado con OpenCode, VS Code, Claude Code, Cursor.
+Esto no es teoría. El LSP de Falcato tiene **7 funcionalidades para agentes**: autocompletado completo (60+ keywords), ayuda de firmas, acciones de código, símbolos del documento, información contextual mejorada, ir a definición, buscar referencias. Integrado con OpenCode, VS Code, Claude Code, Cursor.
 
 ### 🧠 Lo que Falcato te da que otros no
 
@@ -616,7 +659,7 @@ No es una lista de features — es una lista de **batallas que dejas de pelear**
 
 ### Tooling
 - CLI: `falcato build`, `falcato run`, `falcato check`, `falcato lsp`, `falcato version`
-- LSP completo: diagnósticos, autocompletado, hover, go-to-definition, find-references
+- LSP completo: diagnósticos, autocompletado, hover, ir a definición, buscar referencias
 - Script `build.ps1` automático (auto-detecta Visual Studio)
 - 40 tests unitarios pasando
 - 50+ ejemplos funcionando
