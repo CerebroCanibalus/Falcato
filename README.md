@@ -407,102 +407,118 @@ Falcato + Cranelift + WASM = toolchain nativa para código generado por IA. Comp
 
 ---
 
-## 🛠️ ¿Qué puedes construir con Falcato?
+## ¿Para qué sirve Falcato? (Lo que importa)
 
-Falcato no es solo un experimento lingüístico — es un lenguaje de sistemas listo para
-**problemas que otros lenguajes abordan con fricción**. Aquí hay categorías donde Falcato
-tiene ventajas reales hoy:
+Falcato existe para una sola razón: **hacer cosas que otros lenguajes de sistemas no pueden, no quieren, o hacen mal**. No es "otro lenguaje de sistemas" — es lo que los demás no se atreven a ser.
 
-### 🖥️ Aplicaciones Win32 nativas con GUI
+### 🔥 Cosas que solo Falcato puede hacer
 
-Sin Electron, sin webview, sin ejecución externa. MessageBox, ventanas, controles — vía FFI directo
-a `user32.dll` + `gdi32.dll`. El trampolín C precompilado maneja el message loop.
+| Lo que hace | Quién más lo hace | Por qué importa |
+|-------------|-------------------|-----------------|
+| **Estructuras auto-referenciales** — `&yo T` en campos de struct | ❌ Rust requiere `Pin` + `unsafe` | Una linked list, un árbol, un grafo — estructuras que todo programador escribe y que Rust castiga. Falcato las permite sin rodeos. |
+| **Campos de bits como tipos, no como macros** — `bits { habilitado: Natural1, modo_tx: Natural2 }` | ❌ Ningún lenguaje de sistemas lo hace sin macros o crates | El compilador genera los shifts y las máscaras. `reg.baud_div = 868` funciona. Sin errores de bit shifting, sin macros, sin `#define`. |
+| **Préstamo gradual** — Nivel 0 (permisivo) → Nivel 1 (verificado) → Nivel 2 (estricto) | ❌ Rust es Nivel 2 o nada | Un LLM genera → compila en Nivel 0 → el compilador sugiere → se refina a Nivel 2. Curva de aprendizaje, no muro. |
+| **Préstamo por campo** — `&mut punto.x` + `&mut punto.y` simultáneos | ❌ Rust da falso positivo | El compilador sabe que `x` y `y` son campos distintos. Sin rodeos. |
+| **Vida por rama** — los préstamos mueren por rama del CFG | ❌ Rust no lo hace | Código como `if cond { presta &x } else { presta &mut x }` funciona. El análisis entiende flujo de control. |
+| **Artículos = affine types** — `el` = owned, `la` = prestado, `los` = compartido | ❌ Ninguno | La gramática española **es** el sistema de tipos. No aprendes tipos affine — ya sabes español. |
+| **Regiones de arena** — `región { ... }` todo se libera al salir | ❌ Rust requiere crate externo | Asignación determinística, cero overhead. Ideal para kernels, buffers de red, frames de video. |
 
+### 🧵 Concurrencia con hilos reales del sistema operativo
+
+Falcato no tiene event loop, ni green threads, ni async runtime fingido. Tiene **hilos del SO**.
+
+```
+lanzar tarea()        → CreateThread real
+con_executor(8) { ... } → grupo de hilos con cancelación
+canal_nuevo(1024)     → mutex + semáforo + ring buffer
+seleccionar { ... }   → polling de múltiples canales
+cancelar()            → cancelación estructurada de todas las tareas
+```
+
+Mientras otros lenguajes fingen paralelismo con corutinas que comparten un hilo, Falcato reparte trabajo en **todos los núcleos de la CPU**. Con cancelación real que no deja fugas — cada tarea en progreso termina graceful, las encoladas se descartan.
+
+**Echo server concurrente real en 30 líneas:**
+```falcato
+con_executor(4) {
+    lanzar aceptar_conexiones(listener);
+    // Cada cliente corre en su propio hilo del SO
+}
+```
+
+### 📦 Binarios que funcionan en cualquier sitio
+
+Un solo `.exe`. Sin DLLs. Sin runtime. Sin VM. Sin Node. Sin Java.
+
+```
+falcato build herramienta.fc  →  herramienta.exe  (14 KB)
+```
+
+Funciona en **cualquier Windows x64 desde 2010**. Copias el `.exe` a un servidor Windows Server Core sin GUI, a un XP en un museo industrial, a una máquina virtual sin internet — y **funciona**.
+
+La convención de llamada es C por defecto. El layout de structs es C. Los símbolos no se distorsionan. Llamar a `kernel32.dll`, `user32.dll`, `ws2_32.dll` es tan natural como llamar a una función propia.
+
+**Ventana Win32 nativa en 80 líneas, sin Electron, sin webview, sin frameworks:**
 ```falcato
 inseguro fn CreateWindowExA(...) -> Entero64;
 inseguro fn DispatchMessageA(msg: &MSG) -> Entero64;
-// Ventana nativa en <100 líneas, sin dependencias
+// MessageBox, ventanas, controles — vía FFI directo a user32.dll
 ```
 
-**Qué puedes hacer:** asistentes de escritorio, herramientas de sistema, monitores en tiempo real,
-prototipos de UI sin el peso de un framework web. **[Ver guía completa](docs/diseno_gui.md)**
+### 🤖 La única toolchain diseñada para código generado por IA
 
-### 🔌 Drivers y herramientas de kernel-mode (preparado)
+Este es el caso de uso que define Falcato. No es un "extra" — es la razón por la que existe.
 
-C ABI + `inseguro fn` + bitfields para registros hardware + `región` para asignación de arena
-determinística + sin recolector de basura. El perfil perfecto para código de sistema.
+| Problema | Cómo lo resuelve Falcato |
+|----------|-------------------------|
+| LLM alucina sintaxis | El compilador le dice exactamente qué token esperaba, con span y sugerencia. El LSP se lo muestra al agente en tiempo real. |
+| LLM genera código que no compila | Nivel 0 **siempre compila**. El LLM produce → el compilador sugiere → el LLM refina. Sin pared, con feedback. |
+| LLM genera código inseguro | Borrow checker gradual + `región` + `inseguro` explícito. El LLM puede escribir código que el compilador verifica. |
+| Iteración lenta | Cranelift compila en **milisegundos**, no minutos. LLM → check → build → ejecutar en <100ms. |
+| Ejecución insegura de código generado | WASM sandbox. Código de IA se ejecuta aislado, sin acceso al sistema. |
+
+**Flujo de trabajo:**
+```
+1. LLM escribe código Falcato
+2. falcato check — análisis completo en <50ms
+3. Si hay errores, el compilador da [T001] con span + sugerencia parseable
+4. LLM corrige en la siguiente generación
+5. falcato build — binario nativo listo en <100ms total
+```
+
+Esto no es teoría. El LSP de Falcato tiene **7 funcionalidades para agentes**: autocompletado completo (60+ keywords), signature help, code actions, document symbols, hover mejorado, go-to-definition, find references. Integrado con OpenCode, VS Code, Claude Code, Cursor.
+
+### ⚡ Control de hardware sin capas
+
+C ABI por defecto + sin GC + sin runtime + `bits { }` en structs + `región { }` para arena + `inseguro` explícito.
+
+El perfil perfecto para:
+- Firmware embebido (sin la sobreingeniería de Rust embedded)
+- Drivers de dispositivo (sin la verbosidad de C)
+- Manipulación de registros MMIO (con verificación de rangos en compilación)
+- Código de arranque (sin sorpresas en tiempo de ejecución)
+- Herramientas de sistema (sin dependencias)
 
 ```falcato
 estructural RegistroUART {
     bits {
-        habilitado: Natural1,   // bit 0
-        modo_tx: Natural2,      // bits 1-2
-        baud_div: Natural12,    // bits 3-14
+        habilitado: Natural1,    // bit 0
+        modo_tx: Natural2,       // bits 1-2
+        baud_div: Natural12,      // bits 3-14
     }
 }
 // reg.baud_div = 868; → el compilador genera shifts + máscaras
+// Ningún otro lenguaje de sistemas verifica rangos en compilación sin macros
 ```
 
-**Qué puedes hacer:** drivers de dispositivo, firmware embebido, controladores de hardware,
-código de arranque, manipulación de registros MMIO con verificación de rangos en tiempo
-de compilación (ningún otro lenguaje de sistemas ofrece esto sin macros).
+### 🧠 Lo que Falcato te da que otros no
 
-### ⚡ Middleware de alto rendimiento para IA
+No es una lista de features — es una lista de **batallas que dejas de pelear**:
 
-Compilación ultra-rápida (Cranelift AOT) + sandbox WASM + Nivel 0 siempre compila.
-El caso de uso que define Falcato: código generado por agentes de IA que debe
-ejecutarse rápido, seguro, y sin fricción.
-
-```
-LLM genera Falcato → falcato check (Nivel 0) → falcato build → .exe nativo
-    ~100ms por iteración            No rechaza          Sin ejecución externa
-```
-
-**Qué puedes hacer:** plugins de inferencia, middlewares de datos, funciones de scoring,
-clasificadores en tiempo real, transformadores ETL, workers de procesamiento —
-todo generado por IA, compilado a nativo, ejecutado en sandbox.
-
-### 🌐 Servidores TCP concurrentes (async real)
-
-No es async fingido con event loop — son hilos del SO reales. `lanzar` = CreateThread.
-`canal_nuevo` = mutex + semaphore. `con_executor(N)` = grupo de hilos con cancelación.
-
-```falcato
-con_executor(4) {
-    lanzar manejar_cliente(socket);
-    lanzar manejar_cliente(socket);
-}
-```
-
-**Qué puedes hacer:** servidores de chat, balanceadores simples, proxies,
-procesamiento paralelo de datos, workers de cola — con cancelación estructurada
-que no deja fugas.
-
-### 📊 Herramientas de línea de comandos
-
-Compilación a .exe único sin dependencias DLL. Sin ejecución externa, sin VM, sin Node.
-Un binario de 15KB que funciona en cualquier Windows x64 desde 2010.
-
-```falcato
-función principal() -> Entero32 {
-    el args: Vector<Texto> = ambiente::args();
-    // args.tam(), args[0], args[1]...
-}
-```
-
-**Qué puedes hacer:** procesadores de logs, generadores de informes, renombradores batch,
-analizadores de archivos, asistentes CLI, herramientas de DevOps — un solo .exe, cero
-dependencias, cero sorpresas.
-
-### 🧩 Lo que NADIE más puede hacer (combinaciones únicas)
-
-| Combinación | Falcato | Rust | C | Go |
-|------------|---------|------|---|----|
-| **Artículos = affine types + compilación gradual** | ✅ Nativo | ❌ Nivel 2 o nada | ❌ Sin verificación | ❌ Sin affine types |
-| **Estructuras auto-referenciales sin rodeos** | ✅ `&yo T` | ❌ Pin + unsafe | ✅ (pero inseguro) | ❌ |
-| **Bitfields como tipos (no macros)** | ✅ `bits { }` | ❌ Macros o crate | ❌ Manual | ❌ |
-| **Arena asignación lexically scoped** | ✅ `región { }` | ❌ Crate externo | ❌ Manual | ❌ |
-| **100% español en tipos, errores, y sintaxis** | ✅ Primer lenguaje de sistemas | ❌ | ❌ | ❌ |
+- **Rust ownership sin Rust complexity**: gradual, educativo, con opciones de fix
+- **C speed sin C peligro**: nativo, ABI C, pero con verificación de tipos y memoria
+- **Python velocidad de prototipado sin Python lentitud**: compila rápido, corre rápido
+- **Go simplicidad sin Go GC**: sin pausas, sin recolector, sin runtime
+- **Español real**: no necesitas inglés para programar sistemas. Los errores los entiendes, no los traduces
 
 ---
 
