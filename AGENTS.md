@@ -543,19 +543,22 @@ Diseño completo en [`docs/diseno_gui.md`](docs/diseno_gui.md).
 
 **40/40 tests pasan. 50+ ejemplos funcionando. Auditoría completa: 0 crashes.**
 
-### Estado de distribución (v0.1.0 — pre-release)
+### Estado de distribución (v0.3.0 — Alpha)
 
 | Aspecto | Estado |
 |---------|--------|
 | Release build (6.4 MB, LTO) | ✅ `cargo build --release` produce `falcato.exe` |
-| Dependencias DLL | ⚠️ Requiere `VCRUNTIME140.dll` (local: bundle, CI: static) |
-| CRT estático | ⏳ Pendiente — funciona en GitHub Actions (VS completo), no en VS Insiders local |
+| Runtime library (static link) | ✅ `falcato_runtime.lib` — canales, executor, threads |
+| CRT estático | ✅ CI con `+crt-static`, release .exe sin dependencias DLL |
+| Dependencias externas | ⚠️ Developer local: requiere VCRUNTIME140.dll (o `+crt-static`) |
 | GitHub repo | ✅ `CerebroCanibalus/falcato` (privado) |
-| GitHub Actions CI | ✅ build + test en push |
+| GitHub Actions CI | ✅ build + test + end-to-end en push |
+| GitHub Actions Release | ✅ tag v* → ZIP automático con runtime.lib |
 | VS Code Extension | ✅ VSIX instalable, Falcato Dorado theme |
 | LSP para agentes (OpenCode) | ✅ 6 features, integrado globalmente, verificado |
+| Platform Layer (Linux/macOS) | ✅ Diseñado, implementado, **no testeado** |
 | Falso positivo Defender | ⚠️ Riesgo alto sin firma digital |
-| Instalador script | ❌ Pendiente |
+| Instalador script | ✅ `install.ps1` interactivo |
 
 ## Roadmap hacia un lenguaje productivo
 
@@ -950,25 +953,28 @@ Las primitivas de 1 instrucción (mutex_lock/sem_wait/timestamp) van a la **Capa
   - `compilar_seleccionar_cadena` → usa `builtin_canal_intentar` (que va a runtime)
   - ~260 líneas de IR con CreateThread/WaitForSingleObject/ReleaseMutex/CreateSemaphoreW → **~25 líneas** (4 llamadas a runtime)
 
-## Checklist para release v0.2.0
+## Checklist para release v0.3.0
 
-- [ ] `+crt-static` en CI (GitHub Actions tiene VS Build Tools completo)
-- [ ] Release build limpio (CI produce .exe sin DLLs externas)
+- [x] `+crt-static` en CI (GitHub Actions tiene VS Build Tools completo)
+- [x] Release build limpio (CI produce .exe sin DLLs externas)
 - [x] Script `bundle_dlls.ps1` para releases locales
 - [x] GitHub repo creado con README y LICENSE
 - [x] GitHub Actions CI (build + test)
-- [ ] GitHub Actions Release (tag → ZIP) — probar con tag
+- [x] **Tag v0.3.0 creado y release generado**
 - [x] VS Code Extension (syntax + LSP + theme Falcato Dorado)
 - [x] Documentación básica (INSTALL + REFERENCIA + ERRORES)
 - [x] GUIA completa (15 capítulos, ownership, arreglos, funciones, errores)
 - [x] Skill `falcato-language` para LLMs (con reference/builtins.md)
-- [ ] AGENTS.md genérico para cualquier LLM
 - [x] Diccionario + Conjunto implementados
-- [ ] Proyecto ejemplo >500 líneas funcionando
+- [ ] Proyecto ejemplo >500 líneas funcionando (R5)
 - [ ] Falso positivo reportado a Microsoft Security Center
 - [x] Script `install.ps1` probado en máquina limpia
 - [x] Codegen helpers (`src/codegen_helpers.rs`) — BlockBuilder, VariableManager, CFunctionCache, MemoryHelper
 - [x] Platform Runtime Layer (`src/platform/`) — BuiltinRegistry, PlatformRuntime, PlatformLinker + Windows/Linux/macOS
+- [x] **Runtime Library (`lib/falcato_runtime/`)** — canales, executor, threads migrados a Rust staticlib
+- [x] **CI actualizado** — compila runtime + test end-to-end de ejemplos
+- [x] **Release incluye runtime .lib** — `falcato_runtime.lib` en el ZIP
+- [ ] **Soporte Linux (WSL)** — Pendiente, busca colaborador. Ver Fase P5c en AGENTS.md
 
 ## Curva de aprendizaje (diseño vinculante)
 
