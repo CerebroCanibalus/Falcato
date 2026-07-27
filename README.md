@@ -7,7 +7,7 @@
 ```
 
 [![CI](https://github.com/CerebroCanibalus/falcato/actions/workflows/ci.yml/badge.svg)](https://github.com/CerebroCanibalus/falcato)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![Cranelift](https://img.shields.io/badge/motor-Cranelift%200.112-orange)](https://github.com/bytecodealliance/cranelift)
 [![Target](https://img.shields.io/badge/target-x86_64%20Windows-lightgrey)](https://github.com/CerebroCanibalus/falcato)
 
@@ -755,6 +755,9 @@ Resaltado de sintaxis, LSP integrado y tema **"Falcato Dorado"**:
 ## Licencia
 
 MIT OR Apache-2.0 — elige la que prefieras.
+
+- [LICENSE-MIT](LICENSE-MIT)
+- [LICENSE-APACHE](LICENSE-APACHE)
 
 ---
 
