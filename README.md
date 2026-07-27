@@ -1,6 +1,6 @@
-﻿﻿![Falcato Banner](assets/images/falcato_banner.png)
+﻿![Falcato Banner](assets/images/falcato_banner.png)
 
-**Lenguaje de sistemas iberohablante.** Forjado sobre Cranelift. Compila a binarios nativos x86_64.
+**Lenguaje de sistemas en español.** Forjado sobre Cranelift. Compila a binarios nativos x86_64.
 
 ```
 .fc → analizador léxico → Parser → Concordancia Lingüística → Codegen (Cranelift) → .o → enlazador → .exe
@@ -43,11 +43,13 @@ falcato run ejemplos\hola_mundo.fc
 
 ## ¿Qué es Falcato?
 
-Falcato es un **lenguaje de programación de sistemas** construido desde cero donde la gramática española no es azúcar sintáctico — **es el sistema de tipos y el modelo de ejecución**.
+Falcato es un **lenguaje de programación de sistemas** creado desde cero donde la gramática española no es azúcar sintáctico — **es el sistema de tipos y el modelo de ejecución**.
 
 No traduce keywords de Rust al español. No interpreta pseudocódigo. No es un wrapper sobre otro compilador.
 
-Falcato tiene su propio **analizador léxico** (logos), **parser** (descendente manual con Pratt), **análisis semántico** (Concordancia Lingüística), y **codegen** (Cranelift → .o → .exe). El resultado son binarios nativos x86_64 con ABI de C, sin ejecución oculta, sin recolector de basura.
+Falcato tiene su propio **analizador léxico** (logos), **parser** (descendente manual con Pratt),
+**análisis semántico** (Concordancia Lingüística), y **codegen** (Cranelift → .o → .exe).
+El resultado son binarios nativos x86_64 con ABI de C, sin ejecución oculta, sin recolector de basura.
 
 ```falcato
 fn principal() -> Entero32 {
@@ -68,7 +70,6 @@ Falcato responde a tres preguntas:
 | Pregunta | Respuesta |
 |----------|-----------|
 | **¿Y si el español pudiera expresar garantías de compilación?** | Los artículos (`el`/`la`/`un`) codifican posesión. Los tiempos verbales codifican modos de ejecución. El subjuntivo codifica caminos fríos. |
-| **¿Y si un LLM pudiera generar código que compila en Nivel 0?** | Nivel 0 (permisivo) siempre compila. El compilador sugiere, no rechaza. Un LLM genera → compiler sugiere → LLM refina → <3 iteraciones a Nivel 2. |
 | **¿Y si un LLM pudiera generar código que compila en Nivel 0?** | Nivel 0 (permisivo) siempre compila. El compilador sugiere, no rechaza. Un LLM genera → compilador sugiere → LLM refina → <3 iteraciones a Nivel 2. |
 | **¿Y si la ingeniería de lenguajes pudiera explorar una dimensión lingüística distinta?** | 500+ años de evolución del español ofrecen dimensiones que el inglés no tiene: género, ser/estar, subjuntivo, prefijos productivos, voz activa/pasiva. Falcato las convierte en garantías de compilación. |
 
@@ -82,7 +83,7 @@ Falcato responde a tres preguntas:
 | II | **Ser/Estar = Const/Mut** | `es` = identidad permanente, `está` = estado temporal | ✅ Implementado |
 | III | **Tiempos = Modos ejecución** | Presente = sync, Futuro = async, Subjuntivo = fallible | ✅ Implementado |
 | IV | **C ABI por defecto** | disposición C, calling C, sin distorsión de nombres | ✅ Implementado |
-| V | **Prefijos semánticos** | `re-` = retry, `des-` = free, `pre-` = comptime | ✅ Documentados |
+| V | **Prefijos semánticos** | `re-` = retry, `des-` = free, `pre-` = en compilación | ✅ Documentados |
 
 ---
 
@@ -109,7 +110,7 @@ tiempo, modo y aspecto. En programación, **más dimensiones gramaticales = más
 | **Género** | No existe para objetos | Masculino/femenino para **todo** | posesión: `el` (dueño) vs `la` (prestado) |
 | **Ser/Estar** | Traduce ambos como "to be" | Dos verbos de existencia | Const (`es`) vs Mut (`está`) |
 | **Subjuntivo** | Casi extinto ("If I were...") | Vivo y productivo | Cold paths, incertidumbre, fallo esperado |
-| **Prefijos** | Limitados (re-, un-, pre-) | Productivos: re-, des-, pre-, entre-, contra- | Semántica de sistema: retry, free, comptime |
+| **Prefijos** | Limitados (re-, un-, pre-) | Productivos: re-, des-, pre-, entre-, contra- | Semántica de sistema: reintentar, liberar, en compilación |
 | **Artículos** | the/a/an (3) | el/la/un/una/los/las/unos/unas (8) | 5+ niveles de posesión y visibilidad |
 
 #### 2. La brecha semántica LLM → código se reduce drásticamente
@@ -177,11 +178,11 @@ de programación, en vez de ignorarse porque "el inglés es el estándar"?**
 
 ---
 
-## Lo que nos hace verdaderamente únicos
+## Lo que nos distingue
 
 ### 🧬 El español ES el sistema de tipos
 
-En Falcato, la concordancia gramatical es verificación de tipos. Un adjetivo que no concuerda con su sustantivo es un error de compilación — igual que en español real.
+En Falcato, la concordancia gramatical es verificación de tipos. Un adjetivo que no concuerda con su sustantivo es un error de compilación — igual que en español.
 
 ```
 [T001] test.fc:4:8: Disconcordancia de tipo: 'a' es 'Entero32' pero se declaró como 'Booleano'
@@ -219,7 +220,7 @@ Si hablas español, ya entiendes la diferencia entre *"el libro"* (lo tengo yo, 
 
 ### 🧩 Regiones + Self-referential structs
 
-`región nombre { ... }` — arena asignación determinística. `&yo T` — self-referential structs sin workarounds. Dos cosas que Rust no puede hacer de forma sound.
+`región nombre { ... }` — arena asignación determinística. `&yo T` — estructuras auto-referenciales sin rodeos. Dos cosas que Rust no puede hacer de forma correcta.
 
 ### 📡 Async real con hilos del SO
 
@@ -288,7 +289,7 @@ Leer nombre
 
 **Latino** — Es un **lenguaje interpretado** con bytecode VM, como Lua o Python pero en español.
 Sus tipos son dinámicos. No tiene compilación a nativo. No tiene control de memoria. Es
-perfectamente válido como lenguaje de scripting educativo, pero está **en las antípodas**
+válido como lenguaje de scripting educativo, pero está **en las antípodas**
 de un lenguaje de sistemas que corre sobre el metal.
 
 ```latino
@@ -380,7 +381,7 @@ función principal() -> Entero32 {
 
 > **Falcato no compite con Latino, PSeInt, EsJS, Águila, WN++ o Sí.** Compite con **Rust, C, Go y Zig**.
 > Los proyectos en español existentes son herramientas educativas o transpiladores ligeros —
-> perfectamente válidos en su nicho, pero conceptualmente ortogonales a Falcato.
+> válidos en su nicho, pero conceptualmente ortogonales a Falcato.
 >
 > Sería como comparar **Python** con **C**: ambos son lenguajes de programación, pero están
 > diseñados para problemas fundamentalmente distintos.
@@ -393,7 +394,6 @@ función principal() -> Entero32 {
 Si piensas en español cuando programas, Falcato elimina la fricción mental de traducir conceptos al inglés. La posesión, los tipos, los errores — todo en tu idioma.
 
 ### 🤖 Generadores de código por IA
-Nivel 0 siempre compila. El compilador sugiere con códigos + intervalo + corrección concreto. Un LLM genera → compiler sugiere → LLM refina → compila. Menos iteraciones, más confianza.
 Nivel 0 siempre compila. El compilador sugiere con códigos + intervalo + corrección concreto. Un LLM genera → compilador sugiere → LLM refina → compila. Menos iteraciones, más confianza.
 
 ### 🔧 Programadores de sistemas
@@ -499,7 +499,7 @@ dependencias, cero sorpresas.
 | Combinación | Falcato | Rust | C | Go |
 |------------|---------|------|---|----|
 | **Artículos = affine types + compilación gradual** | ✅ Nativo | ❌ Nivel 2 o nada | ❌ Sin verificación | ❌ Sin affine types |
-| **Self-referential structs sin workarounds** | ✅ `&yo T` | ❌ Pin + unsafe | ✅ (pero inseguro) | ❌ |
+| **Estructuras auto-referenciales sin rodeos** | ✅ `&yo T` | ❌ Pin + unsafe | ✅ (pero inseguro) | ❌ |
 | **Bitfields como tipos (no macros)** | ✅ `bits { }` | ❌ Macros o crate | ❌ Manual | ❌ |
 | **Arena asignación lexically scoped** | ✅ `región { }` | ❌ Crate externo | ❌ Manual | ❌ |
 | **100% español en tipos, errores, y sintaxis** | ✅ Primer lenguaje de sistemas | ❌ | ❌ | ❌ |
@@ -531,7 +531,6 @@ dependencias, cero sorpresas.
 - Referencias `&T`, `&mut T`, dereferencia `*ref`
 - vidas léxicos: `&nombre T`
 - Field-level préstamo (`&mut punto.x` vs `&mut punto.y`)
-- Branch-aware liveness (borrows mueren por rama del CFG)
 - Branch-aware liveness (préstamos mueren por rama del CFG)
 - Artículos extendidos: `los` = Posesión compartida, `las` = Prestado compartido
 
@@ -556,14 +555,14 @@ dependencias, cero sorpresas.
 
 ### Bitwise + I/O + Interpolación
 - Operadores bitwise type-safe: `& | ^ << >> ~ >>>`
-- Built-ins I/O: `imprimir`, `imprimir_linea` — polimórficos (Texto, Entero, Bool, Flotante)
-- String interpolation: `imprimir_linea("x = {x}, y = {y}")`
-- `tamaño_de::<T>()` — sizeof comptime
+- Funciones integradas I/O: `imprimir`, `imprimir_linea` — polimórficos (Texto, Entero, Bool, Flotante)
+- Interpolación de texto: `imprimir_linea("x = {x}, y = {y}")`
+- `tamaño_de::<T>()` — tamaño en tiempo de compilación
 - Métodos en enteros: `x.poner_bit(3)`, `x.unos()`, `x.ceros_izquierda()`
 
 ### FFI + ejecución de C
 - `inseguro fn` para funciones sin cuerpo
-- Built-ins C: `puts`, `malloc`, `free`, `printf`
+- Funciones C integradas: `puts`, `malloc`, `free`, `printf`
 - `archivo_leer()`, `archivo_escribir()`, `archivo_existe()`
 - `abs()`, `max()`, `min()`, `raiz()`, `potencia()`
 
@@ -646,7 +645,7 @@ Resaltado de sintaxis, LSP integrado y tema **"Falcato Dorado"**:
 |---------|-----------|
 | Repositorio | [github.com/CerebroCanibalus/falcato](https://github.com/CerebroCanibalus/falcato) |
 | Documentación | `GUIA.md` + carpeta `GUIA/` (15 capítulos) |
-| Referencia de built-ins | `REFERENCIA.md` |
+| Referencia de funciones integradas | `REFERENCIA.md` |
 | Códigos de error | `ERRORES.md` |
 | Instalación | `INSTALL.md` |
 | Ejemplos | `ejemplos/` (50+ archivos `.fc`) |
