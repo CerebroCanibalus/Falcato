@@ -135,6 +135,116 @@ el sustantivo. En Falcato, los valores deben "concordar" en tipo, ownership y es
 11. **Doble sellado = panic**: `assertion failed: !self.is_sealed(block)` significa que se selló un bloque dos veces. Verificar flujo de sellado.
 12. **Funciones internas vs externas**: `Linkage::Local` para funciones con cuerpo (define_function). `Linkage::Import` solo para FFI sin cuerpo.
 
+### Codegen Helpers (Fase 15G) — Capa de abstracción
+
+Para eliminar los patrones manuales propensos a errores, se creó `src/codegen_helpers.rs`:
+
+| Helper | Propósito | Elimina |
+|--------|-----------|---------|
+| `BlockBuilder` | Builder de bloques seguro con anti-double-seal | Panic por `assertion failed: !self.is_sealed(block)` |
+| `VariableManager` | Gestión de variables SSA con API segura | `HashMap<String, (StackSlot, Tipo, Articulo)>` crudo |
+| `CFunctionCache` | Cache de funciones C externas | `asegurar_funcion_c()` repetido |
+| `MemoryHelper` | Helpers de memoria (store/load/const) | `builder.ins().store(MemFlags::new(), val, ptr, offset)` manual |
+| `tipo_a_cranelift()` | Conversión Tipo Falcato → Type Cranelift | Función duplicada en codegen.rs |
+| `tamano_tipo()` | Tamaño en bytes de un Tipo | Función duplicada en codegen.rs |
+
+**Uso en codegen.rs:**
+```rust
+use crate::codegen_helpers::{BlockBuilder, VariableManager, CFunctionCache, MemoryHelper};
+
+// Antes (peligroso):
+let entry_block = builder.create_block();
+builder.append_block_param(entry_block, types::I64);
+builder.switch_to_block(entry_block);
+builder.seal_block(entry_block);  // ← panic si se hace 2 veces
+
+// Después (seguro):
+let mut bb = BlockBuilder::new(&mut builder);
+let entry = bb.crear_bloque_con_parametros(&[types::I64]);
+bb.sellar_si_necesario(entry);  // ← idempotente, seguro
+```
+
+**Patrón de cadenas if/else:**
+```rust
+// Antes (20+ líneas manual):
+let bloque_check1 = builder.create_block();
+builder.ins().brif(es_cero, bloques[0], &[], bloque_check1, &[]);
+builder.switch_to_block(bloques_check1);
+builder.seal_block(bloques_check1);
+// ... repeat N veces
+
+// Después (declarativo):
+let mut bb = BlockBuilder::new(&mut builder);
+let conds = vec![(cond1, block1), (cond2, block2)];
+bb.cadena_si_sino(&conds, default_block);
+```
+
+**Regla de uso:** Siempre usar `BlockBuilder` en vez de `builder.create_block()` + `builder.seal_block()` directo.
+
+**⚠️ PENDIENTE (Fase 15G):** Migrar codegen.rs para usar los helpers:
+- Migrar `compilar_funcion()` para usar `BlockBuilder`
+- Migrar variables de closures para usar `VariableManager`
+- Reemplazar `llamar_malloc/free` con `MemoryHelper`
+- Reemplazar funciones duplicadas `tipo_a_cranelift`/`tamano_tipo`
+
+### Platform Runtime Layer — Abstracción multiplataforma (3 capas)
+
+Para que Falcato funcione en Linux y macOS sin reescribir código, se diseñó una
+arquitectura de **3 capas** con分工 clara según la complejidad de cada operación:
+
+```
+┌───────────────────────────────────────────────────────────┐
+│                    codegen.rs                              │
+│  (genera Cranelift IR que llama a funciones C-ABI)         │
+│                                                             │
+│  let ch = platform_call_ret("falcato_channel_new", &[cap]) │  ← Capa A
+│  runtime.mutex_lock(&mut ctx, builder, ptr)                 │  ← Capa B
+│  asegurar_funcion_c("sleep")                                │  ← Capa C
+└──────────┬──────────────────────┬──────────────────────────┘
+           │                      │
+     ┌─────┴──────┐        ┌──────┴────────┐
+     │  Capa A    │        │  Capa B       │
+     │ C Runtime  │        │PlatformRuntime│   Capa C: BuiltinRegistry
+     │ (Rust .rs) │        │  trait (Rust) │   (remapeo nombre→función)
+     │ complex    │        │  primitives   │
+     │ multi-step │        │  1 instruc.   │
+     └────────────┘        └───────────────┘
+```
+
+| Capa | Para qué | Ejemplo | Implementación |
+|------|----------|---------|---------------|
+| **A: C Runtime** | Operaciones multi-paso con struct layout que difiere por plataforma | `falcato_channel_new()`, `falcato_executor_new()`, `falcato_thread_run()` | `lib/falcato_runtime/` — crate Rust `#![no_std]`, staticlib, raw `extern` declarations. Cero dependencias. |
+| **B: PlatformRuntime trait** | Primitivas de sync simples (misma firma, distinta impl) | `mutex_lock/unlock`, `sem_wait/post`, `timestamp()`, `net_init/close` | `src/platform/traits.rs` + `windows.rs` + `linux.rs` + `macos.rs` |
+| **C: BuiltinRegistry** | Remapeo de nombre de función C (misma firma, distinto nombre) | `"sleep"`→`Sleep`/`usleep`, `"malloc"`→`malloc` | `src/platform/registry.rs` — tabla plana nombre→función |
+
+**Reglas de uso en codegen.rs:**
+```rust
+// Capa C — builtins simples (solo remapeo de nombre)
+ctx.call_void("sleep", builder, &[ms_val]);
+
+// Capa B — primitivas (trait method, misma firma cross-platform)
+let runtime = platform::current_runtime();
+let ts = runtime.timestamp(&mut ctx, builder);
+runtime.mutex_lock(&mut ctx, builder, canal_ptr);
+
+// Capa A — operaciones complejas (runtime library en Rust staticlib)
+let canal = self.platform_call_ret("falcato_channel_new", &[cap, elem_size])?;
+```
+
+**Regla de oro:** La codegen NUNCA hace `#[cfg(target_os)]`. La selección de plataforma
+es siempre por trait dispatch o nombre de función C remapeado.
+
+**Agregar una nueva plataforma:**
+- Capa A: 1 archivo `lib/falcato_runtime/src/miplat.rs` + 1 línea en build.rs
+- Capa B: 1 archivo `src/platform/miplat.rs` + 1 línea en mod.rs
+- Capa C: solo añadir entradas a la tabla en registry.rs
+
+| Plataforma | Soporte | Estado |
+|------------|---------|--------|
+| Windows (x86-64) | ✅ Completo | Cranelift `WindowsFastcall` + MSVC link |
+| Linux (x86-64, aarch64) | ⚠️ Implementado, no testeado | Cranelift `SystemV` + gcc link |
+| macOS (x86-64, aarch64) | ⚠️ Implementado, no testeado | Cranelift `SystemV`/`AppleAarch64` + clang link |
+
 ## Pipeline Funcional End-to-End
 
 ```
@@ -158,12 +268,32 @@ src/
 │   └── declaraciones.rs # Funciones genéricas, structs, enums genéricos, parámetros con bounds
 ├── ast.rs               # AST con Span — Expr, Sentencia, Declaración, Tipos, ModoVerbal, ParametroGenerico
 ├── semantic.rs          # Concordancia Lingüística + Ownership + Arrays + Structs + Enums + Llamadas + Bounds
-├── codegen.rs           # Codegen Cranelift — funciones, variables, ops, condicionales, bucles, arrays, structs, enums, monomorfización
+├── codegen/             # Codegen Cranelift — dividido en submódulos
+│   ├── mod.rs           # Codegen struct + helpers (programa, declarar, cache, malloc, etc.)
+│   ├── funciones.rs     # compilar_funcion, compilar_funcion_normal, async futures (init/poll/wrapper)
+│   ├── sentencias.rs    # compilar_sentencia, bucles, condicionales, con_executor, lanzar hilos
+│   ├── expresiones.rs   # compilar_expresion, compilar_llamada, compilar_literal, dispatch builtins
+│   ├── builtins.rs      # Todas las funciones built-in (I/O, TCP, canales, texto, vector, diccionario, etc.)
+│   ├── generics.rs      # Monomorfización, especialización, sustitución de tipos genéricos
+│   └── tipos.rs         # tipo_a_cranelift, tamano_tipo, inferir_tipo, operaciones binarias/unarias
+├── codegen_helpers.rs   # Helpers de codegen: BlockBuilder, VariableManager, CFunctionCache, MemoryHelper
+├── platform/            # Abstracción multiplataforma
+│   ├── mod.rs           # Punto de entrada: current_runtime(), current_registry(), linker_for()
+│   ├── registry.rs      # BuiltinRegistry — tabla nombre abstracto → función C por plataforma
+│   ├── traits.rs        # PlatformRuntime trait + CodegenCtx
+│   ├── linker.rs        # PlatformLinker — configuración del linker por plataforma
+│   ├── windows.rs       # Implementación Win32 (CreateMutexW, WaitForSingleObject, etc.)
+│   ├── linux.rs         # Implementación POSIX (pthread_mutex, sem_t, clock_gettime)
+│   └── macos.rs         # Implementación macOS (AppleAarch64, mach_absolute_time)
+├── futuros.rs           # Análisis de futures/async para state machine
+├── resolver.rs          # Resolución de módulos e imports
+├── backend.rs           # Trait de backend
 └── lsp.rs               # Servidor LSP — diagnósticos, autocompletado, hover, go-to-definition
 ```
 
 ## Historial de Fases (resumen)
 
+### ✅ Completadas
 - **Fase 1-3:** Core del lenguaje (variables, operaciones, condicionales, bucles, ownership básico) + pulido (spans, recovery de errores, LSP).
 - **Fase 3.5:** Arrays (`[T; N]`, literales, `todos`, acceso, asignación a elementos).
 - **Fase 4:** Structs con layout C (`estructural Punto { ... }`).
@@ -173,11 +303,17 @@ src/
 - **Fase 8A:** Const generics (`función longitud<N: Entero32>(...)`).
 - **Fase 8B:** Base AST/parser para enums genéricos (`enumeración alguno<T> { ... }`).
 - **Fase 8C:** Type generics con bounds (`fn máximo<T que Comparable>(...)`), alias `función`/`funcion`/`fn`, monomorfización por tipo concreto.
-- **Cold block optimization para Subjuntivo**: reordenamiento de bloques Cranelift (else hot path en línea, then cold path afuera).
-- **Ser/Estar real**: `ModoVerbal::Estativo`, bare `está` como truthiness check (enteros/booleanos/punteros, no floats).
+- **Cold block optimization para Subjuntivo**: reordenamiento de bloques Cranelift.
+- **Ser/Estar real**: `ModoVerbal::Estativo`, bare `está` como truthiness check.
 - **Find references en LSP**: handler `references` con traversal completo del AST.
 - **Fase 9 / 9.5:** Módulos e imports (`módulo`, `usar`, visibilidad `el`/`la`, multi-archivo, glob imports, type-checking cross-file).
 - **Backend trait + Resolver multi-archivo**: abstracción de codegen y resolución de dependencias entre archivos.
+
+### 📋 Pendientes (ver Roadmap más abajo)
+- Migración de codegen helpers (Fase 15G)
+- Cross-platform support (Fase P2-P4)
+- Proyecto ejemplo 500+ líneas (Fase R5)
+- Drop automático (Fase R6)
 
 ## Features Implementadas
 
@@ -732,15 +868,87 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 **Resultado:** Diccionario<K,V> y Conjunto<T> funcionales con resize y hash probe. ~700 líneas de código nuevo.
 
 ### Fase R5 — Proyecto ejemplo 500+ líneas
-- Word counter: lee archivo, tokeniza, cuenta frecuencia con Diccionario, ordena con Vector
-- Valida el pipeline completo: módulos, colecciones, archivos, I/O
+- [ ] Word counter: lee archivo, tokeniza, cuenta frecuencia con Diccionario, ordena con Vector
+- [ ] Valida el pipeline completo: módulos, colecciones, archivos, I/O
 
 ### Fase R6 — Drop automático
-- Análisis de CFG para insertar `free` al final de scope
-- Elimina fugas en Texto, Vector, Diccionario, Conjunto, TCP sockets
+- [ ] Análisis de CFG para insertar `free` al final de scope
+- [ ] Elimina fugas en Texto, Vector, Diccionario, Conjunto, TCP sockets
 
 ### Fase R7 — Package manager (post-v1)
-- `Falcato.toml`, dependencias git, comandos `nuevo`/`construir`
+- [ ] `Falcato.toml`, dependencias git, comandos `nuevo`/`construir`
+
+### Fase 15G — Migración de codegen helpers
+- [ ] Migrar `compilar_funcion()` para usar `BlockBuilder`
+- [ ] Migrar variables de closures para usar `VariableManager`
+- [ ] Reemplazar `llamar_malloc/free` con `MemoryHelper`
+- [ ] Reemplazar funciones duplicadas `tipo_a_cranelift`/`tamano_tipo`
+
+### Fase P1 — Platform Runtime Layer ✅ COMPLETADA
+- [x] `BuiltinRegistry` — tabla declarativa nombre → función C por plataforma
+- [x] `PlatformRuntime` trait — primitivas de sync + builtins complejos
+- [x] `PlatformLinker` — configuración del linker por plataforma
+- [x] `WindowsRuntime` — CreateMutexW/CreateSemaphoreW/WaitForSingleObject
+- [x] `LinuxRuntime` — pthread_mutex/sem_t/clock_gettime
+- [x] `MacOsRuntime` — macOS POSIX (sin testear)
+
+### Fase P2 — Migración de codegen.rs para usar platform/ ✅ (Capas A+B+C completadas para canales)
+
+**Estrategia:** Las operaciones multi-paso con layout de struct que difiere por plataforma
+(canales, executor, threads) se mueven a la **Capa A: librería runtime Rust**.
+Las primitivas de 1 instrucción (mutex_lock/sem_wait/timestamp) van a la **Capa B: PlatformRuntime trait**.
+
+| Capa | Qué migra | Estado |
+|------|-----------|--------|
+| ✅ C | `sleep`, `malloc`, `free`, `realloc`, `memcpy`, `strlen` (registry) | Hecho |
+| ✅ C | `puts`, `printf`, `sqrt`, `pow`, `fopen/fread/fwrite/fclose` (registry) | Hecho |
+| ✅ B | `exit_process`, `sleep`, `timestamp`, `net_init`, `mutex_lock/unlock`, `sem_wait/post/trywait` | Hecho |
+| ✅ A | `canal_nuevo`, `canal_cerrar`, `canal_enviar`, `canal_recibir` → `falcato_channel_*` | **HECHO (P5a)** |
+| ✅ A | `canal_intentar` → `falcato_channel_try_recv` (nuevo en runtime) | **HECHO (P5a)** |
+| ✅ A | `falcato_channel_try_recv(ch, data) -> i32` — non-blocking try_recv | **HECHO** |
+| ✅ | Linker: `ntdll.lib` + `userenv.lib` para Rust std de runtime | **HECHO** |
+| ⏳ A | `con_executor init` → `falcato_executor_new` | Pendiente |
+| ⏳ A | `executor_worker loop` → mover loop a C | Pendiente |
+| ⏳ A | `cancelar` → `falcato_executor_cancel/close` | Pendiente |
+| ⏳ A | `lanzar` thread fallback → `falcato_thread_run` | Pendiente |
+
+**Resultado P5a:** ~200 líneas de Cranelift IR con Win32 directo (CreateMutexW, CreateSemaphoreW, CloseHandle, mutex_lock/unlock, sem_wait/post, ring buffer arithmetic)
+→ **~50 líneas de IR** (5 llamadas a runtime). El layout de canal legacy (una semáforo) fue reemplazado por el correcto layout de la runtime (dos semáforos signal+space con backpressure).
+
+### Fase P3 — Linker cross-platform
+- [x] `PlatformLinker` struct con cmd/flags/libs/entry/extra_objs
+- [x] Linker para Windows (link.exe), Linux (gcc), macOS (clang)
+- [ ] Probar compilación nativa en Linux (WSL)
+- [ ] Probar compilación nativa en macOS
+
+### Fase P4 — CI cross-platform
+- [ ] Workflow GitHub Actions: `ubuntu-latest` + `windows-latest` matrix
+- [ ] `cargo test` cross-platform
+- [ ] Compilar + ejecutar hello world en Linux
+
+### Fase P5 — Runtime Library (Capa A)
+- [x] Crear `lib/falcato_runtime/` — crate Rust, staticlib (`#![no_std]`→`std` para c_void)
+- [x] `falcato_channel_new/send/recv/close/try_recv` — channel con 2 semáforos (signal+space), backpressure, ring buffer
+- [x] `falcato_executor_new/submit/cancel/close` — thread pool (creado, no migrado en codegen)
+- [x] `falcato_thread_run` — thread creation wrapper (CreateThread / pthread_create)
+- [x] `build.ps1`: compila runtime antes del compiler
+- [x] `linker.rs` / `main.rs`: añade runtime .lib + ntdll.lib + userenv.lib
+- [x] **codegen.rs: migración de CANALES completa** (~200 líneas IR → ~50 líneas con 5 calls a runtime)
+  - `builtin_canal_nuevo` → `falcato_channel_new(capacity, 4)` (1 línea IR)
+  - `builtin_canal_cerrar` → `falcato_channel_close(ch)` (1 línea IR)
+  - `builtin_canal_enviar` → `falcato_channel_send(ch, &val)` (malloc+store+call+free)
+  - `builtin_canal_recibir` → `falcato_channel_recv(ch, &val)` (malloc+call+load+free)
+  - `builtin_canal_intentar` → `falcato_channel_try_recv(ch, &val)` (call + check ret_code + load/free)
+- [x] **codegen.rs: migración de EXECUTOR + THREADS completa** (~260 líneas IR → ~25 líneas)
+  - `compilar_con_executor` → `falcato_executor_new(hilos, capacidad)` + `falcato_executor_close`
+  - `compilar_lanzar_hilo` → `falcato_executor_submit` (pool) / `falcato_thread_run` (standalone)
+  - `builtin_cancelar` → `falcato_executor_cancel(exec)`
+  - `asegurar_executor_worker` → ELIMINADO (runtime maneja workers internamente)
+  - `compilar_seleccionar_cadena` → usa `builtin_canal_intentar`
+- [ ] **P5c**: Probar en Linux (WSL) — runtime ya tiene stub POSIX en `platform.rs`
+  - `asegurar_executor_worker` → ELIMINADO (runtime maneja workers internamente)
+  - `compilar_seleccionar_cadena` → usa `builtin_canal_intentar` (que va a runtime)
+  - ~260 líneas de IR con CreateThread/WaitForSingleObject/ReleaseMutex/CreateSemaphoreW → **~25 líneas** (4 llamadas a runtime)
 
 ## Checklist para release v0.2.0
 
@@ -759,6 +967,8 @@ lee(fd) función escribir(el fd: Entero32, la datos: &[Entero8]) -> Resultado<En
 - [ ] Proyecto ejemplo >500 líneas funcionando
 - [ ] Falso positivo reportado a Microsoft Security Center
 - [x] Script `install.ps1` probado en máquina limpia
+- [x] Codegen helpers (`src/codegen_helpers.rs`) — BlockBuilder, VariableManager, CFunctionCache, MemoryHelper
+- [x] Platform Runtime Layer (`src/platform/`) — BuiltinRegistry, PlatformRuntime, PlatformLinker + Windows/Linux/macOS
 
 ## Curva de aprendizaje (diseño vinculante)
 

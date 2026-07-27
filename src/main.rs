@@ -6,11 +6,13 @@ use std::process::Command;
 mod ast;
 mod backend;
 mod codegen;
+mod codegen_helpers;
 mod error;
 mod futuros;
 mod lexer;
 mod lsp;
 mod parser;
+mod platform;
 mod resolver;
 mod semantic;
 mod span;
@@ -504,6 +506,11 @@ fn link_objetos(
         if trampolin.exists() {
             cmd.arg(trampolin);
         }
+        // Runtime library (falcato_runtime staticlib)
+        let runtime_lib = std::path::Path::new("lib/falcato_runtime/target/release/falcato_runtime.lib");
+        if runtime_lib.exists() {
+            cmd.arg(runtime_lib);
+        }
         cmd.arg(format!("/OUT:{}", binario))
             .arg("/SUBSYSTEM:CONSOLE")
             .arg("/ENTRY:principal")
@@ -522,7 +529,9 @@ fn link_objetos(
             .arg("kernel32.lib")
             .arg("user32.lib")
             .arg("gdi32.lib")
-            .arg("ws2_32.lib");
+            .arg("ws2_32.lib")
+            .arg("ntdll.lib")
+            .arg("userenv.lib");
 
         let output = cmd.output()
             .map_err(|e| format!("Error al ejecutar linker: {}", e))?;

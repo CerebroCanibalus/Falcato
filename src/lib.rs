@@ -1,10 +1,13 @@
 pub mod ast;
 pub mod backend;
 pub mod codegen;
+pub mod codegen_helpers;
 pub mod error;
 pub mod futuros;
 pub mod lexer;
+pub mod lsp;
 pub mod parser;
+pub mod platform;
 pub mod resolver;
 pub mod semantic;
 pub mod span;
