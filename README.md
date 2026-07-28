@@ -15,23 +15,42 @@
 
 ## 🚀 Inicio rápido (3 pasos)
 
-### 1. Descargar
-Ve a [Releases](https://github.com/CerebroCanibalus/falcato/releases) y descarga `falcato-v0.2.0-x86_64-windows.zip` (o la versión más reciente).
+### 1. Elegir método de instalación
 
-### 2. Instalar
-Extrae el ZIP y ejecuta `install.ps1` (PowerShell):
+**Opción A — MSI (Windows, recomendado):**
+Descarga `falcato-{versión}-x86_64.msi` de [Releases](https://github.com/CerebroCanibalus/falcato/releases).
+Ejecuta el instalador gráfico: selecciona directorio y elige si añadir al PATH.
+
+**Opción B — Shell script (Linux/macOS):**
+```bash
+curl -fsSL https://github.com/CerebroCanibalus/falcato/releases/latest/download/falcato-installer.sh | sh
+```
+
+**Opción C — PowerShell script (multiplataforma):**
 ```powershell
-falcato-v0.2.0-x86_64-windows.zip  →  Extraer aquí
+iwr -useb https://github.com/CerebroCanibalus/falcato/releases/latest/download/falcato-installer.ps1 | iex
+```
+
+**Opción D — ZIP manual:**
+```powershell
+# Extraer y ejecutar el asistente interactivo
 .\install.ps1
 ```
-Menú interactivo: eliges qué instalar (PATH obligatorio, VS Code, OpenCode, Claude Code, Cursor).
-Instala `falcato.exe` en `%USERPROFILE%\.falcato\bin` y lo agrega al PATH de usuario.
+
+### 2. Configurar extras (opcional)
+Una vez instalado Falcato, puedes añadir componentes adicionales:
+```bash
+falcato setup --all        # VS Code extension + agentes OpenCode/Claude
+falcato setup --vscode     # Solo VS Code extension
+falcato setup --agents     # Solo agentes y skills
+falcato setup --uninstall  # Desinstalar componentes adicionales
+```
 
 ### 3. Probar
 Abre una **terminal nueva** y escribe:
 ```cmd
 falcato version
-# → Falcato v0.2.0
+# → Falcato v0.3.0
 
 falcato run ejemplos\hola_mundo.fc
 # → ¡Hola, mundo!

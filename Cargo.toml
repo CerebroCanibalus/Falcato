@@ -1,11 +1,17 @@
 [package]
 name = "falcato"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Falcato Team"]
 description = "Lenguaje de programación de sistemas iberohablante sobre Cranelift"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/CerebroCanibalus/falcato"
+
+[package.metadata.wix]
+upgrade-guid = "A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+path-guid = "F0E1D2C3-B4A5-6789-0FED-CBA987654321"
+license = false
+eula = false
 
 [[bin]]
 name = "falcato"
@@ -46,3 +52,8 @@ predicates = "3.1"
 [profile.release]
 opt-level = 3
 lto = true
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

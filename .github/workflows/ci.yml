@@ -24,16 +24,31 @@ jobs:
     - name: Cache cargo dependencies
       uses: Swatinem/rust-cache@v2
 
-    - name: Build (debug)
+    - name: Build runtime library (debug)
+      run: cargo build --verbose
+      working-directory: lib/falcato_runtime
+
+    - name: Build compiler (debug)
       run: cargo build --verbose
 
     - name: Run tests
       run: cargo test --verbose
 
-    - name: Build (release)
+    - name: Build runtime library (release + static CRT)
+      run: cargo build --release --verbose
+      working-directory: lib/falcato_runtime
+
+    - name: Build compiler (release + static CRT)
       run: cargo build --release --verbose
       env:
         RUSTFLAGS: -C target-feature=+crt-static
+
+    - name: Build end-to-end examples
+      shell: pwsh
+      run: |
+        foreach ($ex in @("hola_mundo", "con_executor_simple", "productor_consumidor")) {
+          .\target\debug\falcato.exe build "ejemplos\$ex.fc"
+        }
 
     - name: Upload release binary as artifact
       uses: actions/upload-artifact@v4

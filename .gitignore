@@ -39,3 +39,14 @@ falcato-vscode/package-lock.json
 tmp_*
 test_out.txt
 test_*.txt
+
+# Test Falcato files
+test_*.fc
+test_*.exe
+test_*.o
+
+# Codebase memory index
+.codebase-memory/
+
+# Benchmarks
+bench_tokens/

@@ -6,11 +6,13 @@ use std::process::Command;
 mod ast;
 mod backend;
 mod codegen;
+mod codegen_helpers;
 mod error;
 mod futuros;
 mod lexer;
 mod lsp;
 mod parser;
+mod platform;
 mod resolver;
 mod semantic;
 mod span;
@@ -65,6 +67,24 @@ enum Comandos {
         #[arg(required = true)]
         archivos: Vec<String>,
     },
+    /// Instala componentes adicionales (VS Code extension, agentes, etc.)
+    Setup {
+        /// Instalar VS Code extension
+        #[arg(long)]
+        vscode: bool,
+        /// Instalar agentes y skills para OpenCode/Claude
+        #[arg(long)]
+        agents: bool,
+        /// Instalar todo (VS Code + agentes)
+        #[arg(long)]
+        all: bool,
+        /// Desinstalar componentes adicionales
+        #[arg(long)]
+        uninstall: bool,
+        /// Ruta al directorio de recursos (VSIX, skills, agents)
+        #[arg(long)]
+        resources: Option<String>,
+    },
     /// Muestra la versión
     Version,
     /// Ejecuta las pruebas definidas con `prueba "nombre" { ... }`
@@ -108,8 +128,16 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        Comandos::Setup { vscode, agents, all, uninstall, resources } => {
+            let do_vscode = all || vscode;
+            let do_agents = all || agents;
+            if let Err(e) = setup(do_vscode, do_agents, uninstall, resources.as_deref()) {
+                eprintln!("[ERROR] {}", e);
+                std::process::exit(1);
+            }
+        }
         Comandos::Version => {
-            println!("Falcato 0.1.0");
+            println!("Falcato 0.3.0");
             println!("Lenguaje de programación de sistemas iberohablante");
         }
         Comandos::Test { archivos } => {
@@ -128,6 +156,169 @@ fn main() {
             });
         }
     }
+}
+
+/// Busca un archivo en directorios relativos al ejecutable.
+fn encontrar_recurso(nombre: &str, exe_dir: &Path, resources: Option<&Path>) -> Option<String> {
+    // 1. Ruta explícita de recursos
+    if let Some(r) = resources {
+        let p = r.join(nombre);
+        if p.exists() { return Some(p.to_string_lossy().to_string()); }
+    }
+    // 2. Relativo al exe: share/falcato/<nombre> (MSI install)
+    let p = exe_dir.join("../share/falcato").join(nombre);
+    if p.exists() { return Some(p.to_string_lossy().to_string()); }
+    // 3. Relativo al exe: ./<nombre> (ZIP, resources junto al bin)
+    let p = exe_dir.join(nombre);
+    if p.exists() { return Some(p.to_string_lossy().to_string()); }
+    // 4. Relativo al exe: ../ (dev, exe en target/release/)
+    let p = exe_dir.join("../..").join(nombre);
+    if p.exists() { return Some(p.to_string_lossy().to_string()); }
+    None
+}
+
+fn setup(do_vscode: bool, do_agents: bool, uninstall: bool, resources: Option<&str>) -> Result<(), String> {
+    use std::path::Path;
+    let exe = std::env::current_exe().map_err(|e| format!("No se pudo obtener la ruta del ejecutable: {}", e))?;
+    let exe_dir = exe.parent().ok_or("No se pudo determinar el directorio del ejecutable")?;
+    let res_dir = resources.map(Path::new);
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .map_err(|_| "No se pudo determinar el directorio home (USERPROFILE/HOME)".to_string())?;
+
+    if uninstall {
+        println!("[Falcato Setup] Desinstalando componentes adicionales...");
+        if do_vscode {
+            if let Ok(output) = std::process::Command::new("code")
+                .arg("--list-extensions").output()
+            {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    if line.contains("falcato") {
+                        std::process::Command::new("code")
+                            .args(["--uninstall-extension", line, "--force"])
+                            .status().ok();
+                        println!("  [OK] Extension VS Code desinstalada: {}", line);
+                    }
+                }
+            }
+            println!("  [OK] Extension VS Code removida");
+        }
+        if do_agents {
+            for agent_file in &[
+                format!("{}/.opencode/agents/falcato.md", home),
+                format!("{}/.claude/agents/falcato.md", home),
+                format!("{}/AppData/Roaming/opencode/agents/falcato.md", home),
+                format!("{}/AppData/Roaming/opencode/skills/falcato-language", home),
+            ] {
+                let p = Path::new(agent_file);
+                if p.exists() {
+                    if p.is_dir() { std::fs::remove_dir_all(p).ok(); }
+                    else { std::fs::remove_file(p).ok(); }
+                    println!("  [OK] Removido: {}", agent_file);
+                }
+            }
+            println!("  [OK] Agentes y skills removidos");
+        }
+        println!("[Falcato Setup] Desinstalacion completa.");
+        return Ok(());
+    }
+
+    println!("[Falcato Setup] Instalando componentes adicionales...");
+
+    // VS Code extension
+    if do_vscode {
+        let vsix = encontrar_recurso("falcato-language-0.2.0.vsix", exe_dir, res_dir)
+            .or_else(|| encontrar_recurso("falcato-vscode/falcato-language-0.2.0.vsix", exe_dir, res_dir))
+            .ok_or("No se encontro el archivo .vsix. Asegurate de que el recurso esta disponible.".to_string())?;
+
+        let status = std::process::Command::new("code")
+            .args(["--install-extension", &vsix, "--force"])
+            .status()
+            .map_err(|e| format!("No se pudo ejecutar 'code': {}", e))?;
+        if status.success() {
+            println!("  [OK] Extension VS Code instalada: {}", vsix);
+            println!("  Tema: Ctrl+K Ctrl+T -> 'Falcato Dorado'");
+        } else {
+            println!("  [!] No se pudo instalar la extension. Asegurate de que 'code' esta en el PATH.");
+        }
+    }
+
+    // Agentes y skills
+    if do_agents {
+        // OpenCode agent
+        let oc_agent_src = encontrar_recurso("agents/falcato.md", exe_dir, res_dir);
+        let oc_agent_dst = format!("{}/.opencode/agents/falcato.md", home);
+        if let Some(src) = oc_agent_src {
+            std::fs::create_dir_all(Path::new(&oc_agent_dst).parent().unwrap()).ok();
+            std::fs::copy(&src, &oc_agent_dst).ok();
+            println!("  [OK] OpenCode agent -> {}", oc_agent_dst);
+        }
+
+        // OpenCode skill
+        let oc_skill_src = encontrar_recurso("skills/falcato-language", exe_dir, res_dir);
+        let oc_skill_dst = format!("{}/.opencode/skills/falcato-language", home);
+        if let Some(src) = oc_skill_src {
+            let dst = Path::new(&oc_skill_dst);
+            std::fs::create_dir_all(dst.parent().unwrap()).ok();
+            if dst.exists() { std::fs::remove_dir_all(dst).ok(); }
+            copiar_dir(Path::new(&src), dst).ok();
+            println!("  [OK] OpenCode skill -> {}", oc_skill_dst);
+        }
+
+        // Claude Code agent
+        let cc_agent_dst = format!("{}/.claude/agents/falcato.md", home);
+        if let Some(src) = encontrar_recurso("agents/falcato.md", exe_dir, res_dir) {
+            std::fs::create_dir_all(Path::new(&cc_agent_dst).parent().unwrap()).ok();
+            std::fs::copy(&src, &cc_agent_dst).ok();
+            println!("  [OK] Claude Code agent -> {}", cc_agent_dst);
+        }
+
+        // Claude Code skill
+        let cc_skill_dst = format!("{}/.claude/skills/falcato-language", home);
+        if let Some(src) = encontrar_recurso("skills/falcato-language", exe_dir, res_dir) {
+            let dst = Path::new(&cc_skill_dst);
+            std::fs::create_dir_all(dst.parent().unwrap()).ok();
+            if dst.exists() { std::fs::remove_dir_all(dst).ok(); }
+            copiar_dir(Path::new(&src), dst).ok();
+            println!("  [OK] Claude Code skill -> {}", cc_skill_dst);
+        }
+
+        // Cursor (ya usa VS Code extension)
+        if do_vscode {
+            println!("  [OK] Cursor detectara automaticamente la extension VS Code");
+        }
+
+        // OpenCode global config (opencode.jsonc)
+        let oc_config = format!("{}/AppData/Roaming/opencode/opencode.jsonc", home);
+        let config_path = Path::new(&oc_config);
+        if config_path.exists() {
+            println!("  [i] OpenCode config existe en: {}", oc_config);
+            println!("  [i] Verifica que falcato-lsp este referenciado en plugins.");
+        }
+    }
+
+    println!("[Falcato Setup] Instalacion completa.");
+    if do_agents {
+        println!("  Abre una terminal NUEVA para que los cambios surtan efecto.");
+    }
+    Ok(())
+}
+
+/// Copia un directorio recursivamente (simplificado).
+fn copiar_dir(src: &Path, dst: &Path) -> Result<(), String> {
+    if src.is_dir() {
+        std::fs::create_dir_all(dst).map_err(|e| format!("No se pudo crear {}: {}", dst.display(), e))?;
+        for entry in std::fs::read_dir(src).map_err(|e| format!("No se pudo leer {}: {}", src.display(), e))? {
+            let entry = entry.map_err(|e| format!("Error leyendo entrada: {}", e))?;
+            let src_path = entry.path();
+            let dst_path = dst.join(entry.file_name());
+            copiar_dir(&src_path, &dst_path)?;
+        }
+    } else {
+        std::fs::copy(src, dst).map_err(|e| format!("No se pudo copiar {} a {}: {}", src.display(), dst.display(), e))?;
+    }
+    Ok(())
 }
 
 /// Compila múltiples archivos usando el Resolver y el backend Cranelift.
@@ -504,6 +695,11 @@ fn link_objetos(
         if trampolin.exists() {
             cmd.arg(trampolin);
         }
+        // Runtime library (falcato_runtime staticlib)
+        let runtime_lib = std::path::Path::new("lib/falcato_runtime/target/release/falcato_runtime.lib");
+        if runtime_lib.exists() {
+            cmd.arg(runtime_lib);
+        }
         cmd.arg(format!("/OUT:{}", binario))
             .arg("/SUBSYSTEM:CONSOLE")
             .arg("/ENTRY:principal")
@@ -522,7 +718,9 @@ fn link_objetos(
             .arg("kernel32.lib")
             .arg("user32.lib")
             .arg("gdi32.lib")
-            .arg("ws2_32.lib");
+            .arg("ws2_32.lib")
+            .arg("ntdll.lib")
+            .arg("userenv.lib");
 
         let output = cmd.output()
             .map_err(|e| format!("Error al ejecutar linker: {}", e))?;

@@ -66,6 +66,21 @@ Escribir-Color "[Falcato Build] Ejecutando: $Comando $(if($Release){'(release)'}
 
 switch ($Comando) {
     "build" {
+        # 1. Compilar runtime library primero (necesaria para linkear binarios)
+        Escribir-Color "[Falcato Build] Compilando falcato_runtime..." $Cyan
+        Push-Location lib\falcato_runtime
+        $ArgsRuntime = @("build", "--release")
+        & cargo @ArgsRuntime
+        $RuntimeOk = $LASTEXITCODE -eq 0
+        Pop-Location
+        
+        if (-not $RuntimeOk) {
+            Escribir-Color "[ERROR] Falló la compilación de falcato_runtime" $Rojo
+            exit 1
+        }
+        Escribir-Color "[OK] falcato_runtime compilada" $Verde
+        
+        # 2. Compilar el compilador
         $Args = @("build")
         if ($Release) { $Args += "--release" }
         & cargo @Args
