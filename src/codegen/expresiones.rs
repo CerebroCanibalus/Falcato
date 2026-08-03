@@ -7,7 +7,7 @@ impl Codegen {
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
         match expr {
-            Expresion::LiteralArray(elementos, span) => {
+            Expresion::LiteralArray(elementos, _span) => {
                 // Arrays literales: creamos stack slot grande y llenamos
                 if elementos.is_empty() {
                     return Ok(builder.ins().iconst(types::I64, 0)); // null pointer
@@ -135,10 +135,10 @@ impl Codegen {
             }
             Expresion::Literal(lit) => {
                 match lit {
-                    Literal::Entero(n, span) => {
+                    Literal::Entero(n, _span) => {
                         Ok(builder.ins().iconst(types::I32, *n as i64))
                     }
-                    Literal::Palabra(s, span) => {
+                    Literal::Palabra(s, _span) => {
                         // Para strings, creamos un global data con ID ├║nico
                         self.contador_strings += 1;
                         let data_id = self.module.declare_data(
@@ -591,14 +591,14 @@ impl Codegen {
 
                 Ok(resultado)
             }
-            Expresion::Ruta(path, span) => {
+            Expresion::Ruta(path, _span) => {
                 // Ruta cualificada sin llamada (ej: pasar funci├│n como valor)
                 // Por ahora: error, ya que no soportamos funciones como valores
                 eprintln!("[Falcato] Error: ruta '{}' no es una expresi├│n v├ílida sin llamada",
                     path.join("::"));
                 Err(())
             }
-            Expresion::Propagacion(expr, span) => {
+            Expresion::Propagacion(expr, _span) => {
                 // Operador ?: propaga errores
                 // Si la expresi├│n es Resultado.Error, retorna inmediatamente
                 // Si es Resultado.Exito, extrae el valor
@@ -657,7 +657,7 @@ impl Codegen {
                 ));
                 Err(())
             }
-            Expresion::Closure(params, cuerpo, span) => {
+            Expresion::Closure(params, cuerpo, _span) => {
                 // Generar nombre ├║nico para la funci├│n an├│nima
                 self.contador_closures += 1;
                 let nombre_closure = format!("__closure_{}", self.contador_closures);
@@ -761,7 +761,7 @@ impl Codegen {
                 let cranelift_tipo = self.tipo_a_cranelift(&tipo_sujeto);
 
                 // Slot para el resultado del match
-                let resultado_slot = builder.create_sized_stack_slot(
+                let _resultado_slot = builder.create_sized_stack_slot(
                     cranelift_codegen::ir::StackSlotData::new(
                         cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
                         cranelift_tipo.bytes(),

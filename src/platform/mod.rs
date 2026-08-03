@@ -56,8 +56,7 @@ mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
 
-pub use registry::{BuiltinRegistry, BuiltinEntry, FuncSignature};
-pub use linker::PlatformLinker;
+pub use registry::BuiltinRegistry;
 pub use traits::{PlatformRuntime, CodegenCtx};
 
 /// Retorna el runtime de la plataforma actual.

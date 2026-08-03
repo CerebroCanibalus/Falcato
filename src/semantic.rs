@@ -869,7 +869,7 @@ impl AnalizadorSemantico {
             span: span_vacio.clone(),
         };
         let tipo_s = Tipo::Generico("T".to_string());
-        let bool_tipo = Tipo::Booleano;
+        let _bool_tipo = Tipo::Booleano;
 
         self.funciones.insert("conjunto_nuevo".to_string(), FirmaFuncion {
             nombre: "conjunto_nuevo".to_string(),
@@ -2028,7 +2028,7 @@ No puedes modificar algo que no es 'tuyo'.",
                     }
                 }
             }
-            Expresion::ArrayRelleno(elem, _, span) => {
+            Expresion::ArrayRelleno(elem, _, _span) => {
                 // Sin contexto, inferimos Array(tipo_elem, 0)
                 // El tamaño real se resuelve en analizar_sentencia si hay tipo explícito
                 let tipo_elem = self.inferir_tipo(elem);
@@ -2526,7 +2526,7 @@ No puedes modificar algo que no es 'tuyo'.",
             }
 
             // Async (Fase 18A): lanzar expr
-            Expresion::Lanzar(expr_interno, span) => {
+            Expresion::Lanzar(expr_interno, _span) => {
                 // TODO: verificar que la expresión es Futuro<T> [T081]
                 let _tipo = self.inferir_tipo(expr_interno);
                 // lanzar retorna Tarea<T> — por ahora Entero64 (handle)

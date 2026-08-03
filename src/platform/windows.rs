@@ -18,7 +18,6 @@
 use cranelift_codegen::ir::{self, types, InstBuilder, Value};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::FunctionBuilder;
-use cranelift_module::Module;
 
 use crate::platform::traits::{CodegenCtx, PlatformRuntime};
 
@@ -87,7 +86,7 @@ impl PlatformRuntime for WindowsRuntime {
     fn sem_init(&self, ctx: &mut CodegenCtx, builder: &mut FunctionBuilder, ptr: Value, _max: Value) {
         // Dos semáforos: signal (init=0) y space (init=max)
         let null_ptr = builder.ins().iconst(types::I64, 0);
-        let false_val = builder.ins().iconst(types::I32, 0);
+        let _false_val = builder.ins().iconst(types::I32, 0);
 
         // sem_signal: CreateSemaphoreW(NULL, 0, max, NULL)
         let cero = builder.ins().iconst(types::I32, 0);

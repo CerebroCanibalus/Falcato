@@ -162,7 +162,7 @@ impl Codegen {
     }
 
     /// Extrae el valor concreto de un genÃƒÆ’Ã‚Â©rico de un tipo
-    pub(crate) fn extraer_valor_generico(&self, tipo: &Tipo, nombre_generico: &str) -> Option<usize> {
+    pub(crate) fn extraer_valor_generico(&self, tipo: &Tipo, _nombre_generico: &str) -> Option<usize> {
         match tipo {
             Tipo::Array(_, n) => Some(*n),
             _ => None,

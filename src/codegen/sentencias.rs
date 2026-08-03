@@ -18,7 +18,7 @@ impl Codegen {
                 );
                 
                 // Arrays: stack slot grande
-                let (slot, tamano) = match &tipo {
+                let (slot, _tamano) = match &tipo {
                     Tipo::Array(tipo_elem, longitud) => {
                         let tamano_elem = self.tamano_tipo(tipo_elem);
                         let tamano_total = tamano_elem * (*longitud as u32);
@@ -353,14 +353,14 @@ impl Codegen {
                             if let Some(offset) = layout.offsets.get(nombre_campo) {
                                 let campo_ptr = builder.ins().iadd_imm(struct_ptr, *offset as i64);
                                 let tipo_campo = self.buscar_tipo_campo(&nombre_struct, nombre_campo);
-                                let cranelift_type = self.tipo_a_cranelift(&tipo_campo);
+                                let _cranelift_type = self.tipo_a_cranelift(&tipo_campo);
                                 builder.ins().store(cranelift_codegen::ir::MemFlags::new(), valor, campo_ptr, 0);
                             }
                         }
                     }
                 }
             }
-            Sentencia::Retornar(expr, span) => {
+            Sentencia::Retornar(expr, _span) => {
                 if let Some(expr) = expr {
                     let val = self.compilar_expresion(expr, builder, variables)?;
                     // Si la expresi├│n accede a una variable de tipo Resultado o enum peque├▒o,

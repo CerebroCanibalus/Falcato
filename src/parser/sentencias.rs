@@ -161,7 +161,7 @@ fn parse_condicional(cursor: &mut ParserCursor) -> Result<Sentencia, ErrorSintax
     cursor.esperar(Token::Si)?;
 
     // Parsear expresión base de la condición
-    let mut expr_izq = parse_expresion(cursor)?;
+    let expr_izq = parse_expresion(cursor)?;
     let mut modo = ModoVerbal::Indicativo;
 
     // Verificar si hay 'fuese' (subjuntivo)

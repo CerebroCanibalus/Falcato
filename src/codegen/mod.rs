@@ -8,11 +8,10 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use crate::ast::*;
 use crate::backend::BackendFalcato;
-use crate::codegen_helpers::{BlockBuilder, VariableManager, CFunctionCache, MemoryHelper};
+use crate::codegen_helpers::CFunctionCache;
 use crate::platform::{self, CodegenCtx, BuiltinRegistry, PlatformRuntime};
 use crate::error::{Errores, ErrorCompilador, CategoriaError};
 use crate::span::Span;
-use crate::futuros;
 
 use std::collections::HashMap;
 
@@ -190,7 +189,7 @@ impl Codegen {
 
     /// Crea un CodegenCtx para llamar builtins de plataforma.
     /// La codegen NUNCA debe hacer #[cfg(target_os)] ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â usa esta API.
-    fn ctx(&mut self) -> CodegenCtx {
+    fn ctx(&mut self) -> CodegenCtx<'_> {
         CodegenCtx::new(&mut self.cache, &mut self.module, &self.registry)
     }
 
@@ -222,7 +221,7 @@ impl Codegen {
         }
 
         // Segunda pasada: declarar funciones (no genÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ricas)
-        for (prefijo, decl) in &todas {
+        for (_prefijo, decl) in &todas {
             if let Declaracion::Funcion(func) = decl {
                 if func.parametros_genericos.is_empty() {
                     self.declarar_funcion(func);
@@ -353,7 +352,7 @@ impl Codegen {
                 }
 
                 // Compilar cuerpo del closure
-                let span_dummy = crate::span::Span::vacio();
+                let _span_dummy = crate::span::Span::vacio();
                 match self.compilar_expresion(&closure.cuerpo, &mut builder, &variables) {
                     Ok(resultado) => {
                         builder.ins().return_(&[resultado]);
@@ -702,7 +701,7 @@ impl Codegen {
             cranelift_codegen::settings::Flags::new(flag_builder)
         ).unwrap();
 
-        let mut builder = ObjectBuilder::new(
+        let builder = ObjectBuilder::new(
             isa,
             b"dummy".to_vec(),
             cranelift_module::default_libcall_names(),

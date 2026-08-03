@@ -249,7 +249,7 @@ fn parse_atom(cursor: &mut ParserCursor) -> Result<Expresion, ErrorSintaxis> {
             // Parsear cuerpo: expresión o bloque
             let cuerpo = if cursor.actual() == Some(&Token::LlaveAbre) {
                 // Bloque: |x| { ... } → wrap en expresión de bloque
-                let bloque = super::sentencias::parse_bloque(cursor)?;
+                let _bloque = super::sentencias::parse_bloque(cursor)?;
                 // Convertir bloque a expresión: usar la última expresión como valor
                 // Por ahora, wrap como bloque con retorno implícito
                 let span_bloque = Span::combinar(&span_inicio, &cursor.span_actual());

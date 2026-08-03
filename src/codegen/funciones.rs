@@ -444,7 +444,7 @@ impl Codegen {
         let fut_ptr = builder.inst_results(init_call)[0];
 
         // Poll loop: while __poll(ptr) == 0 { Sleep(1); }
-        let poll_id = *self.funciones.get(&nombre_poll).unwrap();
+        let _poll_id = *self.funciones.get(&nombre_poll).unwrap();
         // Poll loop: while __poll(ptr) == 0 { Sleep(1); }
         let poll_id = *self.funciones.get(&nombre_poll).unwrap();
 

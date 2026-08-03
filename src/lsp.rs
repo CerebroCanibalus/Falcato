@@ -396,7 +396,7 @@ impl IndiceSemantico {
                 }
                 None
             }
-            Expresion::Binaria(izq, _, der, span) => {
+            Expresion::Binaria(izq, _, der, _span) => {
                 if let Some(n) = self.buscar_en_expresion(izq, linea, columna) {
                     return Some(n);
                 }

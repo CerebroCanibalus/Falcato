@@ -17,7 +17,6 @@ mod resolver;
 mod semantic;
 mod span;
 
-use crate::ast::Programa;
 use crate::codegen::Codegen;
 use crate::lexer::LexerFalcato;
 use crate::parser::ParserFalcato;

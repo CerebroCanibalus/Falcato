@@ -760,8 +760,8 @@ impl Codegen {
             new_len,
         );
 
-        let mut then_block = builder.create_block();
-        let mut merge_block = builder.create_block();
+        let then_block = builder.create_block();
+        let merge_block = builder.create_block();
         let data_var = self.nueva_variable();
         let cap_var = self.nueva_variable();
         builder.declare_var(data_var, types::I64);
@@ -1368,7 +1368,7 @@ impl Codegen {
         }
         let tipo_t = &tipo_args[0];
         let tamano_t = self.tamano_tipo(tipo_t) as i64;
-        let cranelift_t = self.tipo_a_cranelift(tipo_t);
+        let _cranelift_t = self.tipo_a_cranelift(tipo_t);
 
         let desc = self.compilar_expresion(&argumentos[0], builder, variables)?;
         let val = self.compilar_expresion(&argumentos[1], builder, variables)?;
@@ -1383,8 +1383,8 @@ impl Codegen {
             cap,
         );
 
-        let mut then_block = builder.create_block();
-        let mut merge_block = builder.create_block();
+        let then_block = builder.create_block();
+        let merge_block = builder.create_block();
         let data_var = self.nueva_variable();
         let cap_var = self.nueva_variable();
         builder.declare_var(data_var, types::I64);
@@ -1403,9 +1403,9 @@ impl Codegen {
             cap_actual,
             cero,
         );
-        let mut if_cero = builder.create_block();
-        let mut if_no_cero = builder.create_block();
-        let mut merge_cap = builder.create_block();
+        let if_cero = builder.create_block();
+        let if_no_cero = builder.create_block();
+        let merge_cap = builder.create_block();
         builder.ins().brif(es_cero, if_cero, &[], if_no_cero, &[]);
 
         // cap == 0: alloc 4 elementos
@@ -1597,7 +1597,7 @@ impl Codegen {
 
     pub(crate) fn compilar_comparar_claves(
         &self,
-        tipo: &Tipo,
+        _tipo: &Tipo,
         builder: &mut FunctionBuilder,
         a: cranelift_codegen::ir::Value,
         b: cranelift_codegen::ir::Value,

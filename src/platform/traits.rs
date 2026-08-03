@@ -19,7 +19,7 @@
 //!
 //! codegen.rs llama a `ctx.platform.lock_mutex(...)` sin saber qué OS es.
 
-use cranelift_codegen::ir::{self, types, InstBuilder, Value};
+use cranelift_codegen::ir::{InstBuilder, Value};
 use cranelift_frontend::FunctionBuilder;
 use cranelift_module::Module;
 use cranelift_object::ObjectModule;
