@@ -1,4 +1,4 @@
-# Falcato — AGENTS.md
+﻿# Falcato — AGENTS.md
 
 ## Filosofía del proyecto
 
@@ -177,6 +177,110 @@ Nivel 1 (verificado):           use-after-move, errores educativos A/B/C
 Nivel 2 (estricto):             borrow checker completo, 1 mut XOR N inmut
 ```
 **Para LLMs:** N0 siempre compila → compiler sugiere → LLM refina → N2 en <3 iteraciones.
+
+## Auditoría (criterios de calificación)
+
+Auditoría completa en cada release mayor (v0.5.0, v0.6.0…). Semáforo:
+🟢 cumple · 🟡 parcial · 🔴 no cumple. Umbrales basados en McCabe, SonarQube,
+Sebesta, HumanEval.
+
+### A. Calidad de código
+| Parámetro | Umbral | Estándar |
+|-----------|--------|----------|
+| Complejidad ciclomática | ≤10 por función (🟡 11–20) | McCabe/NIST, SonarQube |
+| Tamaño de módulo | ≤1500 LOC (🟡 1500–2500) | Cohesión: 1 archivo = 1 responsabilidad |
+| Panics / unwrap / expect | <2 por 1000 LOC | Prevención de crashes en toolchain |
+| `#[allow]` silenciosos | 0 | Clean Code (Sonar) |
+| `unsafe` | Solo en `src/platform/` | Regla de oro platform layer |
+| Cobertura de tests (core) | ≥60% parser+semantic | Quality gate SonarQube |
+| Build release incremental | <60s | DX de toolchain |
+
+### B. Arquitectura
+| Regla | Verificación |
+|-------|--------------|
+| Layering unidireccional: CLI→resolver→parser→semantic→codegen→platform | Script: parsea `use` de cada capa |
+| Todo nodo AST lleva `Span` (Day-0) | Grep en ast.rs |
+| `#[cfg(target_os)]` prohibido fuera de platform/ | Grep |
+| Capas A/B/C sin acoplamiento circular | cargo machete + review |
+
+### C. El lenguaje (criterios Sebesta)
+| Parámetro | Umbral |
+|-----------|--------|
+| 5 pilares implementados | I–IV ✅, V (prefijos) 📝→completar |
+| Legibilidad: errores con span+sugerencia | 100% (Day-0) |
+| Escribibilidad: ejemplo 500+ líneas (R5) | 1 proyecto real compilable |
+| Fiabilidad: `falcato test` | 40/40 ✅ |
+| Expresividad: linked list, bitfields, self-ref sin pelear | Checklist "superar a Rust" |
+| Paridad doc/código (GUIA.md↔features) | 100% |
+| Ejemplos | 50+ compilan y corren |
+
+### D. Iteración LLM (benchmarking HumanEval-style)
+| Métrica | Umbral |
+|---------|--------|
+| Compile pass rate @1 | ≥90% en corpus fijo de prompts |
+| N0→N2 | <3 ciclos (verificado por agente OpenCode) |
+| Fix rate de errores del compilador | ≥80% primer intento |
+
+### E. Entrega
+| Parámetro | Umbral |
+|-----------|--------|
+| LSP | 6 features operativas |
+| Instalación | MSI + installers en máquina limpia |
+| CI | GitHub Actions verde (build+test+e2e) |
+| Distribución | winget + Scoop (roadmap) |
+
+## 🚨 REPORTE DE AUDITORÍA (2026-08-03) — CRÍTICO, PRIORIDAD INMEDIATA
+
+**Estado real del codebase: 4.5/10 🔴 · Lenguaje en sí: 7/10 🟡.**
+La documentación NO refleja la realidad. Esto es lo que hay que arreglar ANTES de cualquier release.
+
+### ✅ Bloqueante #1 — 17 regresiones de codegen ("Verifier errors") — RESUELTO (2026-08-03)
+- **Síntoma original:** 17/73 ejemplos NO compilaban, incluido el más básico `imprimir_simple.fc` (9 líneas).
+- **Causa raíz (2 bugs):**
+  1. **`printf` variádica mal declarada** (`src/platform/registry.rs:227`): el registry la registraba con firma `&[I64]` (1 param) y `remap()` sobrescribía la firma pedida por el caller (2 params) → `call fn1(v4, v3): got 2, expected 1` → Verifier error. Fix: flag `variadic` en `BuiltinEntry` + `insert_variadic()` — el registry solo remapea el nombre, la firma exacta la decide el caller.
+  2. **Mojibake en string de match** (`src/codegen/expresiones.rs:1049,1076`): `"tamaño_de"` tenía la ñ corrupta (`E2 94 9C E2 96 92` en vez de `C3 B1`) → el match exacto fallaba → "Función 'tamaño_de' no encontrada". Fix: reemplazo de bytes a ñ UTF-8 correcta.
+- **Estado actual:** **66/73 ejemplos compilan** (los 7 restantes son errores intencionales de demostración: borrow_error, efecto_puro_error, feedback_educativo, field_borrow_error, rasgo_error_existe, rasgo_error_metodo, use_after_move). **47/47 unit tests pasan.** Verificado con release oficial `build.ps1`.
+- **Pendiente:** los errores internos de codegen siguen con `sugerencia: None` — hacer que pasen por la tubería de errores con span+sugerencia (violación Day-0).
+
+### 🔴 Bloquei #2. Arquitectura rota
+- **`#[cfg(target_os)]` FUERA de platform/:** `src/codegen/mod.rs:178` usa `cfg(target_os = "windows")` justo debajo de un comentario que dice que NUNCA debe hacerlo.
+- **Ciclo platform↔codegen:** `platform→codegen_helpers` + `codegen→platform`.
+- **Layering invertido:** `semantic→parser` y `platform→codegen_helpers` rompen el orden declarado CLI→resolver→parser→semantic→codegen→platform.
+- **Fix:** mover `call_conv_default` de codegen a `PlatformRuntime` (arregla cfg + ciclo).
+
+### 🔴 Bloqueo #3. Deuda técnica masiva
+- **Módulos sobre límite:** semantic.rs 3230 LOC (límite 1500), builtins.rs 1731, lsp.rs 1511.
+- **Panics/unwrap/expect: 4.2/1000 LOC** (61 unwrap + 12 panic) — umbral <2.
+- **Warnings:** 100 en build release (48 duplicados), 187 en clippy (~53 únicos). `cargo fix --bin falcato` elimina 36 automáticamente.
+- **Código muerto:** BlockBuilder, VariableManager, MemoryHelper, CodegenBuilder, PlatformLinker, BackendFalcato trait — NUNCA construidos (roadmap 15G no conectado).
+
+### 🔴 Bloqueo4. Documentación miente
+- AGENTS.md dice v0.4.0 y "40/40 tests" → binario y Cargo.toml dicen **0.3.0**, hay **47 tests**.
+- AGENTS.md dice "50+ ejemplos compilan y corren" → **66/73** (7 restantes son errores intencionales de demostración).
+- AGENTS.md dice "Build: build.ps1" → **sí existe** (build.ps1, build.bat, build_release.bat), pero el binario y Cargo.toml dicen **0.3.0**.
+- AGENTS.md dice "Pilar V (prefijos) 📝 parcial" → **no existe en el lexer** (los `prefijo` en codegen son de módulos, no re-/des-/pre-).
+
+### 🟡 Bloqueo #5. Deuda de calidad (no bloqueante pero urgente)
+- **Clippy: 187 warnings** en bin (~53 únicos): ptr_arg, collapsible_if, expect_fun_call, manual_is_multiple_of, if_same_then_else.
+- **Cobertura de tests no medible** (sin tarpaulin/llvm-cov instalado) — 47 unit tests + suite `falcato test` manual.
+- **Código muerto confirmado:** BlockBuilder, VariableManager, MemoryHelper, CodegenBuilder, PlatformLinker, BackendFalcato trait — todos "never constructed" (roadmap 15G no conectado).
+
+### ✅ Lo que SÍ está bien (no tocar)
+- **47/47 unit tests pasan** (0.01s).
+- **LSP completo:** 11 handlers (initialize, did_open/change/close, completion, signature_help, code_action, document_symbol, hover, references, goto_definition).
+- **0 `unsafe`** en todo el codebase.
+- **CI verde:** ci.yml + release.yml (build + test + e2e + artifact).
+- `falcato test` funciona en pruebas_simple (2 OK).
+- Build oficial vía `build.ps1` OK (146.5s release, binario 6.8 MB).
+
+### 📋 Plan de acción (orden sugerido)
+1. **Bug #1 (bloqueante):** ✅ RESUELTO — printf variádica + mojibake tamaño_de (2026-08-03).
+2. **Quick win:** `cargo fix --bin falcato` elimina 36 warnings automáticamente.
+3. **Arquitectura:** mover `call_conv_default` de codegen a `PlatformRuntime` (arregla cfg + ciclo platform↔codegen).
+4. **Docs:** sincronizar AGENTS.md (versión 0.3.0, 47 tests, 66/73 ejemplos) — 10 min.
+5. **Pilar V:** decidir si implementar prefijos re-/des-/pre- o retirarlos del roadmap.
+
+---
 
 ## Criterio de "listo para usar"
 

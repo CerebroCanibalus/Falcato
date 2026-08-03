@@ -29,6 +29,9 @@ pub struct BuiltinEntry {
     pub name: String,
     /// Firma Cranelift de la función
     pub sig: FuncSignature,
+    /// Función variádica (printf): la firma exacta la decide el caller
+    /// en cada llamada, no el registry. El registry solo remapea el nombre.
+    pub variadic: bool,
 }
 
 /// Registry de builtins por plataforma.
@@ -224,8 +227,10 @@ impl BuiltinRegistry {
             &[types::I64], Some(types::I64));
         self.insert("puts", "puts",
             &[types::I64], Some(types::I32));
-        self.insert("printf", "printf",
-            &[types::I64], Some(types::I32)); // variadic, simplified
+        // printf es variádica: la firma exacta (número de args) la decide
+        // el caller en cada llamada. El registry solo remapea el nombre.
+        self.insert_variadic("printf", "printf",
+            &[types::I64], Some(types::I32));
 
         // File I/O
         self.insert("fopen", "fopen",
@@ -255,6 +260,20 @@ impl BuiltinRegistry {
                 params: params.to_vec(),
                 ret,
             },
+            variadic: false,
+        });
+    }
+
+    /// Inserta una función variádica (printf): la firma exacta la decide
+    /// el caller en cada llamada, no el registry.
+    fn insert_variadic(&mut self, abstract_name: &str, name: &str, params: &[Type], ret: Option<Type>) {
+        self.entries.insert(abstract_name.to_string(), BuiltinEntry {
+            name: name.to_string(),
+            sig: FuncSignature {
+                params: params.to_vec(),
+                ret,
+            },
+            variadic: true,
         });
     }
 
@@ -307,6 +326,11 @@ impl BuiltinRegistry {
 
         if let Some(abstract_name) = abstract_name {
             if let Some(entry) = self.lookup(abstract_name) {
+                // Variádicas (printf): la firma exacta la decide el caller
+                // en cada llamada. Solo remapeamos el nombre.
+                if entry.variadic {
+                    return (entry.name.clone(), default_params.to_vec(), default_ret);
+                }
                 return (entry.name.clone(), entry.sig.params.clone(), entry.sig.ret);
             }
         }

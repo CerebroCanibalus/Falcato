@@ -1,4 +1,4 @@
-use super::*;
+﻿use super::*;
 impl Codegen {
     pub(crate) fn compilar_expresion(
         &mut self,
@@ -1046,7 +1046,7 @@ impl Codegen {
     }
     pub(crate) fn es_llamada_builtin(&self, llamada: &Llamada) -> bool {
         matches!(llamada.funcion.as_str(),
-            "imprimir" | "imprimir_linea" | "decir" | "tama├▒o_de" | "afirmar" |
+            "imprimir" | "imprimir_linea" | "decir" | "tamaño_de" | "afirmar" |
             "texto_nuevo" | "texto_desde" | "texto_agregar" | "texto_longitud" | "texto_tam" | "texto_liberar" |
             "texto_concatenar" | "texto_subtexto" | "texto_comparar" | "texto_obtener_byte" |
             "archivo_leer" | "archivo_escribir" | "archivo_existe" |
@@ -1073,7 +1073,7 @@ impl Codegen {
         match llamada.funcion.as_str() {
             "imprimir" => self.builtin_imprimir(builder, variables, &llamada.argumentos, false),
             "imprimir_linea" | "decir" => self.builtin_imprimir(builder, variables, &llamada.argumentos, true),
-            "tama├▒o_de" => self.builtin_tamano_de(builder, &llamada.tipo_args),
+            "tamaño_de" => self.builtin_tamano_de(builder, &llamada.tipo_args),
             "afirmar" => self.builtin_afirmar(builder, variables, &llamada.argumentos, &llamada.span),
             "texto_nuevo" => self.builtin_texto_nuevo(builder),
             "texto_desde" => self.builtin_texto_desde(builder, variables, &llamada.argumentos),
