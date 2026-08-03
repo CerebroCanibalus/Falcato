@@ -33,6 +33,14 @@ impl WindowsRuntime {
 
 impl PlatformRuntime for WindowsRuntime {
     // ============================================================
+    // Calling convention
+    // ============================================================
+
+    fn call_conv_default(&self) -> CallConv {
+        CallConv::WindowsFastcall
+    }
+
+    // ============================================================
     // Timers & Process
     // ============================================================
 

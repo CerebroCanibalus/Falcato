@@ -66,6 +66,8 @@ pub struct Codegen {
     pub(crate) cache: CFunctionCache,
     /// Registry de builtins segÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºn plataforma
     pub(crate) registry: BuiltinRegistry,
+    /// Convención de llamada nativa (WindowsFastcall en Win, SystemV en POSIX)
+    pub(crate) call_conv: CallConv,
     pub(crate) contador_strings: u32,
     pub(crate) contador_variables: u32,
     pub(crate) contador_closures: u32,
@@ -127,6 +129,7 @@ impl Codegen {
             errores: Errores::nuevo(),
             cache: CFunctionCache::nuevo(),
             registry: platform::current_registry(),
+            call_conv: platform::current_runtime().call_conv_default(),
             contador_strings: 0,
             contador_variables: 0,
             contador_closures: 0,
@@ -174,10 +177,7 @@ impl Codegen {
     /// ConvenciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n de llamada por defecto segÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºn el target nativo.
     /// En Windows x64 se usa WindowsFastcall; en otros, SystemV.
     fn call_conv_default(&self) -> CallConv {
-        #[cfg(target_os = "windows")]
-        { CallConv::WindowsFastcall }
-        #[cfg(not(target_os = "windows"))]
-        { CallConv::SystemV }
+        self.call_conv
     }
 
     /// Genera un ID ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºnico de variable SSA para el builder actual.

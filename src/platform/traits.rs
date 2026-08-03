@@ -20,6 +20,7 @@
 //! codegen.rs llama a `ctx.platform.lock_mutex(...)` sin saber qué OS es.
 
 use cranelift_codegen::ir::{InstBuilder, Value};
+use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::FunctionBuilder;
 use cranelift_module::Module;
 use cranelift_object::ObjectModule;
@@ -63,6 +64,13 @@ impl<'a> CodegenCtx<'a> {
 
 /// Trait que cada plataforma implementa con sus primitivas de sync + builtins complejos.
 pub trait PlatformRuntime {
+    // ============================================================
+    // Calling convention
+    // ============================================================
+    /// Convención de llamada por defecto según el target nativo.
+    /// Windows x64 usa WindowsFastcall; POSIX usa SystemV.
+    fn call_conv_default(&self) -> CallConv;
+
     // ============================================================
     // Timers & Process
     // ============================================================

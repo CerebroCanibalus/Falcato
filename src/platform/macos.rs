@@ -35,6 +35,10 @@ impl PlatformRuntime for MacOsRuntime {
     // Por ahora, idéntico a LinuxRuntime.
     // TODO: ajustar cuando tengamos un Mac para testing.
 
+    fn call_conv_default(&self) -> CallConv {
+        CallConv::SystemV
+    }
+
     fn sleep(&self, ctx: &mut CodegenCtx, builder: &mut FunctionBuilder, ms_val: Value) {
         // En macOS, nanosleep es preferible a usleep
         // struct timespec { time_t tv_sec; long tv_nsec; }
