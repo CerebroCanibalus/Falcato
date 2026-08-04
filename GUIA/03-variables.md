@@ -249,6 +249,49 @@ el z: Entero32 = 10;
 z = 20;          // ok
 ```
 
+## Tipos de datos: nombres naturales
+
+Falcato tiene **nombres naturales** para los tipos numéricos — se leen como español de verdad:
+
+| Escribes | Significa | Tamaño |
+|----------|-----------|--------|
+| `Entero` | Entero32 | 4 bytes |
+| `EnteroLargo` | Entero64 | 8 bytes |
+| `EnteroCorto` | Entero16 | 2 bytes |
+| `EnteroMínimo` | Entero8 | 1 byte |
+| `Natural` | Natural32 | 4 bytes (sin signo) |
+| `NaturalLargo` / `NaturalCorto` / `NaturalMínimo` | Natural64/16/8 | 8/2/1 byte |
+| `Real` | Flotante64 | 8 bytes |
+| `RealCorto` | Flotante32 | 4 bytes |
+| `Lógico` | Booleano | 1 byte |
+
+**Regla:** sin número = el tamaño más común (32 enteros, 64 reales). Si el tamaño importa
+(FFI con C, registros de hardware), usa el nombre preciso: `Entero64`, `Natural16`, `Real32`.
+
+Los nombres clásicos (`Entero32`, `Flotante64`, `Booleano`) **siguen funcionando**.
+
+```falcato
+el edad: Entero = 25;            // Entero32
+el saldo: EnteroLargo = 5000000000;  // Entero64 — el literal se adapta al tipo
+el precio: Real = 19.99;         // Flotante64
+el activo: Lógico = verdadero;   // Booleano
+```
+
+## Apodos de tipos: `apodo`
+
+Para dar un nombre con significado a un tipo, usa `apodo` (top-level):
+
+```falcato
+apodo ID = EnteroLargo;
+apodo Precio = Real;
+
+el id: ID = 123456789;      // ID se comporta como EnteroLargo
+el p: Precio = 9.99;        // Precio se comporta como Real
+```
+
+Los apodos son **transparentes**: `ID` es exactamente `EnteroLargo`, no una copia.
+Se pueden usar en structs, funciones, vectores — donde vaya un tipo.
+
 ## Recuerda
 
 - **`el`**: es tuyo, cámbialo, bórralo, haz lo que quieras
