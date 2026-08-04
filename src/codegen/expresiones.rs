@@ -1120,6 +1120,7 @@ impl Codegen {
             "terminal_modo_raw" | "terminal_leer_tecla" |
             "entrada_leer" |
             "fecha_unix" | "fecha_ms" |
+            "dht_nuevo" | "dht_publicar" | "dht_consultar" | "dht_bootstrap" | "dht_cerrar" |
             "cancelar" |
             "texto_a_puntero" |
             "como_entero64"
@@ -1181,6 +1182,11 @@ impl Codegen {
             "entrada_leer" => self.builtin_entrada_leer(builder, variables, &llamada.argumentos),
             "fecha_unix" => self.builtin_fecha_unix(builder, variables, &llamada.argumentos),
             "fecha_ms" => self.builtin_fecha_ms(builder, variables, &llamada.argumentos),
+            "dht_nuevo" => self.builtin_dht_nuevo(builder, variables, &llamada.argumentos),
+            "dht_publicar" => self.builtin_dht_publicar(builder, variables, &llamada.argumentos),
+            "dht_consultar" => self.builtin_dht_consultar(builder, variables, &llamada.argumentos),
+            "dht_bootstrap" => self.builtin_dht_bootstrap(builder, variables, &llamada.argumentos),
+            "dht_cerrar" => self.builtin_dht_cerrar(builder, variables, &llamada.argumentos),
             "diccionario_nuevo" => self.builtin_diccionario_nuevo(builder, &llamada.tipo_args),
             "diccionario_insertar" => self.builtin_diccionario_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "diccionario_obtener" => self.builtin_diccionario_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),

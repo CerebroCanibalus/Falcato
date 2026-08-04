@@ -2190,4 +2190,108 @@ impl Codegen {
         Ok(builder.inst_results(call)[0])
     }
 
+    // ============================================================
+    // DHT distribuido (R8.2)
+    // ============================================================
+
+    /// dht_nuevo(puerto: Entero32) -> Entero64 (handle, 0 = error)
+    pub(crate) fn builtin_dht_nuevo(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let puerto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let puerto_i32 = if builder.func.dfg.value_type(puerto) == types::I64 {
+            builder.ins().ireduce(types::I32, puerto)
+        } else {
+            puerto
+        };
+        // falcato_dht_nuevo(puerto: u16) -> *mut c_void (i64)
+        let fn_id = self.asegurar_funcion_c("falcato_dht_nuevo", &[types::I32], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[puerto_i32]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// dht_publicar(handle, clave: Palabra, valor: Palabra) -> Entero32
+    pub(crate) fn builtin_dht_publicar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let clave = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let valor = self.compilar_expresion(&argumentos[2], builder, variables)?;
+
+        let clave_len = self.llamar_strlen(builder, clave);
+        let valor_len = self.llamar_strlen(builder, valor);
+
+        // falcato_dht_publicar(handle, clave, clave_len, valor, valor_len) -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_dht_publicar",
+            &[types::I64, types::I64, types::I64, types::I64, types::I64], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[handle, clave, clave_len, valor, valor_len]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// dht_consultar(handle, clave: Palabra) -> Entero64 (puntero, NULL = no encontrado)
+    pub(crate) fn builtin_dht_consultar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let clave = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let clave_len = self.llamar_strlen(builder, clave);
+
+        // falcato_dht_consultar(handle, clave, clave_len) -> *mut u8 (i64)
+        let fn_id = self.asegurar_funcion_c("falcato_dht_consultar",
+            &[types::I64, types::I64, types::I64], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[handle, clave, clave_len]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// dht_bootstrap(handle, direccion: Palabra, puerto: Entero32) -> Entero32
+    pub(crate) fn builtin_dht_bootstrap(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let direccion = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let puerto = self.compilar_expresion(&argumentos[2], builder, variables)?;
+        let puerto_i32 = if builder.func.dfg.value_type(puerto) == types::I64 {
+            builder.ins().ireduce(types::I32, puerto)
+        } else {
+            puerto
+        };
+
+        // falcato_dht_bootstrap(handle, direccion: *const i8, puerto: u16) -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_dht_bootstrap",
+            &[types::I64, types::I64, types::I32], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[handle, direccion, puerto_i32]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// dht_cerrar(handle) — libera el nodo
+    pub(crate) fn builtin_dht_cerrar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // falcato_dht_cerrar(handle: *mut c_void) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_dht_cerrar", &[types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[handle]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
 }

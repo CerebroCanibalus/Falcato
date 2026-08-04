@@ -534,6 +534,59 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // DHT (R8.2): índice P2P distribuido
+        self.funciones.insert("dht_nuevo".to_string(), FirmaFuncion {
+            nombre: "dht_nuevo".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("puerto".to_string(), Tipo::Entero32)],
+            retorno: Some(Tipo::Entero64), // handle (0 = error)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("dht_publicar".to_string(), FirmaFuncion {
+            nombre: "dht_publicar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("handle".to_string(), Tipo::Entero64),
+                ("clave".to_string(), Tipo::Palabra),
+                ("valor".to_string(), Tipo::Palabra),
+            ],
+            retorno: Some(Tipo::Entero32), // 1 = OK, 0 = error
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("dht_consultar".to_string(), FirmaFuncion {
+            nombre: "dht_consultar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("handle".to_string(), Tipo::Entero64),
+                ("clave".to_string(), Tipo::Palabra),
+            ],
+            retorno: Some(Tipo::Entero64), // puntero al valor (NULL = no encontrado)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("dht_bootstrap".to_string(), FirmaFuncion {
+            nombre: "dht_bootstrap".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("handle".to_string(), Tipo::Entero64),
+                ("direccion".to_string(), Tipo::Palabra),
+                ("puerto".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Entero32), // 1 = OK, 0 = error
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("dht_cerrar".to_string(), FirmaFuncion {
+            nombre: "dht_cerrar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("handle".to_string(), Tipo::Entero64)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
         // Canales (Fase 18C): comunicación entre tareas
         self.funciones.insert("canal_nuevo".to_string(), FirmaFuncion {
             nombre: "canal_nuevo".to_string(),

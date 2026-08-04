@@ -18,6 +18,7 @@ mod proceso;
 mod terminal;
 mod entrada;
 mod tiempo;
+mod dht;
 
 use std::ffi::c_void;
 
@@ -168,4 +169,52 @@ pub unsafe extern "C" fn falcato_fecha_unix() -> i64 {
 #[no_mangle]
 pub unsafe extern "C" fn falcato_fecha_ms() -> i64 {
     tiempo::fecha_ms()
+}
+
+// ============================================================
+// DHT distribuido (R8.2) — índice P2P de paquetes
+// ============================================================
+
+/// Crea un nodo DHT (puerto 0 = efímero). Devuelve Handle o NULL.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_dht_nuevo(puerto: u16) -> *mut c_void {
+    dht::dht_nuevo(puerto)
+}
+
+/// Publica clave→valor firmado (ed25519). Devuelve 1 si OK, 0 si error.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_dht_publicar(
+    handle: *mut c_void,
+    clave: *const u8,
+    clave_len: usize,
+    valor: *const u8,
+    valor_len: usize,
+) -> i32 {
+    dht::dht_publicar(handle, clave, clave_len, valor, valor_len)
+}
+
+/// Consulta la clave. Devuelve buffer heap (caller libera con free) o NULL.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_dht_consultar(
+    handle: *mut c_void,
+    clave: *const u8,
+    clave_len: usize,
+) -> *mut u8 {
+    dht::dht_consultar(handle, clave, clave_len)
+}
+
+/// Conecta el nodo a un peer conocido (bootstrap). Devuelve 1 si OK.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_dht_bootstrap(
+    handle: *mut c_void,
+    direccion: *const i8,
+    puerto: u16,
+) -> i32 {
+    dht::dht_bootstrap(handle, direccion, puerto)
+}
+
+/// Libera el nodo DHT.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_dht_cerrar(handle: *mut c_void) {
+    dht::dht_cerrar(handle);
 }

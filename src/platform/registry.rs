@@ -121,6 +121,13 @@ impl BuiltinRegistry {
         r.insert("fecha_unix", "falcato_fecha_unix", &[], Some(types::I64));
         r.insert("fecha_ms", "falcato_fecha_ms", &[], Some(types::I64));
 
+        // DHT (R8.2): índice P2P
+        r.insert("dht_nuevo", "falcato_dht_nuevo", &[types::I32], Some(types::I64));
+        r.insert("dht_publicar", "falcato_dht_publicar", &[types::I64, types::I64, types::I64, types::I64, types::I64], Some(types::I32));
+        r.insert("dht_consultar", "falcato_dht_consultar", &[types::I64, types::I64, types::I64], Some(types::I64));
+        r.insert("dht_bootstrap", "falcato_dht_bootstrap", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("dht_cerrar", "falcato_dht_cerrar", &[types::I64], None);
+
         // Networking
         r.insert("wsa_startup", "WSAStartup",
             &[types::I32, types::I64], Some(types::I32));
@@ -202,6 +209,13 @@ impl BuiltinRegistry {
         // Reloj de pared (R7.4)
         r.insert("fecha_unix", "falcato_fecha_unix", &[], Some(types::I64));
         r.insert("fecha_ms", "falcato_fecha_ms", &[], Some(types::I64));
+
+        // DHT (R8.2): índice P2P
+        r.insert("dht_nuevo", "falcato_dht_nuevo", &[types::I32], Some(types::I64));
+        r.insert("dht_publicar", "falcato_dht_publicar", &[types::I64, types::I64, types::I64, types::I64, types::I64], Some(types::I32));
+        r.insert("dht_consultar", "falcato_dht_consultar", &[types::I64, types::I64, types::I64], Some(types::I64));
+        r.insert("dht_bootstrap", "falcato_dht_bootstrap", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("dht_cerrar", "falcato_dht_cerrar", &[types::I64], None);
 
         // Networking — POSIX (misma API que Winsock, sin WSAStartup)
         r.insert("socket", "socket",

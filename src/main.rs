@@ -805,7 +805,10 @@ fn link_objetos(
             .arg("gdi32.lib")
             .arg("ws2_32.lib")
             .arg("ntdll.lib")
-            .arg("userenv.lib");
+            .arg("userenv.lib")
+            // cripto R8.2: getrandom (BCryptGenRandom) y SystemFunction036
+            .arg("bcrypt.lib")
+            .arg("advapi32.lib");
 
         let output = cmd.output()
             .map_err(|e| format!("Error al ejecutar linker: {}", e))?;

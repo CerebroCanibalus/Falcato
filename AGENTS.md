@@ -30,6 +30,11 @@ Cranelift no es "lo que tocó" — es el backend oficial y estratégico. Bytecod
 - **C ABI por defecto**: layout C, calling conv SystemV/C, mangling off, salida `.o`
 - **Span en cada nodo AST**: `Span { inicio, fin, archivo }` — sin span no hay LSP
 - **Errores en español con códigos**: `[T001] archivo.fc:7:12: mensaje` — S/T/O/C/M/I/W
+- **Documentar al agente**: las adiciones grandes de funcionalidad y los cambios de
+  workflow importantes SE DOCUMENTAN en `C:\Users\Lord Gatito\.config\opencode\agents\falcato.md`
+  (y en la skill `falcato-language` si cambia sintaxis/builtins). Un builtin nuevo, un
+  subcomando nuevo del CLI, una primitiva nueva del runtime → actualizar el agente en la
+  misma tanda, no "para después".
 
 ## Stack técnico
 

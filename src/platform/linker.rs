@@ -43,6 +43,9 @@ impl PlatformLinker {
                 "ws2_32.lib".to_string(),
                 "ntdll.lib".to_string(),
                 "userenv.lib".to_string(),
+                // cripto R8.2: getrandom usa BCryptGenRandom y SystemFunction036
+                "bcrypt.lib".to_string(),
+                "advapi32.lib".to_string(),
             ],
             entry: "principal".to_string(),
             extra_objs: vec!["lib/trampolin_win32.obj".to_string()],
