@@ -135,11 +135,69 @@ falcato version              # Muestra versión
 
 ## Roadmap — Pendiente real
 
-### R5 — Proyecto ejemplo 500+ líneas
-- [ ] Word counter: lee archivo, tokeniza, cuenta frecuencia, ordena
+> ~~R5 — Proyecto ejemplo 500+ líneas~~ **SALTADO (2026-08-03).** Sustituido por R7: el primer gran
+> proyecto de Falcato es el CLI **Cid** (agente estilo OpenCode escrito en Falcato, `D:\Cid`).
+> Las primitivas nativas que exige el CLI son el dogfooding real — más valiosas que un word counter.
 
 ### R6 — Drop automático
 - [ ] Análisis de CFG para insertar `free` al final de scope (Texto, Vector, Diccionario, TCP)
+- [ ] **Requisito para:** Fase 2 de Cid (loop agente con JSON trees por doquier)
+
+### R7 — Primitivas nativas para el CLI (Cid)
+El CLI `cid` necesita tocar el sistema. Estas son las piezas **NATIVAS** (Capa A/B/C) —
+todo lo demás (JSON, HTTP, SSE, MCP) son librerías `.fc` y NO tocan el compiler.
+
+- [ ] **R7.1 — Spawn procesos + pipes** (CreateProcess/CreatePipe/WaitForSingleObject)
+  - [ ] Runtime C: `proceso_crear(comando) -> Handle`, `proceso_esperar(p) -> código`, `proceso_leer_salida(p) -> Texto` (stdout+stderr capturados)
+  - [ ] Registry: remapeo de los 3 nombres
+  - [ ] Codegen: builtins `proceso_*` con Span
+  - [ ] **Criterio:** ejecutar `falcato check` desde un programa Falcato y capturar su salida
+  - [ ] *Bloqueante:* sin esto no hay `cid run/build/test`, ni git, ni MCPs stdio
+- [ ] **R7.2 — Terminal raw mode + ANSI**
+  - [ ] PlatformRuntime: `terminal_modo_raw(activo)`, `terminal_leer_tecla() -> Entero32`
+  - [ ] Windows: `SetConsoleMode(ENABLE_VIRTUAL_TERMINAL_PROCESSING)`, `ReadConsoleInput`
+  - [ ] Codegen: builtins `terminal_*` con Span
+  - [ ] **Criterio:** leer teclas sin Enter y detectar flechas; colores ANSI activados
+  - [ ] *Bloqueante:* sin esto no hay TUI de Cid (Pilar IV)
+- [ ] **R7.3 — Entrada estándar (stdin)**
+  - [ ] Registry: `entrada_leer() -> Texto` (ReadFile sobre STD_INPUT_HANDLE)
+  - [ ] **Criterio:** `echo hola | cid` lee el texto
+  - [ ] *Bloqueante:* los MCPs y el LSP client hablan por stdio (JSON-RPC)
+- [ ] **R7.4 — Date/time formato** (timestamp ya existe; falta formatear)
+  - [ ] Librería `.fc` sobre el builtin `timestamp` (strftime manual o FFI)
+  - [ ] **Criterio:** sesiones y logs con fecha legible
+  - [ ] *No bloqueante:* el timestamp crudo ya sirve para ordenar
+
+### R8 — Sistema de paquetes distribuido (P2P, sin servidores)
+Ecosistema estilo crates.io pero **sin registry central**: contenido por hash, índice en la
+**DHT de BitTorrent** (BEP44 mutable items firmados), transporte por torrent con seeding.
+Casi todo vive en el compiler Rust (como cargo); solo la distribución entra en Capa A.
+**Espíritu:** esfuerzo comunitario — la confianza, las denuncias y el contenido los crean los
+pares (comunismo absoluto); semilla de confianza cero, nadie por defecto. Patrón validado por
+IPFS (Benet 2014): Kademlia + BitTorrent + Git, tamper-resistance por construcción.
+
+- [ ] **R8.1 — Formato y CLI**
+  - [ ] `falcato.toml` (nombre, versión, deps, permisos) + `falcato.lock` (árbol resuelto + hashes)
+  - [ ] Comandos: `falcato paquete add/publicar/buscar/actualizar`
+  - [ ] Resolver semver + integración de imports desde paquetes en `resolver.rs`
+  - [ ] **Anti-confusión (ConfuGuard-lite, arXiv 2025):** al resolver, alertar si dos paquetes tienen nombres similares (`texto_util` vs `texto-util`), o si una dependencia transitiva es reciente con 0 avales → confirmación manual
+- [ ] **R8.2 — Capa A: cliente torrent + DHT**
+  - [ ] `falcato_torrent_descargar(hash, dir)` / `falcato_torrent_publicar(dir) -> hash`
+  - [ ] DHT: publicar/consultar `paquete:<nombre>` → versión + hash (BEP44)
+  - [ ] Seeding configurable tras descarga
+  - [ ] **Anti-eclipse (Inria 2011):** consultas replicadas a múltiples peers; el valor firmado hace que una respuesta falsa falle verificación → el peor daño posible es DoS, no compromiso. La DHT es **directorio, nunca fuente de confianza**
+- [ ] **R8.3 — Seguridad (7 capas, cero mantenimiento)**
+  - [ ] **Capa 1 — Integridad:** hash blake3 obligatorio (lo da BitTorrent gratis)
+  - [ ] **Capa 2 — Solo fuente:** paquetes = código `.fc`, NUNCA binarios; **sin build scripts** (mata el 80% del malware tipo npm/cargo)
+  - [ ] **Capa 3 — Autenticidad:** firma ed25519; **obligatoria en producción, opcional en modo "auditar"** (dev puede instalar sin firma para probar)
+  - [ ] **Capa 4 — Tipos como permisos (INNOVACIÓN, capability-based):** permisos declarados `red/archivos/procesos/terminal` en el manifiesto; el compiler verifica por los efectos `puro/muta/lee` que el código no exceda lo declarado → falla la compilación. Enforcement en compile-time, sin sandbox. Más fuerte que Miller ("Capability Myths Demolished"): si el código no tiene la capacidad en su tipo, no compila — no hay bypass
+  - [ ] **Capa 5 — WoT distribuida:** **semilla de confianza cero** (nadie por defecto); TOFU al primer contacto; avales entre editores; la confianza fluye entre pares
+  - [ ] **Capa 6 — Blocklist comunal:** denuncias firmadas en DHT (`denuncia:<hash>` → razón); todos consultan antes de instalar
+  - [ ] **Capa 7 — Transparency log en DHT:** publicaciones BEP44 firmadas e inmutables; historial público auditable; un editor comprometido no borra su rastro
+  - [ ] **Capa 8 — Builds reproducibles (v2):** mismo fuente → mismo hash; toda la red es auditor — cualquiera compila y compara
+  - [ ] *Permisos = buckets sencillos e intuitivos (red, archivos, procesos, terminal)*
+- [ ] **Criterio:** `falcato paquete add <lib>` descarga de la red P2P, verifica hash + firma, valida permisos, compila contra ella
+- [ ] *Depende de:* principalmente compiler Rust; Capa A para torrent/DHT
 
 ### 15G — Migración de codegen helpers
 - [ ] Migrar `compilar_funcion()` a `BlockBuilder`
