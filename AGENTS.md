@@ -105,7 +105,7 @@ wix/main.wxs             # Plantilla MSI (cargo-dist)
 dist-workspace.toml      # Config cargo-dist
 ```
 
-## Estado del proyecto (v0.4.0)
+## Estado del proyecto (v0.3.0)
 
 Pipeline end-to-end operativo. Turing-completo con:
 - **Core:** variables, ops, condicionales, bucles, arrays, structs, enums, generics (const+type)
@@ -116,7 +116,7 @@ Pipeline end-to-end operativo. Turing-completo con:
 - **LSP:** 6 features, integrado OpenCode, signature help, code actions, context-aware completion
 - **Documentación:** GUIA.md + 15 capítulos, REFERENCIA.md, ERRORES.md, skill falcato-language, VS Code Extension (Falcato Dorado)
 - **Instalación:** cargo-dist (MSI+shell+powershell), `falcato setup --all`, install.ps1 legacy
-- **40/40 tests pasan. 50+ ejemplos.**
+- **47/47 tests pasan. 66/73 ejemplos compilan** (7 restantes son errores intencionales de demostración).
 
 ## Comandos CLI
 
@@ -154,7 +154,7 @@ falcato version              # Muestra versión
 - [ ] Publicar en winget + Scoop
 - [ ] Fix interpolación (`{var}` en strings, roto desde antes de migración)
 
-## Estado de distribución (v0.4.0 — Alpha)
+## Estado de distribución (v0.3.0 — Alpha)
 
 | Aspecto | Estado |
 |---------|--------|
@@ -209,10 +209,10 @@ Sebesta, HumanEval.
 | 5 pilares implementados | I–IV ✅, V (prefijos) 📝→completar |
 | Legibilidad: errores con span+sugerencia | 100% (Day-0) |
 | Escribibilidad: ejemplo 500+ líneas (R5) | 1 proyecto real compilable |
-| Fiabilidad: `falcato test` | 40/40 ✅ |
+| Fiabilidad: `falcato test` | 47/47 ✅ |
 | Expresividad: linked list, bitfields, self-ref sin pelear | Checklist "superar a Rust" |
 | Paridad doc/código (GUIA.md↔features) | 100% |
-| Ejemplos | 50+ compilan y corren |
+| Ejemplos | 66/73 compilan (7 intencionales) |
 
 ### D. Iteración LLM (benchmarking HumanEval-style)
 | Métrica | Umbral |
@@ -232,7 +232,7 @@ Sebesta, HumanEval.
 ## 🚨 REPORTE DE AUDITORÍA (2026-08-03) — CRÍTICO, PRIORIDAD INMEDIATA
 
 **Estado real del codebase: 4.5/10 🔴 · Lenguaje en sí: 7/10 🟡.**
-La documentación NO refleja la realidad. Esto es lo que hay que arreglar ANTES de cualquier release.
+La documentación NO reflejaba la realidad. Progreso 2026-08-03: 4 de 5 puntos del plan resueltos (Verifier errors, warnings, arquitectura, docs). Pendiente: Pilar V (decisión) + deuda técnica (semantic.rs 3230 LOC, panics 4.2/1000).
 
 ### ✅ Bloqueante #1 — 17 regresiones de codegen ("Verifier errors") — RESUELTO (2026-08-03)
 - **Síntoma original:** 17/73 ejemplos NO compilaban, incluido el más básico `imprimir_simple.fc` (9 líneas).
@@ -254,11 +254,11 @@ La documentación NO refleja la realidad. Esto es lo que hay que arreglar ANTES 
 - **Warnings:** 100 en build release (48 duplicados), 187 en clippy (~53 únicos). `cargo fix --bin falcato` elimina 36 automáticamente.
 - **Código muerto:** BlockBuilder, VariableManager, MemoryHelper, CodegenBuilder, PlatformLinker, BackendFalcato trait — NUNCA construidos (roadmap 15G no conectado).
 
-### 🔴 Bloqueo4. Documentación miente
-- AGENTS.md dice v0.4.0 y "40/40 tests" → binario y Cargo.toml dicen **0.3.0**, hay **47 tests**.
-- AGENTS.md dice "50+ ejemplos compilan y corren" → **66/73** (7 restantes son errores intencionales de demostración).
-- AGENTS.md dice "Build: build.ps1" → **sí existe** (build.ps1, build.bat, build_release.bat), pero el binario y Cargo.toml dicen **0.3.0**.
-- AGENTS.md dice "Pilar V (prefijos) 📝 parcial" → **no existe en el lexer** (los `prefijo` en codegen son de módulos, no re-/des-/pre-).
+### ✅ Bloqueo4. Documentación miente — RESUELTO (2026-08-03)
+- ~~AGENTS.md dice v0.4.0 y "40/40 tests"~~ → sincronizado: **0.3.0**, **47 tests**.
+- ~~AGENTS.md dice "50+ ejemplos compilan y corren"~~ → sincronizado: **66/73** (7 intencionales).
+- AGENTS.md dice "Build: build.ps1" → **sí existe** (build.ps1, build.bat, build_release.bat).
+- AGENTS.md dice "Pilar V (prefijos) 📝 parcial" → **no existe en el lexer** (los `prefijo` en codegen son de módulos, no re-/des-/pre-) — pendiente de decisión (punto 5 del plan).
 
 ### 🟡 Bloqueo #5. Deuda de calidad (no bloqueante pero urgente)
 - **Clippy: 187 warnings** en bin (~53 únicos): ptr_arg, collapsible_if, expect_fun_call, manual_is_multiple_of, if_same_then_else.
@@ -275,9 +275,9 @@ La documentación NO refleja la realidad. Esto es lo que hay que arreglar ANTES 
 
 ### 📋 Plan de acción (orden sugerido)
 1. **Bug #1 (bloqueante):** ✅ RESUELTO — printf variádica + mojibake tamaño_de (2026-08-03).
-2. **Quick win:** `cargo fix --bin falcato` elimina 36 warnings automáticamente.
-3. **Arquitectura:** mover `call_conv_default` de codegen a `PlatformRuntime` (arregla cfg + ciclo platform↔codegen).
-4. **Docs:** sincronizar AGENTS.md (versión 0.3.0, 47 tests, 66/73 ejemplos) — 10 min.
+2. **Quick win:** ✅ `cargo fix --bin falcato` — 100 → 61 warnings (2026-08-03).
+3. **Arquitectura:** ✅ `call_conv_default` movido a `PlatformRuntime` — 0 cfg(target_os) fuera de platform/ (2026-08-03).
+4. **Docs:** ✅ AGENTS.md sincronizado (0.3.0, 47 tests, 66/73 ejemplos) (2026-08-03).
 5. **Pilar V:** decidir si implementar prefijos re-/des-/pre- o retirarlos del roadmap.
 
 ---
