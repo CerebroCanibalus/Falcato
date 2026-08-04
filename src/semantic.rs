@@ -488,6 +488,24 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // Terminal (R7.2): modo raw + lectura de teclas
+        self.funciones.insert("terminal_modo_raw".to_string(), FirmaFuncion {
+            nombre: "terminal_modo_raw".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("activo".to_string(), Tipo::Entero32)],
+            retorno: Some(Tipo::Entero32), // 1 = OK, 0 = error
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("terminal_leer_tecla".to_string(), FirmaFuncion {
+            nombre: "terminal_leer_tecla".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero32), // código de tecla (ver terminal.rs)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
         // Canales (Fase 18C): comunicación entre tareas
         self.funciones.insert("canal_nuevo".to_string(), FirmaFuncion {
             nombre: "canal_nuevo".to_string(),

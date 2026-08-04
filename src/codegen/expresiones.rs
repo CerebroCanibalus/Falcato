@@ -1117,6 +1117,7 @@ impl Codegen {
             "tcp_vincular" | "tcp_aceptar" | "tcp_leer" | "tcp_escribir" | "tcp_cerrar" |
             "canal_nuevo" | "canal_enviar" | "canal_recibir" | "canal_cerrar" | "canal_intentar" |
             "proceso_crear" | "proceso_esperar" | "proceso_leer_salida" | "proceso_cerrar" |
+            "terminal_modo_raw" | "terminal_leer_tecla" |
             "cancelar" |
             "texto_a_puntero" |
             "como_entero64"
@@ -1173,6 +1174,8 @@ impl Codegen {
             "proceso_esperar" => self.builtin_proceso_esperar(builder, variables, &llamada.argumentos),
             "proceso_leer_salida" => self.builtin_proceso_leer_salida(builder, variables, &llamada.argumentos),
             "proceso_cerrar" => self.builtin_proceso_cerrar(builder, variables, &llamada.argumentos),
+            "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
+            "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
             "diccionario_nuevo" => self.builtin_diccionario_nuevo(builder, &llamada.tipo_args),
             "diccionario_insertar" => self.builtin_diccionario_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "diccionario_obtener" => self.builtin_diccionario_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),

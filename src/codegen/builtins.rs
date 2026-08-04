@@ -2073,4 +2073,42 @@ impl Codegen {
         Ok(builder.ins().iconst(types::I32, 0))
     }
 
+    // ============================================================
+    // Terminal (R7.2): modo raw + lectura de teclas
+    // ============================================================
+
+    /// terminal_modo_raw(activo: Entero32) -> Entero32 (1 = OK, 0 = error)
+    pub(crate) fn builtin_terminal_modo_raw(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let activo = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let activo_i32 = if builder.func.dfg.value_type(activo) == types::I64 {
+            builder.ins().ireduce(types::I32, activo)
+        } else {
+            activo
+        };
+        // falcato_terminal_modo_raw(activo: i32) -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_terminal_modo_raw", &[types::I32], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[activo_i32]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// terminal_leer_tecla() -> Entero32 (código de tecla, ver terminal.rs)
+    pub(crate) fn builtin_terminal_leer_tecla(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // falcato_terminal_leer_tecla() -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_terminal_leer_tecla", &[], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[]);
+        Ok(builder.inst_results(call)[0])
+    }
+
 }

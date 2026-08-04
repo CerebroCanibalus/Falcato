@@ -15,6 +15,7 @@ mod canal;
 mod executor;
 mod threading;
 mod proceso;
+mod terminal;
 
 use std::ffi::c_void;
 
@@ -120,4 +121,22 @@ pub unsafe extern "C" fn falcato_proceso_leer_salida(handle: *mut c_void) -> *mu
 #[no_mangle]
 pub unsafe extern "C" fn falcato_proceso_cerrar(handle: *mut c_void) {
     proceso::proceso_cerrar(handle);
+}
+
+// ============================================================
+// Terminal API — modo raw y lectura de teclas (TUI)
+// ============================================================
+
+/// Activa (1) o desactiva (0) el modo raw de terminal.
+/// En Windows también activa ENABLE_VIRTUAL_TERMINAL_PROCESSING (ANSI).
+/// Devuelve 1 si OK, 0 si error.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_terminal_modo_raw(activo: i32) -> i32 {
+    terminal::terminal_modo_raw(activo)
+}
+
+/// Lee una tecla bloqueante. Devuelve el código de tecla (ver terminal.rs).
+#[no_mangle]
+pub unsafe extern "C" fn falcato_terminal_leer_tecla() -> i32 {
+    terminal::terminal_leer_tecla()
 }

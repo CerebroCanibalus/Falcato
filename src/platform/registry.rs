@@ -110,6 +110,10 @@ impl BuiltinRegistry {
         r.insert("proceso_leer_salida", "falcato_proceso_leer_salida", &[types::I64], Some(types::I64));
         r.insert("proceso_cerrar", "falcato_proceso_cerrar", &[types::I64], None);
 
+        // Terminal (R7.2): modo raw + lectura de teclas
+        r.insert("terminal_modo_raw", "falcato_terminal_modo_raw", &[types::I32], Some(types::I32));
+        r.insert("terminal_leer_tecla", "falcato_terminal_leer_tecla", &[], Some(types::I32));
+
         // Networking
         r.insert("wsa_startup", "WSAStartup",
             &[types::I32, types::I64], Some(types::I32));
@@ -180,6 +184,10 @@ impl BuiltinRegistry {
         r.insert("proceso_esperar", "falcato_proceso_esperar", &[types::I64], Some(types::I32));
         r.insert("proceso_leer_salida", "falcato_proceso_leer_salida", &[types::I64], Some(types::I64));
         r.insert("proceso_cerrar", "falcato_proceso_cerrar", &[types::I64], None);
+
+        // Terminal (R7.2): modo raw + lectura de teclas
+        r.insert("terminal_modo_raw", "falcato_terminal_modo_raw", &[types::I32], Some(types::I32));
+        r.insert("terminal_leer_tecla", "falcato_terminal_leer_tecla", &[], Some(types::I32));
 
         // Networking — POSIX (misma API que Winsock, sin WSAStartup)
         r.insert("socket", "socket",
