@@ -105,6 +105,10 @@ impl BuiltinRegistry {
         r.insert("sleep", "Sleep", &[types::I32], None);
         r.insert("timestamp", "GetTickCount64", &[], Some(types::I64));
         r.insert("exit_process", "ExitProcess", &[types::I32], None);
+        r.insert("proceso_crear", "falcato_proceso_crear", &[types::I64], Some(types::I64));
+        r.insert("proceso_esperar", "falcato_proceso_esperar", &[types::I64], Some(types::I32));
+        r.insert("proceso_leer_salida", "falcato_proceso_leer_salida", &[types::I64], Some(types::I64));
+        r.insert("proceso_cerrar", "falcato_proceso_cerrar", &[types::I64], None);
 
         // Networking
         r.insert("wsa_startup", "WSAStartup",
@@ -172,6 +176,10 @@ impl BuiltinRegistry {
         // Timers & process
         r.insert("sleep", "usleep", &[types::I32], Some(types::I32));
         r.insert("exit_process", "_exit", &[types::I32], None);
+        r.insert("proceso_crear", "falcato_proceso_crear", &[types::I64], Some(types::I64));
+        r.insert("proceso_esperar", "falcato_proceso_esperar", &[types::I64], Some(types::I32));
+        r.insert("proceso_leer_salida", "falcato_proceso_leer_salida", &[types::I64], Some(types::I64));
+        r.insert("proceso_cerrar", "falcato_proceso_cerrar", &[types::I64], None);
 
         // Networking — POSIX (misma API que Winsock, sin WSAStartup)
         r.insert("socket", "socket",

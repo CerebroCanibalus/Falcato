@@ -14,6 +14,7 @@ mod platform;
 mod canal;
 mod executor;
 mod threading;
+mod proceso;
 
 use std::ffi::c_void;
 
@@ -89,4 +90,34 @@ pub unsafe extern "C" fn falcato_thread_run(
 #[no_mangle]
 pub unsafe extern "C" fn falcato_thread_join(handle: *mut c_void) -> i32 {
     threading::thread_join(handle)
+}
+
+// ============================================================
+// Proceso API — creación de procesos con captura de salida
+// ============================================================
+
+/// Lanza un proceso con el comando dado (vía shell del sistema), capturando
+/// stdout+stderr en un pipe. Devuelve un Handle opaco o NULL si falla.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_crear(comando: *const i8) -> *mut c_void {
+    proceso::proceso_crear(comando as *const std::ffi::c_char)
+}
+
+/// Espera a que el proceso termine. Devuelve el exit code del proceso.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_esperar(handle: *mut c_void) -> i32 {
+    proceso::proceso_esperar(handle)
+}
+
+/// Devuelve un puntero a la salida capturada (malloc'ed, con null terminator).
+/// El caller debe liberarlo con `free`.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_leer_salida(handle: *mut c_void) -> *mut i8 {
+    proceso::proceso_leer_salida(handle) as *mut i8
+}
+
+/// Libera el handle del proceso (después de proceso_esperar/proceso_leer_salida).
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_cerrar(handle: *mut c_void) {
+    proceso::proceso_cerrar(handle);
 }

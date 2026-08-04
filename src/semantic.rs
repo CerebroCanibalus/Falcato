@@ -454,6 +454,40 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // Procesos (R7.1): lanzar comandos y capturar salida
+        self.funciones.insert("proceso_crear".to_string(), FirmaFuncion {
+            nombre: "proceso_crear".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("comando".to_string(), Tipo::Palabra)],
+            retorno: Some(Tipo::Entero64), // handle (0 = error)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_esperar".to_string(), FirmaFuncion {
+            nombre: "proceso_esperar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("handle".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Entero32), // exit code
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_leer_salida".to_string(), FirmaFuncion {
+            nombre: "proceso_leer_salida".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("handle".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Texto), // salida capturada
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_cerrar".to_string(), FirmaFuncion {
+            nombre: "proceso_cerrar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("handle".to_string(), Tipo::Entero64)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
         // Canales (Fase 18C): comunicación entre tareas
         self.funciones.insert("canal_nuevo".to_string(), FirmaFuncion {
             nombre: "canal_nuevo".to_string(),
