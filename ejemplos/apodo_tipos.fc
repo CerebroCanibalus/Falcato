@@ -1,0 +1,46 @@
+// apodo_tipos.fc - Prueba de apodos de tipos y tipos naturales
+// Sintaxis:
+//   apodo Nombre = Tipo;           -> renombrado de tipos (ex-alias)
+//   Entero, Natural, Real, Lógico  -> nombres naturales (defaults de tamaño)
+//   EnteroLargo, NaturalCorto...   -> tamaño como adjetivo
+
+apodo ID = Entero64;
+apodo Precio = Real;
+apodo Edad = Natural;
+
+función principal() -> Entero32 {
+    // Apodos
+    el id: ID = 1234567890123;
+    el precio: Precio = 19.99;
+    el edad: Edad = 25;
+
+    // Tipos naturales (defaults)
+    el x: Entero = 42;
+    el y: Real = 3.14;
+    el es_activo: Lógico = verdadero;
+    el conteo: Natural = 100;
+
+    // Tamaño como adjetivo
+    el grande: EnteroLargo = 9999999999;
+    el pequeño: NaturalCorto = 5;
+    el minimo: EnteroMínimo = -128;
+    el real_corto: RealCorto = 1.5;
+
+    imprimir_linea("id = {id}");
+    imprimir_linea("precio = {precio}");
+    imprimir_linea("edad = {edad}");
+    imprimir_linea("x = {x}");
+    imprimir_linea("y = {y}");
+    imprimir_linea("es_activo = {es_activo}");
+    imprimir_linea("conteo = {conteo}");
+    imprimir_linea("grande = {grande}");
+    imprimir_linea("pequeño = {pequeño}");
+    imprimir_linea("minimo = {minimo}");
+    imprimir_linea("real_corto = {real_corto}");
+
+    // Los apodos son transparentes: ID es Entero64
+    el suma: Entero64 = id + 1;
+    imprimir_linea("suma = {suma}");
+
+    retornar 0;
+}

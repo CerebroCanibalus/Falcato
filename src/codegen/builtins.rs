@@ -597,9 +597,19 @@ impl Codegen {
                 // Variable: imprimir segÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºn su tipo
                 if let Some((slot, tipo, _)) = variables.get(contenido) {
                     let slot = *slot;
-                    let tipo = tipo.clone();
+                    let tipo = self.resolver_alias(tipo);
                     let (fmt_str, val) = match tipo {
-                        Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 => {
+                        Tipo::Entero8 => {
+                            let v = builder.ins().stack_load(types::I8, slot, 0);
+                            let ext = builder.ins().sextend(types::I64, v);
+                            ("%d\0", ext)
+                        }
+                        Tipo::Entero16 => {
+                            let v = builder.ins().stack_load(types::I16, slot, 0);
+                            let ext = builder.ins().sextend(types::I64, v);
+                            ("%d\0", ext)
+                        }
+                        Tipo::Entero32 => {
                             let v = builder.ins().stack_load(types::I32, slot, 0);
                             let ext = builder.ins().sextend(types::I64, v);
                             ("%d\0", ext)
@@ -608,7 +618,17 @@ impl Codegen {
                             let v = builder.ins().stack_load(types::I64, slot, 0);
                             ("%lld\0", v)
                         }
-                        Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 => {
+                        Tipo::Natural8 => {
+                            let v = builder.ins().stack_load(types::I8, slot, 0);
+                            let ext = builder.ins().uextend(types::I64, v);
+                            ("%u\0", ext)
+                        }
+                        Tipo::Natural16 => {
+                            let v = builder.ins().stack_load(types::I16, slot, 0);
+                            let ext = builder.ins().uextend(types::I64, v);
+                            ("%u\0", ext)
+                        }
+                        Tipo::Natural32 => {
                             let v = builder.ins().stack_load(types::I32, slot, 0);
                             let ext = builder.ins().uextend(types::I64, v);
                             ("%u\0", ext)
@@ -617,9 +637,21 @@ impl Codegen {
                             let v = builder.ins().stack_load(types::I64, slot, 0);
                             ("%llu\0", v)
                         }
-                        Tipo::Flotante32 | Tipo::Flotante64 => {
+                        Tipo::Flotante32 => {
+                            // Cargar F32 y promover a F64 (el slot es de 4 bytes)
+                            let v32 = builder.ins().stack_load(types::F32, slot, 0);
+                            let v = builder.ins().fpromote(types::F64, v32);
+                            // printf %f espera un double; la firma Cranelift usa I64,
+                            // así que pasamos los bits del F64 como I64 (bitcast).
+                            let bits = builder.ins().bitcast(types::I64, cranelift_codegen::ir::MemFlags::new(), v);
+                            ("%f\0", bits)
+                        }
+                        Tipo::Flotante64 => {
                             let v = builder.ins().stack_load(types::F64, slot, 0);
-                            ("%f\0", v)
+                            // printf %f espera un double; la firma Cranelift usa I64,
+                            // así que pasamos los bits del F64 como I64 (bitcast).
+                            let bits = builder.ins().bitcast(types::I64, cranelift_codegen::ir::MemFlags::new(), v);
+                            ("%f\0", bits)
                         }
                         Tipo::Booleano => {
                             let v = builder.ins().stack_load(types::I8, slot, 0);

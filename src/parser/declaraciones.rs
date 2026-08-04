@@ -18,6 +18,7 @@ pub fn parse_declaracion(cursor: &mut ParserCursor) -> Result<Declaracion, Error
         Some(Token::Rasgo) => parse_rasgo(cursor),
         Some(Token::Implementar) => parse_impl(cursor),
         Some(Token::Prueba) => parse_prueba(cursor),
+        Some(Token::Apodo) => parse_apodo(cursor),
         // Visibilidad: `el función` o `la función`
         Some(Token::ArticuloEl) | Some(Token::ArticuloLa) => {
             let span_articulo = cursor.span_actual();
@@ -805,6 +806,42 @@ fn parse_prueba(cursor: &mut ParserCursor) -> Result<Declaracion, ErrorSintaxis>
     Ok(Declaracion::Prueba(PruebaDecl {
         nombre,
         bloque,
+        span,
+    }))
+}
+
+/// Parsea: apodo Nombre = Tipo;
+fn parse_apodo(cursor: &mut ParserCursor) -> Result<Declaracion, ErrorSintaxis> {
+    let span_inicio = cursor.span_actual();
+    cursor.esperar(Token::Apodo)?;
+
+    // Nombre del apodo (identificador)
+    let nombre = match cursor.actual() {
+        Some(Token::Identificador(n)) => {
+            let s = n.clone();
+            cursor.avanzar();
+            s
+        }
+        _ => {
+            let span = cursor.span_actual();
+            return Err(ErrorSintaxis::nuevo(17, span, "esperaba nombre de apodo: apodo Nombre = Tipo;"));
+        }
+    };
+
+    // Símbolo =
+    cursor.esperar(Token::Igual)?;
+
+    // Tipo
+    let tipo = parse_tipo(cursor)?;
+
+    // Punto y coma
+    cursor.esperar(Token::PuntoYComa)?;
+
+    let span = Span::combinar(&span_inicio, &cursor.span_actual());
+
+    Ok(Declaracion::Apodo(ApodoDecl {
+        nombre,
+        tipo,
         span,
     }))
 }

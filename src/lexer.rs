@@ -115,6 +115,9 @@ pub enum Token {
     #[token("prueba")]
     Prueba,
 
+    #[token("apodo")]
+    Apodo,
+
     // Async (Fase 18)
     #[token("fut")]
     Fut,
@@ -156,6 +159,46 @@ pub enum Token {
     ArticuloLas,
 
     // Tipos primitivos
+    // Nombres naturales (defaults de tamaño + adjetivos)
+    #[token("Entero")]
+    Entero,
+    
+    #[token("EnteroLargo")]
+    EnteroLargo,
+    
+    #[token("EnteroCorto")]
+    EnteroCorto,
+    
+    #[token("EnteroMínimo")]
+    EnteroMinimo,
+    
+    #[token("Natural")]
+    Natural,
+    
+    #[token("NaturalLargo")]
+    NaturalLargo,
+    
+    #[token("NaturalCorto")]
+    NaturalCorto,
+    
+    #[token("NaturalMínimo")]
+    NaturalMinimo,
+    
+    #[token("Real")]
+    Real,
+    
+    #[token("Real32")]
+    Real32,
+    
+    #[token("Real64")]
+    Real64,
+    
+    #[token("RealCorto")]
+    RealCorto,
+    
+    #[token("Lógico")]
+    Logico,
+    
     #[token("Entero8")]
     Entero8,
     

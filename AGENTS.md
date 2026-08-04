@@ -23,7 +23,7 @@ Cranelift no es "lo que tocó" — es el backend oficial y estratégico. Bytecod
 | II | **Ser/Estar = Const/Mut** | `es`=identidad permanente, `está`=estado temporal | ✅ |
 | III | **Tiempos = Modos ejecución** | Presente=sync, Futuro=async, Subjuntivo=fallible | ✅ |
 | IV | **C ABI por defecto** | Layout C, calling C, mangling off | ✅ |
-| V | **Prefijos semánticos** | `re-`=retry, `des-`=free, `pre-`=comptime | 📝 Parcial |
+| V | ~~Prefijos semánticos~~ | ~~`re-`=retry, `des-`=free, `pre-`=comptime~~ | ⛔ Retirado (2026-08-03) — riesgo de colisión con `retornar`/`prestar`/`desde`; `des-` cubierto por R6 (drop automático) |
 
 ## Day-0 (no negociable)
 
@@ -206,7 +206,7 @@ Sebesta, HumanEval.
 ### C. El lenguaje (criterios Sebesta)
 | Parámetro | Umbral |
 |-----------|--------|
-| 5 pilares implementados | I–IV ✅, V (prefijos) 📝→completar |
+| 5 pilares implementados | I–IV ✅, V ⛔ retirado (2026-08-03) |
 | Legibilidad: errores con span+sugerencia | 100% (Day-0) |
 | Escribibilidad: ejemplo 500+ líneas (R5) | 1 proyecto real compilable |
 | Fiabilidad: `falcato test` | 47/47 ✅ |
@@ -232,7 +232,7 @@ Sebesta, HumanEval.
 ## 🚨 REPORTE DE AUDITORÍA (2026-08-03) — CRÍTICO, PRIORIDAD INMEDIATA
 
 **Estado real del codebase: 4.5/10 🔴 · Lenguaje en sí: 7/10 🟡.**
-La documentación NO reflejaba la realidad. Progreso 2026-08-03: 4 de 5 puntos del plan resueltos (Verifier errors, warnings, arquitectura, docs). Pendiente: Pilar V (decisión) + deuda técnica (semantic.rs 3230 LOC, panics 4.2/1000).
+La documentación NO reflejaba la realidad. Progreso 2026-08-03: 5 de 5 puntos del plan resueltos (Verifier errors, warnings, arquitectura, docs, Pilar V retirado). Pendiente: deuda técnica (semantic.rs 3230 LOC, panics 4.2/1000).
 
 ### ✅ Bloqueante #1 — 17 regresiones de codegen ("Verifier errors") — RESUELTO (2026-08-03)
 - **Síntoma original:** 17/73 ejemplos NO compilaban, incluido el más básico `imprimir_simple.fc` (9 líneas).
@@ -258,7 +258,7 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 4 de 5 puntos d
 - ~~AGENTS.md dice v0.4.0 y "40/40 tests"~~ → sincronizado: **0.3.0**, **47 tests**.
 - ~~AGENTS.md dice "50+ ejemplos compilan y corren"~~ → sincronizado: **66/73** (7 intencionales).
 - AGENTS.md dice "Build: build.ps1" → **sí existe** (build.ps1, build.bat, build_release.bat).
-- AGENTS.md dice "Pilar V (prefijos) 📝 parcial" → **no existe en el lexer** (los `prefijo` en codegen son de módulos, no re-/des-/pre-) — pendiente de decisión (punto 5 del plan).
+- AGENTS.md dice "Pilar V (prefijos) 📝 parcial" → **no existe en el lexer** → ⛔ **RETIRADO (2026-08-03)** — riesgo de colisión con `retornar`/`prestar`/`desde`; `des-` cubierto por R6 (drop automático).
 
 ### 🟡 Bloqueo #5. Deuda de calidad (no bloqueante pero urgente)
 - **Clippy: 187 warnings** en bin (~53 únicos): ptr_arg, collapsible_if, expect_fun_call, manual_is_multiple_of, if_same_then_else.
@@ -278,7 +278,7 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 4 de 5 puntos d
 2. **Quick win:** ✅ `cargo fix --bin falcato` — 100 → 61 warnings (2026-08-03).
 3. **Arquitectura:** ✅ `call_conv_default` movido a `PlatformRuntime` — 0 cfg(target_os) fuera de platform/ (2026-08-03).
 4. **Docs:** ✅ AGENTS.md sincronizado (0.3.0, 47 tests, 66/73 ejemplos) (2026-08-03).
-5. **Pilar V:** decidir si implementar prefijos re-/des-/pre- o retirarlos del roadmap.
+5. **Pilar V:** ✅ **RETIRADO (2026-08-03)** — riesgo de colisión con `retornar`/`prestar`/`desde`; `des-` cubierto por R6 (drop automático).
 
 ---
 

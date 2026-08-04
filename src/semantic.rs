@@ -283,6 +283,8 @@ pub struct AnalizadorSemantico {
     rasgos: HashMap<String, InfoRasgo>,
     /// Impls registrados: (rasgo, tipo) → métodos
     impls: HashMap<(String, String), Vec<String>>,
+    /// Alias de tipos: nombre → Tipo (ej: "Entero" → Entero32)
+    aliases: HashMap<String, Tipo>,
 }
 
 impl AnalizadorSemantico {
@@ -304,6 +306,7 @@ impl AnalizadorSemantico {
             efecto_actual: crate::ast::Efecto::Conservador,
             rasgos: HashMap::new(),
             impls: HashMap::new(),
+            aliases: HashMap::new(),
         };
         analizador.registrar_builtins();
         analizador
@@ -329,6 +332,7 @@ impl AnalizadorSemantico {
             efecto_actual: crate::ast::Efecto::Conservador,
             rasgos: HashMap::new(),
             impls: HashMap::new(),
+            aliases: HashMap::new(),
         };
         analizador.registrar_builtins();
         analizador
@@ -1087,6 +1091,10 @@ impl AnalizadorSemantico {
                     span: e.span.clone(),
                 });
             }
+            Declaracion::Apodo(a) => {
+                let nombre_registro = self.nombre_con_modulo(&a.nombre);
+                self.aliases.insert(nombre_registro, a.tipo.clone());
+            }
             Declaracion::Modulo(modulo) => {
                 self.modulo_actual.push(modulo.nombre.clone());
                 for decl in &modulo.contenido {
@@ -1276,7 +1284,31 @@ impl AnalizadorSemantico {
                 
                 // Verificar concordancia de tipo explícito
                 if let Some(ref tipo_declarado) = decl.tipo {
-                    if !self.tipos_compatibles(tipo_declarado, &tipo_valor) {
+                    // Resolver apodos (ej: apodo ID = Entero64 → Entero64)
+                    let tipo_declarado_resuelto = self.resolver_alias(tipo_declarado);
+                    // Adaptar literal numérico al tipo declarado (ej: el x: Entero64 = 5)
+                    // Los literales enteros se infieren como Entero32; si el tipo declarado
+                    // es numérico, el literal se re-tipifica para concordar.
+                    let es_literal_entero = |e: &Expresion| match e {
+                        Expresion::Literal(Literal::Entero(_, _)) => true,
+                        Expresion::Unaria(_, inner, _) => matches!(inner.as_ref(), Expresion::Literal(Literal::Entero(_, _))),
+                        _ => false,
+                    };
+                    let es_literal_flotante = |e: &Expresion| matches!(e, Expresion::Literal(Literal::Flotante(_, _)));
+                    let tipo_valor_adaptado = match &decl.valor {
+                        e if es_literal_entero(e) && self.es_entero(&tipo_declarado_resuelto) => {
+                            tipo_declarado_resuelto.clone()
+                        }
+                        e if es_literal_entero(e) && self.es_flotante(&tipo_declarado_resuelto) => {
+                            tipo_declarado_resuelto.clone()
+                        }
+                        e if es_literal_flotante(e) && self.es_flotante(&tipo_declarado_resuelto) => {
+                            tipo_declarado_resuelto.clone()
+                        }
+                        _ => tipo_valor.clone(),
+                    };
+                    let tipo_valor = &tipo_valor_adaptado;
+                    if !self.tipos_compatibles(tipo_declarado, tipo_valor) {
                         self.reportar_error(
                             CategoriaError::Tipo,
                             DISCONCORDANCIA_TIPO,
@@ -1288,9 +1320,15 @@ impl AnalizadorSemantico {
                     }
                 }
 
+                // Resolver alias de tipo al declarar (ej: alias Entero = Entero32)
+                let tipo_final = match &decl.tipo {
+                    Some(t) => self.resolver_alias(t),
+                    None => tipo_valor.clone(),
+                };
+
                 self.entorno.declarar(InfoVariable {
                     nombre: decl.nombre.clone(),
-                    tipo: decl.tipo.clone().unwrap_or(tipo_valor),
+                    tipo: tipo_final,
                     articulo: decl.articulo,
                     span: decl.span.clone(),
                 });
@@ -1813,7 +1851,10 @@ No puedes modificar algo que no es 'tuyo'.",
                 let tipo_izq = self.inferir_tipo(izq);
                 let tipo_der = self.inferir_tipo(der);
 
-                // Verificar concordancia de tipos en operación binaria
+                // Verificar concordancia de tipos en operación binaria.
+                // Los literales numéricos se adaptan al tipo del otro operando
+                // (ej: id: Entero64 + 1 → el 1 se trata como Entero64).
+                let (tipo_izq, tipo_der) = self.adaptar_literales_binaria(izq, &tipo_izq, der, &tipo_der);
                 if tipo_izq != tipo_der {
                     self.reportar_error(
                         CategoriaError::Tipo,
@@ -2807,15 +2848,40 @@ No puedes modificar algo que no es 'tuyo'.",
 
     /// Verifica si un tipo de argumento es compatible con un tipo de parámetro,
     /// permitiendo genéricos en el parámetro.
+    /// Resuelve un alias de tipo recursivamente hasta el tipo base.
+    /// Ej: alias Entero = Entero32 → resolver_alias(Entero) = Entero32.
+    /// Si el nombre no es un alias, devuelve el tipo sin cambios.
+    fn resolver_alias(&self, tipo: &Tipo) -> Tipo {
+        match tipo {
+            Tipo::Nombre(nombre) => {
+                if let Some(alias) = self.aliases.get(nombre) {
+                    self.resolver_alias(alias)
+                } else {
+                    tipo.clone()
+                }
+            }
+            // Resolver también dentro de contenedores
+            Tipo::Vector(inner) => Tipo::Vector(Box::new(self.resolver_alias(inner))),
+            Tipo::Array(inner, n) => Tipo::Array(Box::new(self.resolver_alias(inner)), *n),
+            Tipo::Puntero(inner) => Tipo::Puntero(Box::new(self.resolver_alias(inner))),
+            Tipo::Referencia(inner) => Tipo::Referencia(Box::new(self.resolver_alias(inner))),
+            Tipo::ReferenciaMut(inner) => Tipo::ReferenciaMut(Box::new(self.resolver_alias(inner))),
+            _ => tipo.clone(),
+        }
+    }
+
     fn tipos_compatibles(&self,
         tipo_param: &Tipo,
         tipo_arg: &Tipo,
     ) -> bool {
+        // Resolver aliases de tipo antes de comparar (ej: alias Entero = Entero32)
+        let tipo_param = self.resolver_alias(tipo_param);
+        let tipo_arg = self.resolver_alias(tipo_arg);
         if tipo_param == tipo_arg {
             return true;
         }
 
-        match (tipo_param, tipo_arg) {
+        match (&tipo_param, &tipo_arg) {
             // Type params concuerdan con cualquier tipo en ambas direcciones
             (Tipo::Generico(_), _) | (_, Tipo::Generico(_)) => true,
             // Array-to-pointer decay: array es compatible con Entero64 (puntero raw)
@@ -2874,6 +2940,32 @@ No puedes modificar algo que no es 'tuyo'.",
             Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64 |
             Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64
         )
+    }
+
+    fn es_flotante(&self, tipo: &Tipo) -> bool {
+        matches!(tipo, Tipo::Flotante32 | Tipo::Flotante64)
+    }
+
+    /// En operaciones binarias, los literales numéricos se adaptan al tipo del
+    /// otro operando (ej: `x: Entero64 + 1` → el 1 se trata como Entero64).
+    /// Devuelve los tipos adaptados.
+    fn adaptar_literales_binaria(&self, izq: &Expresion, tipo_izq: &Tipo, der: &Expresion, tipo_der: &Tipo) -> (Tipo, Tipo) {
+        let es_literal_entero = |e: &Expresion| match e {
+            Expresion::Literal(Literal::Entero(_, _)) => true,
+            Expresion::Unaria(_, inner, _) => matches!(inner.as_ref(), Expresion::Literal(Literal::Entero(_, _))),
+            _ => false,
+        };
+        let es_literal_flotante = |e: &Expresion| matches!(e, Expresion::Literal(Literal::Flotante(_, _)));
+
+        match (es_literal_entero(izq), es_literal_entero(der), es_literal_flotante(izq), es_literal_flotante(der)) {
+            // Literal entero + tipo entero/flotante
+            (true, false, _, _) if self.es_numerico(tipo_der) && !es_literal_flotante(izq) => (tipo_der.clone(), tipo_der.clone()),
+            (false, true, _, _) if self.es_numerico(tipo_izq) && !es_literal_flotante(der) => (tipo_izq.clone(), tipo_izq.clone()),
+            // Literal flotante + tipo flotante
+            (_, _, true, false) if self.es_flotante(tipo_der) => (tipo_der.clone(), tipo_der.clone()),
+            (_, _, false, true) if self.es_flotante(tipo_izq) => (tipo_izq.clone(), tipo_izq.clone()),
+            _ => (tipo_izq.clone(), tipo_der.clone()),
+        }
     }
 
     fn es_comparable(&self, tipo: &Tipo) -> bool {

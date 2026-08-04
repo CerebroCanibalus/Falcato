@@ -47,8 +47,9 @@ impl Codegen {
     ) -> Result<cranelift_codegen::ir::Value, ()> {
         let resultado = match op {
             OperadorUnario::Negacion => {
-                // NegaciÃƒÂ³n aritmÃƒÂ©tica: 0 - val
-                let cero = builder.ins().iconst(types::I32, 0);
+                // Negación aritmética: 0 - val (el cero usa el ancho del valor)
+                let tipo_val = builder.func.dfg.value_type(val);
+                let cero = builder.ins().iconst(tipo_val, 0);
                 builder.ins().isub(cero, val)
             }
             OperadorUnario::NegacionLogica => {
@@ -74,11 +75,32 @@ impl Codegen {
         Ok(resultado)
     }
 
+    /// Resuelve un alias de tipo recursivamente hasta el tipo base.
+    /// Ej: alias Entero = Entero32 → resolver_alias(Entero) = Entero32.
+    pub(crate) fn resolver_alias(&self, tipo: &Tipo) -> Tipo {
+        match tipo {
+            Tipo::Nombre(nombre) => {
+                if let Some(alias) = self.aliases.get(nombre) {
+                    self.resolver_alias(alias)
+                } else {
+                    tipo.clone()
+                }
+            }
+            Tipo::Vector(inner) => Tipo::Vector(Box::new(self.resolver_alias(inner))),
+            Tipo::Array(inner, n) => Tipo::Array(Box::new(self.resolver_alias(inner)), *n),
+            Tipo::Puntero(inner) => Tipo::Puntero(Box::new(self.resolver_alias(inner))),
+            Tipo::Referencia(inner) => Tipo::Referencia(Box::new(self.resolver_alias(inner))),
+            Tipo::ReferenciaMut(inner) => Tipo::ReferenciaMut(Box::new(self.resolver_alias(inner))),
+            _ => tipo.clone(),
+        }
+    }
+
     pub(crate) fn tipo_a_cranelift(
         &self,
         tipo: &Tipo,
     ) -> cranelift_codegen::ir::Type {
-        match tipo {
+        let tipo = self.resolver_alias(tipo);
+        match &tipo {
             Tipo::Entero8 |
             Tipo::Natural8 => types::I8,
             Tipo::Entero16 |
@@ -117,7 +139,8 @@ impl Codegen {
         &self,
         tipo: &Tipo,
     ) -> u32 {
-        match tipo {
+        let tipo = self.resolver_alias(tipo);
+        match &tipo {
             Tipo::Entero8 |
             Tipo::Natural8 |
             Tipo::Booleano |
@@ -182,7 +205,7 @@ impl Codegen {
             }
             Expresion::Identificador(nombre, _) => {
                 variables.get(nombre)
-                    .map(|(_, tipo, _)| tipo.clone())
+                    .map(|(_, tipo, _)| self.resolver_alias(tipo))
                     .unwrap_or(Tipo::Entero32)
             }
             Expresion::AccesoArray(array, _, _) => {
@@ -241,5 +264,14 @@ impl Codegen {
 
     pub(crate) fn inferir_tipo_rango(&self, inicio: &Expresion, variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>) -> Tipo {
         self.inferir_tipo(inicio, variables)
+    }
+
+    /// ¿Es un tipo numérico (entero o flotante)?
+    pub(crate) fn es_tipo_numerico(&self, tipo: &Tipo) -> bool {
+        matches!(tipo,
+            Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64 |
+            Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64 |
+            Tipo::Flotante32 | Tipo::Flotante64
+        )
     }
 }

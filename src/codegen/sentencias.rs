@@ -16,6 +16,9 @@ impl Codegen {
                 let tipo = decl.tipo.clone().unwrap_or_else(||
                     self.inferir_tipo(&decl.valor, variables)
                 );
+                // Resolver apodos de tipo (ej: apodo ID = Entero64 → Entero64)
+                // para que el slot tenga el tamaño correcto y el literal se emita bien.
+                let tipo = self.resolver_alias(&tipo);
                 
                 // Arrays: stack slot grande
                 let (slot, _tamano) = match &tipo {
@@ -238,7 +241,23 @@ impl Codegen {
                                 0,
                             )
                         );
-                        let valor = self.compilar_expresion(&decl.valor, builder, variables)?;
+                        // Si el valor es un literal numérico y hay tipo declarado, emitir
+                        // con el ancho correcto (ej: el x: Entero64 = 5, o apodo ID = Entero64)
+                        let tipo_resuelto = self.resolver_alias(&tipo);
+                        let valor = match (&decl.valor, &tipo_resuelto) {
+                            (Expresion::Literal(lit), t) if self.es_tipo_numerico(t) => {
+                                self.compilar_literal_con_tipo(lit, t, builder)?
+                            }
+                            (Expresion::Unaria(op, inner, _), t) if self.es_tipo_numerico(t) => {
+                                if let Expresion::Literal(lit) = inner.as_ref() {
+                                    let val = self.compilar_literal_con_tipo(lit, t, builder)?;
+                                    self.compilar_operacion_unaria(*op, val, builder, &decl.span)?
+                                } else {
+                                    self.compilar_expresion(&decl.valor, builder, variables)?
+                                }
+                            }
+                            _ => self.compilar_expresion(&decl.valor, builder, variables)?,
+                        };
                         builder.ins().stack_store(valor, slot, 0);
                         (slot, tamano)
                     }

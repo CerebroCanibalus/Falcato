@@ -194,11 +194,13 @@ impl Codegen {
                 };
                 
                 // Si es array, struct o enum con datos, devolvemos puntero (direcci├│n base)
-                let val = if matches!(tipo, Tipo::Array(_, _) | Tipo::Nombre(_) | Tipo::Resultado(_, _)) {
+                // Resolver apodos primero (ej: apodo ID = Entero64 → Entero64)
+                let tipo_resuelto = self.resolver_alias(&tipo);
+                let val = if matches!(tipo_resuelto, Tipo::Array(_, _) | Tipo::Nombre(_) | Tipo::Resultado(_, _)) {
                     builder.ins().stack_addr(types::I64, slot, 0)
                 } else {
                     builder.ins().stack_load(
-                        self.tipo_a_cranelift(&tipo),
+                        self.tipo_a_cranelift(&tipo_resuelto),
                         slot,
                         0,
                     )
@@ -219,8 +221,12 @@ impl Codegen {
                         return self.compilar_llamada(&llamada, builder, variables);
                     }
                 }
-                let val_izq = self.compilar_expresion(izq, builder, variables)?;
-                let val_der = self.compilar_expresion(der, builder, variables)?;
+                // Adaptar literales numéricos al tipo del otro operando
+                // (ej: x: Entero64 + 1 → el 1 se emite como I64)
+                let tipo_izq = self.inferir_tipo(izq, variables);
+                let tipo_der = self.inferir_tipo(der, variables);
+                let val_izq = self.compilar_lado_binaria(izq, &tipo_der, builder, variables)?;
+                let val_der = self.compilar_lado_binaria(der, &tipo_izq, builder, variables)?;
                 self.compilar_operacion_binaria(*op, val_izq, val_der, builder)
             }
             Expresion::Unaria(op, expr, span) => {
@@ -912,6 +918,31 @@ impl Codegen {
             }
         }
     }
+    /// Compila un lado de una operación binaria, adaptando literales numéricos
+    /// al tipo del otro operando (ej: x: Entero64 + 1 → el 1 se emite como I64).
+    fn compilar_lado_binaria(
+        &mut self,
+        expr: &Expresion,
+        tipo_otro: &Tipo,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        match expr {
+            Expresion::Literal(lit) if self.es_tipo_numerico(tipo_otro) => {
+                self.compilar_literal_con_tipo(lit, tipo_otro, builder)
+            }
+            Expresion::Unaria(op, inner, span) if self.es_tipo_numerico(tipo_otro) => {
+                if let Expresion::Literal(lit) = inner.as_ref() {
+                    let val = self.compilar_literal_con_tipo(lit, tipo_otro, builder)?;
+                    self.compilar_operacion_unaria(*op, val, builder, span)
+                } else {
+                    self.compilar_expresion(expr, builder, variables)
+                }
+            }
+            _ => self.compilar_expresion(expr, builder, variables),
+        }
+    }
+
     pub(crate) fn compilar_literal(&mut self, lit: &Literal, builder: &mut FunctionBuilder) -> Result<cranelift_codegen::ir::Value, ()> {
         match lit {
             Literal::Entero(n, _) => Ok(builder.ins().iconst(types::I32, *n as i64)),
@@ -922,6 +953,32 @@ impl Codegen {
                 // Strings en patrones no soportados por ahora
                 Ok(builder.ins().iconst(types::I64, 0))
             }
+        }
+    }
+
+    /// Compila un literal respetando el tipo declarado (ej: `el x: Entero64 = 5`).
+    /// Los literales enteros se infieren como I32; si el tipo esperado es más ancho,
+    /// se emite con el ancho correcto para evitar basura en los bytes altos.
+    pub(crate) fn compilar_literal_con_tipo(
+        &mut self,
+        lit: &Literal,
+        tipo_esperado: &Tipo,
+        builder: &mut FunctionBuilder,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        match lit {
+            Literal::Entero(n, _) => {
+                let ct = self.tipo_a_cranelift(tipo_esperado);
+                Ok(builder.ins().iconst(ct, *n as i64))
+            }
+            Literal::Flotante(f, _) => {
+                let ct = self.tipo_a_cranelift(tipo_esperado);
+                if ct == types::F32 {
+                    Ok(builder.ins().f32const(*f as f32))
+                } else {
+                    Ok(builder.ins().f64const(*f))
+                }
+            }
+            _ => self.compilar_literal(lit, builder),
         }
     }
     pub(crate) fn indice_variante_enum(&self, enum_nombre: &str, variante: &str) -> Option<u32> {

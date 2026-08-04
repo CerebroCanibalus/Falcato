@@ -41,7 +41,11 @@ pub fn parse_tipo(cursor: &mut ParserCursor) -> Result<Tipo, ErrorSintaxis> {
                 if let Some(Token::Identificador(nombre)) = cursor.actual() {
                     let nombre = nombre.clone();
                     // Verificar si hay otro tipo después (lifetime léxico)
-                    if let Some(Token::Identificador(_)) | Some(Token::Entero8) | Some(Token::Entero16) | 
+                    if let Some(Token::Identificador(_)) | Some(Token::Entero) | Some(Token::EnteroLargo) |
+                       Some(Token::EnteroCorto) | Some(Token::EnteroMinimo) | Some(Token::Natural) |
+                       Some(Token::NaturalLargo) | Some(Token::NaturalCorto) | Some(Token::NaturalMinimo) |
+                       Some(Token::Real) | Some(Token::Real32) | Some(Token::Real64) | Some(Token::RealCorto) |
+                       Some(Token::Logico) | Some(Token::Entero8) | Some(Token::Entero16) | 
                        Some(Token::Entero32) | Some(Token::Entero64) | Some(Token::Texto) | 
                        Some(Token::Booleano) | Some(Token::Ampersand) = cursor.peek(1) {
                         cursor.avanzar(); // nombre (lifetime)
@@ -64,7 +68,11 @@ pub fn parse_tipo(cursor: &mut ParserCursor) -> Result<Tipo, ErrorSintaxis> {
                 if let Some(Token::Identificador(nombre)) = cursor.actual() {
                     let nombre = nombre.clone();
                     // Verificar si hay otro tipo después (lifetime léxico)
-                    if let Some(Token::Identificador(_)) | Some(Token::Entero8) | Some(Token::Entero16) | 
+                    if let Some(Token::Identificador(_)) | Some(Token::Entero) | Some(Token::EnteroLargo) |
+                       Some(Token::EnteroCorto) | Some(Token::EnteroMinimo) | Some(Token::Natural) |
+                       Some(Token::NaturalLargo) | Some(Token::NaturalCorto) | Some(Token::NaturalMinimo) |
+                       Some(Token::Real) | Some(Token::Real32) | Some(Token::Real64) | Some(Token::RealCorto) |
+                       Some(Token::Logico) | Some(Token::Entero8) | Some(Token::Entero16) | 
                        Some(Token::Entero32) | Some(Token::Entero64) | Some(Token::Texto) | 
                        Some(Token::Booleano) | Some(Token::Ampersand) = cursor.peek(1) {
                         cursor.avanzar(); // nombre (lifetime)
@@ -77,6 +85,19 @@ pub fn parse_tipo(cursor: &mut ParserCursor) -> Result<Tipo, ErrorSintaxis> {
                 Ok(Tipo::Referencia(Box::new(tipo)))
             }
         }
+        Some(Token::Entero) => { cursor.avanzar(); Ok(Tipo::Entero32) }
+        Some(Token::EnteroLargo) => { cursor.avanzar(); Ok(Tipo::Entero64) }
+        Some(Token::EnteroCorto) => { cursor.avanzar(); Ok(Tipo::Entero16) }
+        Some(Token::EnteroMinimo) => { cursor.avanzar(); Ok(Tipo::Entero8) }
+        Some(Token::Natural) => { cursor.avanzar(); Ok(Tipo::Natural32) }
+        Some(Token::NaturalLargo) => { cursor.avanzar(); Ok(Tipo::Natural64) }
+        Some(Token::NaturalCorto) => { cursor.avanzar(); Ok(Tipo::Natural16) }
+        Some(Token::NaturalMinimo) => { cursor.avanzar(); Ok(Tipo::Natural8) }
+        Some(Token::Real) => { cursor.avanzar(); Ok(Tipo::Flotante64) }
+        Some(Token::Real32) => { cursor.avanzar(); Ok(Tipo::Flotante32) }
+        Some(Token::Real64) => { cursor.avanzar(); Ok(Tipo::Flotante64) }
+        Some(Token::RealCorto) => { cursor.avanzar(); Ok(Tipo::Flotante32) }
+        Some(Token::Logico) => { cursor.avanzar(); Ok(Tipo::Booleano) }
         Some(Token::Entero8) => { cursor.avanzar(); Ok(Tipo::Entero8) }
         Some(Token::Entero16) => { cursor.avanzar(); Ok(Tipo::Entero16) }
         Some(Token::Entero32) => { cursor.avanzar(); Ok(Tipo::Entero32) }

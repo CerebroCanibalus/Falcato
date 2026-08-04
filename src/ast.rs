@@ -18,6 +18,15 @@ pub enum Declaracion {
     Rasgo(RasgoDecl),
     Implementacion(ImplDecl),
     Prueba(PruebaDecl),
+    Apodo(ApodoDecl),
+}
+
+/// Declaración de apodo de tipo: `apodo Nombre = Tipo;`
+#[derive(Debug, Clone)]
+pub struct ApodoDecl {
+    pub nombre: String,
+    pub tipo: Tipo,
+    pub span: Span,
 }
 
 /// Nivel de verificación de ownership (borrow checker gradual)

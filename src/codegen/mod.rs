@@ -61,6 +61,8 @@ pub struct Codegen {
     pub(crate) instanciaciones: HashMap<(String, Vec<String>), cranelift_module::FuncId>,
     pub(crate) structs: HashMap<String, LayoutStruct>,
     pub(crate) enums: HashMap<String, LayoutEnum>,
+    /// Alias de tipos: nombre → Tipo (ej: "Entero" → Entero32)
+    pub(crate) aliases: HashMap<String, Tipo>,
     pub(crate) errores: Errores,
     /// Cache de funciones C externas (para no declarar repetido)
     pub(crate) cache: CFunctionCache,
@@ -126,6 +128,7 @@ impl Codegen {
             instanciaciones: HashMap::new(),
             structs: HashMap::new(),
             enums: HashMap::new(),
+            aliases: HashMap::new(),
             errores: Errores::nuevo(),
             cache: CFunctionCache::nuevo(),
             registry: platform::current_registry(),
@@ -211,11 +214,12 @@ impl Codegen {
 
             .collect();
 
-        // Primera pasada: registrar structs y enums
+        // Primera pasada: registrar structs, enums y aliases
         for (_prefijo, decl) in &todas {
             match decl {
                 Declaracion::Estructural(s) => self.registrar_struct(s),
                 Declaracion::Enumeracion(e) => self.registrar_enum(e),
+                Declaracion::Apodo(a) => { self.aliases.insert(a.nombre.clone(), a.tipo.clone()); }
                 _ => {}
             }
         }
