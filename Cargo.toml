@@ -45,6 +45,10 @@ insta = "1.39"
 thiserror = "1.0"
 anyhow = "1.0"
 
+# Paquetes (R8): formato falcato.toml / falcato.lock
+toml = "0.8"
+serde = { version = "1", features = ["derive"] }
+
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.1"

@@ -11,6 +11,7 @@ mod error;
 mod futuros;
 mod lexer;
 mod lsp;
+mod paquetes;
 mod parser;
 mod platform;
 mod resolver;
@@ -94,6 +95,40 @@ enum Comandos {
     },
     /// Inicia el servidor LSP (Language Server Protocol)
     Lsp,
+    /// Sistema de paquetes (R8): manifiesto, dependencias, resolución
+    #[command(subcommand)]
+    Paquete(PaqueteComandos),
+}
+
+/// Subcomandos del sistema de paquetes
+#[derive(Subcommand)]
+enum PaqueteComandos {
+    /// Crea un proyecto nuevo con falcato.toml + falcato.lock
+    Init {
+        /// Directorio del proyecto (default: actual)
+        #[arg(default_value = ".")]
+        dir: String,
+        /// Nombre del paquete (default: nombre del directorio)
+        #[arg(long)]
+        nombre: Option<String>,
+    },
+    /// Añade una dependencia al falcato.toml
+    Add {
+        /// Nombre del paquete dependencia
+        nombre: String,
+        /// Restricción de versión (default: ^0.1.0)
+        #[arg(default_value = "^0.1.0")]
+        version: String,
+        /// Directorio del proyecto
+        #[arg(default_value = ".")]
+        dir: String,
+    },
+    /// Muestra el manifiesto y dependencias del proyecto
+    Mostrar {
+        /// Directorio del proyecto
+        #[arg(default_value = ".")]
+        dir: String,
+    },
 }
 
 fn main() {
@@ -141,6 +176,12 @@ fn main() {
         }
         Comandos::Test { archivos } => {
             if let Err(e) = ejecutar_pruebas(&archivos) {
+                eprintln!("[ERROR] {}", e);
+                std::process::exit(1);
+            }
+        }
+        Comandos::Paquete(sub) => {
+            if let Err(e) = ejecutar_paquete(sub) {
                 eprintln!("[ERROR] {}", e);
                 std::process::exit(1);
             }
@@ -646,6 +687,51 @@ fn ejecutar_pruebas(archivos: &[String]) -> Result<(), String> {
         return Err(format!("Pruebas fallaron (código: {})", status.code().unwrap_or(-1)));
     }
 
+    Ok(())
+}
+
+/// Ejecuta subcomandos del sistema de paquetes (R8.1).
+fn ejecutar_paquete(sub: PaqueteComandos) -> Result<(), String> {
+    use crate::paquetes::{Manifiesto, iniciar_proyecto, agregar_dependencia};
+
+    match sub {
+        PaqueteComandos::Init { dir, nombre } => {
+            let dir = Path::new(&dir);
+            iniciar_proyecto(dir, nombre.as_deref())
+                .map_err(|e| e.to_string())?;
+            println!("[Falcato] Proyecto creado en {}", dir.display());
+            println!("[Falcato] Manifiesto: {}", dir.join("falcato.toml").display());
+        }
+        PaqueteComandos::Add { nombre, version, dir } => {
+            let dir = Path::new(&dir);
+            agregar_dependencia(dir, &nombre, &version)
+                .map_err(|e| e.to_string())?;
+        }
+        PaqueteComandos::Mostrar { dir } => {
+            let dir = Path::new(&dir);
+            let ruta = Manifiesto::buscar_en(dir)
+                .ok_or("No se encontró falcato.toml en este directorio o padres")?;
+            let m = Manifiesto::desde_archivo(&ruta).map_err(|e| e.to_string())?;
+            println!("[Falcato] Paquete: {} v{}", m.paquete.nombre, m.paquete.version);
+            if m.paquete.descripcion.is_empty() {
+                println!("[Falcato] Descripción: (sin descripción)");
+            } else {
+                println!("[Falcato] Descripción: {}", m.paquete.descripcion);
+            }
+            println!("[Falcato] Permisos: red={} archivos={} procesos={} terminal={}",
+                m.permisos.red, m.permisos.archivos, m.permisos.procesos, m.permisos.terminal);
+            if m.dependencias.is_empty() {
+                println!("[Falcato] Dependencias: (ninguna)");
+            } else {
+                println!("[Falcato] Dependencias:");
+                let mut nombres: Vec<&String> = m.dependencias.keys().collect();
+                nombres.sort();
+                for n in nombres {
+                    println!("  - {} = \"{}\"", n, m.dependencias[n]);
+                }
+            }
+        }
+    }
     Ok(())
 }
 
