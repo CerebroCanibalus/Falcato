@@ -658,6 +658,18 @@ impl Codegen {
                             let ext = builder.ins().uextend(types::I64, v);
                             ("%d\0", ext)
                         }
+                        Tipo::Caracter => {
+                            let v = builder.ins().stack_load(types::I8, slot, 0);
+                            let ext = builder.ins().uextend(types::I64, v);
+                            ("%c\0", ext)
+                        }
+                        Tipo::Texto => {
+                            // Texto = puntero a descriptor {ptr, len, cap}.
+                            // Cargar descriptor y luego el ptr de datos (offset 0).
+                            let desc = builder.ins().stack_load(types::I64, slot, 0);
+                            let v = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), desc, Self::OFFSET_PTR);
+                            ("%s\0", v)
+                        }
                         _ => {
                             let v = builder.ins().stack_load(types::I64, slot, 0);
                             ("%s\0", v)
