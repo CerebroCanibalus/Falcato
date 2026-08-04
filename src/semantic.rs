@@ -506,6 +506,34 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // Entrada estándar (R7.3)
+        self.funciones.insert("entrada_leer".to_string(), FirmaFuncion {
+            nombre: "entrada_leer".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Texto), // TODO stdin hasta EOF
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // Reloj de pared (R7.4)
+        self.funciones.insert("fecha_unix".to_string(), FirmaFuncion {
+            nombre: "fecha_unix".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero64), // segundos desde epoch
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("fecha_ms".to_string(), FirmaFuncion {
+            nombre: "fecha_ms".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero64), // ms desde epoch
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
         // Canales (Fase 18C): comunicación entre tareas
         self.funciones.insert("canal_nuevo".to_string(), FirmaFuncion {
             nombre: "canal_nuevo".to_string(),

@@ -114,6 +114,13 @@ impl BuiltinRegistry {
         r.insert("terminal_modo_raw", "falcato_terminal_modo_raw", &[types::I32], Some(types::I32));
         r.insert("terminal_leer_tecla", "falcato_terminal_leer_tecla", &[], Some(types::I32));
 
+        // Entrada estándar (R7.3)
+        r.insert("entrada_leer", "falcato_entrada_leer", &[], Some(types::I64));
+
+        // Reloj de pared (R7.4)
+        r.insert("fecha_unix", "falcato_fecha_unix", &[], Some(types::I64));
+        r.insert("fecha_ms", "falcato_fecha_ms", &[], Some(types::I64));
+
         // Networking
         r.insert("wsa_startup", "WSAStartup",
             &[types::I32, types::I64], Some(types::I32));
@@ -188,6 +195,13 @@ impl BuiltinRegistry {
         // Terminal (R7.2): modo raw + lectura de teclas
         r.insert("terminal_modo_raw", "falcato_terminal_modo_raw", &[types::I32], Some(types::I32));
         r.insert("terminal_leer_tecla", "falcato_terminal_leer_tecla", &[], Some(types::I32));
+
+        // Entrada estándar (R7.3)
+        r.insert("entrada_leer", "falcato_entrada_leer", &[], Some(types::I64));
+
+        // Reloj de pared (R7.4)
+        r.insert("fecha_unix", "falcato_fecha_unix", &[], Some(types::I64));
+        r.insert("fecha_ms", "falcato_fecha_ms", &[], Some(types::I64));
 
         // Networking — POSIX (misma API que Winsock, sin WSAStartup)
         r.insert("socket", "socket",

@@ -2111,4 +2111,71 @@ impl Codegen {
         Ok(builder.inst_results(call)[0])
     }
 
+    // ============================================================
+    // Entrada estándar (R7.3)
+    // ============================================================
+
+    /// entrada_leer() -> Texto (TODO stdin hasta EOF)
+    pub(crate) fn builtin_entrada_leer(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // falcato_entrada_leer() -> *mut c_char (i64)
+        let fn_id = self.asegurar_funcion_c("falcato_entrada_leer", &[], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[]);
+        let ptr = builder.inst_results(call)[0];
+
+        // Construir descriptor Texto desde el puntero C (strlen + malloc + memcpy)
+        let len = self.llamar_strlen(builder, ptr);
+        let uno = builder.ins().iconst(types::I64, 1);
+        let cap = builder.ins().iadd(len, uno);
+
+        let data = self.llamar_malloc(builder, cap);
+        self.llamar_memcpy(builder, data, ptr, cap);
+
+        // Liberar el buffer temporal devuelto por el runtime
+        self.llamar_free(builder, ptr);
+
+        let desc = self.descriptor_nuevo(builder);
+        self.guardar_campo_descriptor(builder, desc, Self::OFFSET_PTR, data);
+        self.guardar_campo_descriptor(builder, desc, Self::OFFSET_LEN, len);
+        self.guardar_campo_descriptor(builder, desc, Self::OFFSET_CAP, cap);
+        Ok(desc)
+    }
+
+    // ============================================================
+    // Reloj de pared (R7.4)
+    // ============================================================
+
+    /// fecha_unix() -> Entero64 (segundos desde epoch)
+    pub(crate) fn builtin_fecha_unix(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // falcato_fecha_unix() -> i64
+        let fn_id = self.asegurar_funcion_c("falcato_fecha_unix", &[], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// fecha_ms() -> Entero64 (ms desde epoch)
+    pub(crate) fn builtin_fecha_ms(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // falcato_fecha_ms() -> i64
+        let fn_id = self.asegurar_funcion_c("falcato_fecha_ms", &[], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[]);
+        Ok(builder.inst_results(call)[0])
+    }
+
 }

@@ -16,6 +16,8 @@ mod executor;
 mod threading;
 mod proceso;
 mod terminal;
+mod entrada;
+mod tiempo;
 
 use std::ffi::c_void;
 
@@ -139,4 +141,31 @@ pub unsafe extern "C" fn falcato_terminal_modo_raw(activo: i32) -> i32 {
 #[no_mangle]
 pub unsafe extern "C" fn falcato_terminal_leer_tecla() -> i32 {
     terminal::terminal_leer_tecla()
+}
+
+// ============================================================
+// Entrada estándar (stdin) — R7.3
+// ============================================================
+
+/// Lee TODO stdin hasta EOF. Devuelve buffer malloc'ed con null terminator
+/// (caller libera con free) o NULL en error.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_entrada_leer() -> *mut i8 {
+    entrada::entrada_leer() as *mut i8
+}
+
+// ============================================================
+// Tiempo (reloj de pared) — R7.4
+// ============================================================
+
+/// Segundos desde Unix epoch (1970-01-01 UTC).
+#[no_mangle]
+pub unsafe extern "C" fn falcato_fecha_unix() -> i64 {
+    tiempo::fecha_unix()
+}
+
+/// Milisegundos desde Unix epoch.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_fecha_ms() -> i64 {
+    tiempo::fecha_ms()
 }

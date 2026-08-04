@@ -1118,6 +1118,8 @@ impl Codegen {
             "canal_nuevo" | "canal_enviar" | "canal_recibir" | "canal_cerrar" | "canal_intentar" |
             "proceso_crear" | "proceso_esperar" | "proceso_leer_salida" | "proceso_cerrar" |
             "terminal_modo_raw" | "terminal_leer_tecla" |
+            "entrada_leer" |
+            "fecha_unix" | "fecha_ms" |
             "cancelar" |
             "texto_a_puntero" |
             "como_entero64"
@@ -1176,6 +1178,9 @@ impl Codegen {
             "proceso_cerrar" => self.builtin_proceso_cerrar(builder, variables, &llamada.argumentos),
             "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
             "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
+            "entrada_leer" => self.builtin_entrada_leer(builder, variables, &llamada.argumentos),
+            "fecha_unix" => self.builtin_fecha_unix(builder, variables, &llamada.argumentos),
+            "fecha_ms" => self.builtin_fecha_ms(builder, variables, &llamada.argumentos),
             "diccionario_nuevo" => self.builtin_diccionario_nuevo(builder, &llamada.tipo_args),
             "diccionario_insertar" => self.builtin_diccionario_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "diccionario_obtener" => self.builtin_diccionario_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),
