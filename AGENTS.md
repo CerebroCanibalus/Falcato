@@ -35,6 +35,14 @@ Cranelift no es "lo que tocó" — es el backend oficial y estratégico. Bytecod
   (y en la skill `falcato-language` si cambia sintaxis/builtins). Un builtin nuevo, un
   subcomando nuevo del CLI, una primitiva nueva del runtime → actualizar el agente en la
   misma tanda, no "para después".
+- **🚨 SEGURIDAD CRÍTICA — el usuario NUNCA queda expuesto**: cualquier pieza que toque
+  la red (DHT, TCP, MCP, HTTP), el sistema (procesos, archivos, terminal) o entrada
+  externa (parsing de datos no confiables) se somete a **revisión de seguridad minuciosa
+  ANTES de mergear**. Prohibido dejar "exploits estúpidos": sin validar longitud de
+  buffers, sin verificar firmas antes de confiar, sin inyección de comandos, sin DoS por
+  memoria/CPU. Cada builtin nuevo con superficie externa lleva su análisis de vectores
+  de ataque en la descripción del commit. Si un PR toca red/sistema sin nota de
+  seguridad, NO se mergea.
 
 ## Stack técnico
 
@@ -203,6 +211,40 @@ IPFS (Benet 2014): Kademlia + BitTorrent + Git, tamper-resistance por construcci
   - [ ] *Permisos = buckets sencillos e intuitivos (red, archivos, procesos, terminal)*
 - [ ] **Criterio:** `falcato paquete add <lib>` descarga de la red P2P, verifica hash + firma, valida permisos, compila contra ella
 - [ ] *Depende de:* principalmente compiler Rust; Capa A para torrent/DHT
+
+### 🔴 REVISIÓN DE SEGURIDAD — PENDIENTES CRÍTICOS (auditoría 2026-08-03)
+> Regla Day-0: NUNCA mergear red/sistema sin nota de seguridad. Vectores detectados
+> en el DHT actual (R8.2, `lib/falcato_runtime/src/dht.rs`) que DEBEN cerrarse antes
+> de exponer el runtime a redes no confiables:
+
+- [ ] **R8S.1 — SET sin verificación de firma**: `procesar_mensaje` tipo 2 acepta
+  cualquier datagrama y lo inserta en el mapa local con `clave_publica=[0;32]` y
+  `firma=[0;64]` (falsas). **Un atacante envenena el caché local con items falsos.**
+  Fix: verificar firma ed25519 contra `clave_publica` ANTES de insertar; descartar
+  si no verifica. (La Capa 3 de R8.3 es la mitigación definitiva — hacerla ya.)
+- [ ] **R8S.2 — DoS por memoria**: SET sin límite de tamaño ni de cantidad — un peer
+  puede mandar millones de items gigantes y llenar la RAM. Fix: límite de tamaño por
+  item (ej. 1 MB), límite de items totales, evict LRU.
+- [ ] **R8S.3 — DoS por CPU**: el hilo de escucha no tiene rate-limit; datagramas
+  continuos queman CPU. Fix: budget por peer (token bucket), dormir adaptativo.
+- [ ] **R8S.4 — Buffer slicing frágil**: `&data[1..1]` (clave de 0 bytes) y slicing
+  por offsets fijos pueden dar pánico con mensajes malformados (necesita validación
+  de longitudes antes de cada slice). Fix: parseo con checks, nunca indexar sin
+  verificar.
+- [ ] **R8S.5 — `dht_consultar` devuelve puntero sin longitud**: el caller hace
+  strlen — con valores binarios que contienen `\0` el resultado se trunca. Fix:
+  devolver (ptr, len) o codificar en el payload.
+- [ ] **R8S.6 — `proceso_crear` usa `cmd.exe /C "{}"` sin sanitizar**: si el comando
+  proviene de input del usuario (Cid), hay inyección de comandos. Fix: validar el
+  comando antes de pasar a la shell, o API de spawn directo (CreateProcessW sin
+  shell) con args separados.
+- [ ] **R8S.7 — Sin autenticación de peers**: bootstrap acepta cualquier "peer".
+  Los peers solo deben ser fuente de *direcciones*, NUNCA de datos confiables
+  (ya es así por diseño — mantener: la DHT es directorio, la firma es la verdad).
+
+> **Criterio de cierre:** antes de cualquier release que exponga el runtime a la red
+> real (DHT pública, MCP, HTTP), TODOS los R8S.* deben estar verificados. El commit
+> que los cierre debe listar el vector, la causa raíz y el fix en la descripción.
 
 ### 15G — Migración de codegen helpers
 - [ ] Migrar `compilar_funcion()` a `BlockBuilder`
