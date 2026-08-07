@@ -1,6 +1,9 @@
-﻿![Falcato Banner](assets/images/falcato_banner.png)
+﻿
+Falcato. Forjado sobre Cranelift. Compila a binarios nativos x86_64. Archivos .exe y .o 
 
-**Lenguaje de sistemas en español.** Forjado sobre Cranelift. Compila a binarios nativos x86_64.
+![Falcato Banner](assets/images/falcato_banner.png)
+
+El Pipeline se ve así:
 
 ```
 .fc → analizador léxico → Parser → Concordancia Lingüística → Codegen (Cranelift) → .o → enlazador → .exe
