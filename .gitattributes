@@ -1,0 +1,17 @@
+# Fuerza EOL por tipo de archivo — evita que autocrlf/git convierta líneas
+# y rompa la comparación de contenido de cargo-dist (que regenera wix/main.wxs
+# con CRLF y falla el job 'plan' si el archivo del repo difiere).
+*.wxs text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Fuentes del lenguaje: siempre UTF-8 sin BOM, LF
+*.fc text eol=lf
+*.rs text eol=lf
+
+# Docs: LF
+*.md text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
