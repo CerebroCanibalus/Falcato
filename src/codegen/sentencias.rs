@@ -1099,7 +1099,7 @@ impl Codegen {
                 builder.ins().return_(&[cero]);
             }
 
-            if let Err(_) = self.module.define_function(func_id, &mut ctx) {
+            if let Err(_) = self.definir_funcion(func_id, &mut ctx, &hilo.nombre) {
                 // Error silencioso en MVP
             }
         }

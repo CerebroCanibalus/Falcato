@@ -47,7 +47,7 @@ jobs:
       shell: pwsh
       run: |
         foreach ($ex in @("hola_mundo", "con_executor_simple", "productor_consumidor")) {
-          .\target\debug\falcato.exe build "ejemplos\$ex.fc"
+          .\target\debug\falcato.exe compila "ejemplos\$ex.fc"
         }
 
     - name: Upload release binary as artifact

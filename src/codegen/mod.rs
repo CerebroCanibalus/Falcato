@@ -77,6 +77,8 @@ pub struct Codegen {
     pub(crate) hilos_pendientes: Vec<HiloPendiente>,
     pub(crate) executor_pool_var: Option<String>,
     pub(crate) executor_worker_generado: bool,
+    /// Si true, imprime el CLIF de cada función antes de definirla (flag --emit-clif)
+    pub(crate) emit_clif: bool,
 }
 
 /// Info para compilar un closure diferidamente
@@ -140,7 +142,31 @@ impl Codegen {
             hilos_pendientes: Vec::new(),
             executor_pool_var: None,
             executor_worker_generado: false,
+            emit_clif: false,
         }.registrar_builtins_codegen())
+    }
+
+    /// Activa la emisión de CLIF (flag --emit-clif).
+    pub fn con_emit_clif(&mut self, activo: bool) -> &mut Self {
+        self.emit_clif = activo;
+        self
+    }
+
+    /// Define una función en el módulo. Si `emit_clif` está activo, imprime el
+    /// CLIF de la función ANTES de definirla (el contexto aún tiene el IR).
+    pub(crate) fn definir_funcion(
+        &mut self,
+        func_id: cranelift_module::FuncId,
+        ctx: &mut cranelift_codegen::Context,
+        nombre: &str,
+    ) -> Result<(), String> {
+        if self.emit_clif {
+            println!("; función: {}", nombre);
+            println!("{}", ctx.func.display());
+            println!();
+        }
+        self.module.define_function(func_id, ctx)
+            .map_err(|e| format!("Error definiendo '{}': {}", nombre, e))
     }
 
     /// Registra enums built-in (Resultado<T,E>)
@@ -372,7 +398,7 @@ impl Codegen {
             }
 
             // Definir la funciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n en el mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³dulo
-            let _ = self.module.define_function(func_id, &mut ctx);
+            let _ = self.definir_funcion(func_id, &mut ctx, &closure.nombre);
         }
     }
 

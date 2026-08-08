@@ -50,3 +50,7 @@ test_*.o
 
 # Benchmarks
 bench_tokens/
+
+# Cache incremental de verificación (--incremental)
+.falcato-cache/
+
