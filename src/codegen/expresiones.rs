@@ -1106,6 +1106,7 @@ impl Codegen {
             "imprimir" | "imprimir_linea" | "decir" | "tamaño_de" | "afirmar" |
             "texto_nuevo" | "texto_desde" | "texto_agregar" | "texto_longitud" | "texto_tam" | "texto_liberar" |
             "texto_concatenar" | "texto_subtexto" | "texto_comparar" | "texto_obtener_byte" |
+            "texto_a_entero" | "texto_a_natural" | "texto_a_flotante" | "texto_a_booleano" |
             "archivo_leer" | "archivo_escribir" | "archivo_existe" |
             "abs" | "max" | "min" | "raiz" | "potencia" |
             "vector_nuevo" | "vector_agregar" | "vector_obtener" | "vector_longitud" | "vector_tam" | "vector_liberar" |
@@ -1119,11 +1120,12 @@ impl Codegen {
             "proceso_crear" | "proceso_esperar" | "proceso_leer_salida" | "proceso_cerrar" |
             "terminal_modo_raw" | "terminal_leer_tecla" |
             "entrada_leer" |
+            "argumentos" |
             "fecha_unix" | "fecha_ms" |
             "dht_nuevo" | "dht_publicar" | "dht_consultar" | "dht_bootstrap" | "dht_cerrar" |
             "cancelar" |
             "texto_a_puntero" |
-            "como_entero64"
+            "como_entero64" | "como_entero32"
         )
     }
     pub(crate) fn compilar_llamada_builtin(
@@ -1146,8 +1148,13 @@ impl Codegen {
             "texto_subtexto" => self.builtin_texto_subtexto(builder, variables, &llamada.argumentos),
             "texto_comparar" => self.builtin_texto_comparar(builder, variables, &llamada.argumentos),
             "texto_obtener_byte" => self.builtin_texto_obtener_byte(builder, variables, &llamada.argumentos),
+            "texto_a_entero" => self.builtin_texto_a_entero(builder, variables, &llamada.argumentos),
+            "texto_a_natural" => self.builtin_texto_a_natural(builder, variables, &llamada.argumentos),
+            "texto_a_flotante" => self.builtin_texto_a_flotante(builder, variables, &llamada.argumentos),
+            "texto_a_booleano" => self.builtin_texto_a_booleano(builder, variables, &llamada.argumentos),
             "texto_a_puntero" => self.builtin_texto_a_puntero(builder, variables, &llamada.argumentos),
             "como_entero64" => self.builtin_como_entero64(builder, variables, &llamada.argumentos),
+            "como_entero32" => self.builtin_como_entero32(builder, variables, &llamada.argumentos),
             "archivo_leer" => self.builtin_archivo_leer(builder, variables, &llamada.argumentos),
             "archivo_escribir" => self.builtin_archivo_escribir(builder, variables, &llamada.argumentos),
             "archivo_existe" => self.builtin_archivo_existe(builder, variables, &llamada.argumentos),
@@ -1180,6 +1187,7 @@ impl Codegen {
             "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
             "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
             "entrada_leer" => self.builtin_entrada_leer(builder, variables, &llamada.argumentos),
+"argumentos" => self.builtin_argumentos(builder, variables, &llamada.argumentos),
             "fecha_unix" => self.builtin_fecha_unix(builder, variables, &llamada.argumentos),
             "fecha_ms" => self.builtin_fecha_ms(builder, variables, &llamada.argumentos),
             "dht_nuevo" => self.builtin_dht_nuevo(builder, variables, &llamada.argumentos),

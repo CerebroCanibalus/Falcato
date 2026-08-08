@@ -19,6 +19,8 @@ mod terminal;
 mod entrada;
 mod tiempo;
 mod dht;
+mod argumentos;
+mod convertir;
 
 use std::ffi::c_void;
 
@@ -169,6 +171,19 @@ pub unsafe extern "C" fn falcato_fecha_unix() -> i64 {
 #[no_mangle]
 pub unsafe extern "C" fn falcato_fecha_ms() -> i64 {
     tiempo::fecha_ms()
+}
+
+// ============================================================
+// Argumentos de línea de comandos (argv) — R7.5
+// ============================================================
+
+/// Devuelve un descriptor `Vector<Texto>` de Falcato construido en heap:
+/// `{ptr: i64, len: i64, cap: i64}` donde `ptr` apunta a un array de
+/// descriptores `Texto` y cada uno a un string malloc'ed. El caller usa
+/// `vector_liberar`/`texto_liberar` de Falcato para liberar.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_argumentos() -> *mut c_void {
+    argumentos::argumentos()
 }
 
 // ============================================================

@@ -1,4 +1,4 @@
-﻿# Falcato — AGENTS.md
+# Falcato — AGENTS.md
 
 ## Filosofía del proyecto
 
@@ -28,14 +28,14 @@ Cranelift no es "lo que tocó" — es el backend oficial y estratégico. Bytecod
 ## Day-0 (no negociable)
 
 - **🚨 TODO VA EN ESPAÑOL — REGLA ABSOLUTA, NI UNA SOLA COSA EN INGLÉS**: el lenguaje,
-  los errores, los flags del CLI, los subcomandos, la documentación, los mensajes del
-  compilador — TODO en español. Nada en inglés, salvo (a) términos técnicos sin
-  traducción cómoda (Cranelift, CLIF, JSON, LSP, WASM, ed25519, TCP) y (b) nombres de
-  funciones C / builtins que son identidad de API (printf, malloc). Se permite
-  **hispanizar** términos en inglés cuando la solución al español es incómoda o muy
-  larga (ej: `check` → `verificar`, `build` → `compilar`). Los nombres en inglés del
-  CLI existen SOLO como aliases ocultos para compatibilidad con scripts/CI, nunca como
-  interfaz visible. Excepción implícita: si un día queremos enseñar Falcato a
+  los errores, las etiquetas del CLI (`--nombre`), los subcomandos, la documentación,
+  los mensajes del compilador — TODO en español. Nada en inglés, salvo (a) términos
+  técnicos sin traducción cómoda (Cranelift, CLIF, JSON, LSP, WASM, ed25519, TCP) y
+  (b) nombres de funciones C / builtins que son identidad de API (printf, malloc). Se
+  permite **hispanizar** términos en inglés cuando la solución al español es incómoda o
+  muy larga (ej: `check` → `verificar`, `build` → `compilar`). Los nombres en inglés
+  del CLI existen SOLO como aliases ocultos para compatibilidad con scripts/CI, nunca
+  como interfaz visible. Excepción implícita: si un día queremos enseñar Falcato a
   angloparlantes, esa versión será una doc aparte — el lenguaje y el toolchain siguen
   en español.
 - **C ABI por defecto**: layout C, calling conv SystemV/C, mangling off, salida `.o`
@@ -54,20 +54,32 @@ Cranelift no es "lo que tocó" — es el backend oficial y estratégico. Bytecod
   memoria/CPU. Cada builtin nuevo con superficie externa lleva su análisis de vectores
   de ataque en la descripción del commit. Si un PR toca red/sistema sin nota de
   seguridad, NO se mergea.
-- **NINGÚN FLAG CAMBIA SEMÁNTICA**: si una opción decide qué programas compilan o qué
-  significan (ownership, const/mut, permisos, sanitizers, niveles), NO es flag — es
-  lenguaje puro o directiva por módulo. Un flag solo decide CÓMO se produce el binario
-  (optimización, output, verbosidad) o CUÁNTO se te dice (diagnósticos). El día que un
-  flag decide si el código compila, es una promesa que el compilador no puede verificar.
-- **`--target` es el ÚNICO flag de plataforma**: el código `.fc` nunca sabe en qué
+- **NINGUNA ETIQUETA CAMBIA SEMÁNTICA**: si una opción decide qué programas compilan o
+  qué significan (ownership, const/mut, permisos, sanitizers, niveles), NO es etiqueta —
+  es lenguaje puro o directiva por módulo. Una etiqueta solo decide CÓMO se produce el
+  binario (optimización, output, verbosidad) o CUÁNTO se te dice (diagnósticos). El día
+  que una etiqueta decide si el código compila, es una promesa que el compilador no
+  puede verificar.
+- **`--destino` es la ÚNICA etiqueta de plataforma**: el código `.fc` nunca sabe en qué
   plataforma corre. Las diferencias (procesos, terminal, stdin, fecha, rutas, EOL) las
-  absorbe el runtime (Capa B/C) con builtins neutros + dispatch interno. Prohibidos
+  absorbe el runtime (Capa B/C) con builtins neutros + dispatch interno. Prohibidas
   `--windows`/`--linux`/`--compat-*`/`--cfg(os)` — crearían dos lenguajes.
 - **Código portable o no compila**: un builtin sin impl para el target es **error de
   compilación** (con builtin + plataforma en el mensaje), nunca warning ni crash.
 - **Impls juntas**: toda pieza nueva que toque sistema (procesos, terminal, red) lleva
   impl Windows + POSIX en la misma tanda (aunque solo se pruebe Windows; POSIX se
   verifica en WSL / CI matrix), más su nota de seguridad.
+- **VERSIONADO ACORDE A LA ESCALA DEL CAMBIO**: `MAYOR.menor.parche`
+  - **MAYOR** (x.0.0): cambios gigantes — sintaxis nueva, rompe compatibilidad, rediseño
+    del lenguaje o del CLI visible.
+- **menor** (0.x.0): refactorizaciones, cambios importantes o moderados — features
+  nuevas del lenguaje/toolchain, etiquetas nuevas, cambios de workflow. NO rompe
+  compatibilidad (aliases cubren lo viejo).
+  - **parche** (0.0.x): bugs, quality-of-life, pequeños — fixes, docs, mejoras internas.
+  - Regla de oro: si el cambio se ve desde fuera del compilador (CLI, lenguaje, errores),
+    al menos sube **menor**. Si rompe algo existente, **MAYOR**. Si es invisible o un
+    arreglo, **parche**. El bump SIEMPRE en `Cargo.toml` (`env!("CARGO_PKG_VERSION")`
+    es la única fuente de verdad) + tag `vMAYOR.menor.parche` + `AGENTS.md` sincronizado.
 
 ## Stack técnico
 
@@ -154,7 +166,7 @@ Pipeline end-to-end operativo. Turing-completo con:
 - **LSP:** 6 features, integrado OpenCode, signature help, code actions, context-aware completion
 - **Documentación:** GUIA.md + 15 capítulos, REFERENCIA.md, ERRORES.md, skill falcato-language, VS Code Extension (Falcato Dorado)
 - **Instalación:** cargo-dist (MSI+shell+powershell), `falcato setup --all`, install.ps1 legacy
-- **54/54 tests pasan. 66/73 ejemplos compilan** (7 restantes son errores intencionales de demostración).
+- **54/54 tests pasan. 68/75 ejemplos compilan** (7 restantes son errores intencionales de demostración).
 
 ## Comandos CLI
 
@@ -176,42 +188,42 @@ test, setup…) e infinitivos anteriores (compilar, ejecutar, verificar, probar,
 instalar) funcionan como aliases ocultos para compatibilidad con scripts/CI — nunca
 como interfaz visible.
 
-## Flags del toolchain (2026-08-07)
+## Etiquetas del toolchain (2026-08-08)
 
-**Regla:** un flag solo decide CÓMO se produce el binario (optimización, output,
-verbosidad) o CUÁNTO se te dice (diagnósticos). Lo que decide qué compila o qué
-significa el código NO es flag — es lenguaje puro, directiva de módulo o `falcato.toml`.
-**Los flags están en español** (el lenguaje es español); los nombres en inglés
-funcionan como aliases ocultos para compatibilidad con scripts/CI.
+**Regla:** una etiqueta (`--nombre`) solo decide CÓMO se produce el binario
+(optimización, output, verbosidad) o CUÁNTO se te dice (diagnósticos). Lo que decide
+qué compila o qué significa el código NO es etiqueta — es lenguaje puro, directiva de
+módulo o `falcato.toml`. **Las etiquetas están en español** (el lenguaje es español);
+los nombres en inglés funcionan como aliases ocultos para compatibilidad con scripts/CI.
 
-### Aprobados (decisión de invocación)
+### Aprobadas (decisión de invocación)
 
-| Flag (ES) | Alias (EN) | Para qué | Prioridad |
+| Etiqueta (ES) | Alias (EN) | Para qué | Prioridad |
 |------|----------|-----------|-----------|
-| `--lanzar` (+ `--opt-level N`) | `release` / `opt-level` | Optimización global (inlining, layout); la optimización *semántica* vive en efectos `puro`/`muta`/`lee` | 🔴 R8 |
+| `--lanzar` (+ `--nivel-opt N`) | `release` / `opt-level` | Optimización global (inlining, layout); la optimización *semántica* vive en efectos `puro`/`muta`/`lee` | 🔴 R8 |
 | `--emitir-clif` | `emit-clif` | Salida de Cranelift CLIF — debuggear el codegen propio (backend propietario) | ✅ 2026-08-07 |
-| `--json` | — | Diagnósticos como JSON estructurado (agentes LLM, CI, IDEs — mismo contrato que el LSP) | ✅ 2026-08-07 (check/build) |
-| `--incremental` | — | Cache de verificación por hash de fuente — iteración LLM write→check→fix <100ms | ✅ 2026-08-07 (check) |
-| `--entrada` | `stdin` | `echo "código" \| falcato check -` — agentes sin archivos temporales | ✅ 2026-08-07 (check) |
-| `--destino <triple>` | `target` | Cross-compile (`x86_64-unknown-linux-gnu`, `aarch64-apple-darwin`, …). **Único flag de plataforma** | 🟡 R8 |
+| `--json` | — | Diagnósticos como JSON estructurado (agentes LLM, CI, IDEs — mismo contrato que el LSP) | ✅ 2026-08-07 (verifica/compila) |
+| `--incremental` | — | Cache de verificación por hash de fuente — iteración LLM write→check→fix <100ms | ✅ 2026-08-07 (verifica) |
+| `--entrada` | `stdin` | `echo "código" \| falcato verifica -` — agentes sin archivos temporales | ✅ 2026-08-07 (verifica) |
+| `--destino <triple>` | `target` | Cross-compile (`x86_64-unknown-linux-gnu`, `aarch64-apple-darwin`, …). **Única etiqueta de plataforma** | 🟡 R8 |
 | `--enlazador <path>` / `--raiz-sistema <dir>` | `linker` / `sysroot` | Cross-linking (lld, gcc, link.exe) | 🟡 R8 |
 | `--crt-estatico` / `--crt-dinamico` | `crt-static` / `crt-dynamic` | CRT estático (default, funciona en cualquier máquina) vs DLLs del sistema (binario menor). R8 distribuye estático | 🟡 R8 |
 | `-o, --salida <ruta>` / `--detallado` / `-g` / `-j N` | `output` / `verbose` / — / — | Output, verbosidad, debug info, paralelismo | 🟢 Baja |
 | `--edicion` | `edition` | Versionar sintaxis — diseñar el formato YA aunque no haya cambios aún | 🟢 Baja |
-| `--todo` / `--agentes` / `--desinstalar` / `--recursos` | `all` / `agents` / `uninstall` / `resources` | Subcomando `setup` — instalar VS Code extension, agentes, skills | ✅ |
+| `--todo` / `--agentes` / `--desinstalar` / `--recursos` | `all` / `agents` / `uninstall` / `resources` | Subcomando `instala` — instalar VS Code extension, agentes, skills | ✅ |
 
-### Prohibidos (semántica → lenguaje puro)
+### Prohibidas (semántica → lenguaje puro)
 
 | Cosa | Hogar correcto |
 |------|----------------|
-| Nivel N0/N1/N2 | Directiva por módulo (`# nivel 2`), NUNCA flag global |
+| Nivel N0/N1/N2 | Directiva por módulo (`# nivel 2`), NUNCA etiqueta global |
 | Warnings/sugerencias educativas | El compiler sugiere en N0; el nivel de módulo ES el `-Werror`. Sin `--deny-warnings` |
-| Permisos (R8.3 Capa 4) | Efectos `puro/muta/lee` + `falcato.toml` — un flag de bypass de seguridad NO existe |
+| Permisos (R8.3 Capa 4) | Efectos `puro/muta/lee` + `falcato.toml` — una etiqueta de bypass de seguridad NO existe |
 | Ownership, const/mut, ABI | Artículos, `es`/`está`, C ABI por defecto |
 | Bounds checks / sanitizers | Efecto declarado en el tipo o directiva de módulo |
 | `--windows` / `--linux` / `--cfg(os)` / `--compat-*` | Nunca — el runtime (Capa B/C) absorbe la diferencia |
 
-**Nota:** los flags están en español; los nombres en inglés son aliases ocultos (funcionan, no se muestran en help).
+**Nota:** las etiquetas están en español; los nombres en inglés son aliases ocultos (funcionan, no se muestran en help).
 
 ## Roadmap — Pendiente real
 
@@ -247,6 +259,32 @@ todo lo demás (JSON, HTTP, SSE, MCP) son librerías `.fc` y NO tocan el compile
   - [ ] Librería `.fc` sobre el builtin `timestamp` (strftime manual o FFI)
   - [ ] **Criterio:** sesiones y logs con fecha legible
   - [ ] *No bloqueante:* el timestamp crudo ya sirve para ordenar
+- [ ] **R7.5 — Argumentos de línea de comandos (argv tipado, INNOVACIÓN)**
+  - [x] **Fase 1 (baseline):** builtin `argumentos() -> Vector<Texto>` — crudo estilo C.
+        `falcato corre` YA pasa args al binario (`cmd.args(args)`); falta que el
+        lenguaje los lea. Mapeo Capa B/C: `GetCommandLineW`/`CommandLineToArgvW` en
+        Windows, `argv` en POSIX — sin `--cfg(os)`. **✅ 2026-08-08** (Windows verificado;
+        POSIX implementado en runtime, falta probar en WSL). Linker: añadido `shell32.lib`.
+  - [x] **Fase 2 (la innovación):** `función principal(el args: Struct) -> Entero32` — el
+        compiler genera parseo `--campo valor` + validación de tipos + `--ayuda`
+        automático en español. **Los artículos codifican el esquema**: `el`=requerido,
+        `un`=opcional, `la`=inmutable/validado, `los`=varargs posicionales.
+        No es sintaxis nueva — struct + artículos que ya existen.
+        **✅ 2026-08-08.** Implementación: `src/args_tipados.rs` (preprocesa el AST de
+        `principal`, elimina el param ABI y sintetiza un prólogo Falcato que recorre
+        argv con `argumentos()`/`vector_obtener`/`texto_comparar`, convierte con los
+        nuevos builtins `texto_a_entero/natural/flotante/booleano` + `como_entero32`,
+        valida requeridos y construye el struct `args`). Verificado:
+        `.\saludo_app.exe --nombre sebas --cuenta 3` → "hola, sebas". Tipos soportados:
+        Texto, Entero32/64, Natural32/64, Flotante64, Booleano. Interpolación ahora
+        soporta acceso a campo `{args.nombre}`.
+  - [ ] **Fase 3:** librería `.fc` `args_avanzados` (subcomandos, defaults, repetición)
+        — sin tocar el compiler.
+  - [x] **Criterio:** `.\saludo_app.exe --nombre sebas` → imprime "hola, sebas" ✅
+  - [ ] *Bloqueante:* Cid necesita args en Fase 2 (loop agente con opciones)
+  - [ ] *NO es etiqueta* — es lenguaje puro post-compilado (regla: lo post-compilado se
+        hace en lenguaje). Documentar a fondo en GUIA.md (sección "Argumentos de
+        línea de comandos") cuando esté listo.
 
 ### R8 — Sistema de paquetes distribuido (P2P, sin servidores)
 Ecosistema estilo crates.io pero **sin registry central**: contenido por hash, índice en la
@@ -384,7 +422,7 @@ Sebesta, HumanEval.
 | Fiabilidad: `falcato test` | 54/54 ✅ |
 | Expresividad: linked list, bitfields, self-ref sin pelear | Checklist "superar a Rust" |
 | Paridad doc/código (GUIA.md↔features) | 100% |
-| Ejemplos | 66/73 compilan (7 intencionales) |
+| Ejemplos | 68/75 compilan (7 intencionales) |
 
 ### D. Iteración LLM (benchmarking HumanEval-style)
 | Métrica | Umbral |
@@ -411,7 +449,7 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 5 de 5 puntos d
 - **Causa raíz (2 bugs):**
   1. **`printf` variádica mal declarada** (`src/platform/registry.rs:227`): el registry la registraba con firma `&[I64]` (1 param) y `remap()` sobrescribía la firma pedida por el caller (2 params) → `call fn1(v4, v3): got 2, expected 1` → Verifier error. Fix: flag `variadic` en `BuiltinEntry` + `insert_variadic()` — el registry solo remapea el nombre, la firma exacta la decide el caller.
   2. **Mojibake en string de match** (`src/codegen/expresiones.rs:1049,1076`): `"tamaño_de"` tenía la ñ corrupta (`E2 94 9C E2 96 92` en vez de `C3 B1`) → el match exacto fallaba → "Función 'tamaño_de' no encontrada". Fix: reemplazo de bytes a ñ UTF-8 correcta.
-- **Estado actual:** **66/73 ejemplos compilan** (los 7 restantes son errores intencionales de demostración: borrow_error, efecto_puro_error, feedback_educativo, field_borrow_error, rasgo_error_existe, rasgo_error_metodo, use_after_move). **54/54 unit tests pasan.** Verificado con release oficial `build.ps1`.
+- **Estado actual:** **68/75 ejemplos compilan** (los 7 restantes son errores intencionales de demostración: borrow_error, efecto_puro_error, feedback_educativo, field_borrow_error, rasgo_error_existe, rasgo_error_metodo, use_after_move). **54/54 unit tests pasan.** Verificado con release oficial `build.ps1`.
 - **Pendiente:** los errores internos de codegen siguen con `sugerencia: None` — hacer que pasen por la tubería de errores con span+sugerencia (violación Day-0).
 
 ### 🔴 Bloquei #2. Arquitectura rota
@@ -449,9 +487,9 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 5 de 5 puntos d
 1. **Bug #1 (bloqueante):** ✅ RESUELTO — printf variádica + mojibake tamaño_de (2026-08-03).
 2. **Quick win:** ✅ `cargo fix --bin falcato` — 100 → 61 warnings (2026-08-03).
 3. **Arquitectura:** ✅ `call_conv_default` movido a `PlatformRuntime` — 0 cfg(target_os) fuera de platform/ (2026-08-03).
-4. **Docs:** ✅ AGENTS.md sincronizado (0.5.0, 54 tests, 66/73 ejemplos) (2026-08-03, actualizado 2026-08-07).
+4. **Docs:** ✅ AGENTS.md sincronizado (0.5.0, 54 tests, 68/75 ejemplos) (2026-08-03, actualizado 2026-08-07).
 5. **Pilar V:** ✅ **RETIRADO (2026-08-03)** — riesgo de colisión con `retornar`/`prestar`/`desde`; `des-` cubierto por R6 (drop automático).
-6. **Flags toolchain:** ✅ `--emit-clif`, `--json`, `--stdin`, `--incremental` implementados y verificados (2026-08-07).
+6. **Etiquetas toolchain:** ✅ `--emitir-clif`, `--json`, `--entrada`, `--incremental` implementados y verificados (2026-08-07).
 7. **build.bat:** ✅ CRLF fix — cmd.exe no parsea `.bat` con finales de línea LF; el archivo tenía LF-only y rompía todos los `if errorlevel`.
 
 ---
@@ -489,6 +527,34 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 5 de 5 puntos d
   versión+archivo+fuente, cache `.falcato-cache/` solo para resultados OK.
 - `check --json` y `--stdin` verificados con release oficial: el JSON sigue el contrato
   del LSP (código/archivo/línea/columna/mensaje/sugerencia).
+
+### ✅ `vector_obtener<Texto>` rompía el verifier de Cranelift — RESUELTO (2026-08-08)
+- **Síntoma:** `el arg: Texto = vector_obtener<Texto>(v, i)` — incluso fuera de bucle,
+  en un vector vacío — producía `Verifier errors` al definir `principal`.
+- **Causa raíz:** en `builtin_vector_obtener` el `sextend` del índice estaba condicionado
+  al tipo del ELEMENTO; con `Texto` el índice no se extendía a I64 → el offset no cuadraba
+  con el array de punteros → SSA dominance rota en el merge.
+- **Fix:** el índice SIEMPRE se extiende a I64, sin depender del tipo del elemento.
+- **Verificado:** bug_vector2/3/4 compilan y corren; `argumentos()` recorre argv con
+  `vector_obtener<Texto>` sin verifier errors.
+- **Impacto:** desbloquea R7.5 Fase 2 (parseo tipado) y Cid.
+
+### 🐛 La runtime lib tiene target SEPARADO (trampa de recompilación)
+- **Causa raíz:** el linker apunta a `lib/falcato_runtime/target/release/falcato_runtime.lib`
+  (crate standalone), NO al target del workspace. `cargo build --release` en la raíz
+  recompila el compiler pero NO la runtime lib que enlaza.
+- **Fix:** para cambios en `lib/falcato_runtime/`, recompilar DESDE ese directorio
+  (`cargo build --release` con workdir `D:\Falcato\lib\falcato_runtime`) antes de probar.
+- **Lección:** el fix del null terminator de `argumentos()` parecía funcionar, pero era
+  la lib vieja; la prueba real (args limpios en `saludo_app`) llegó al recompilar la lib.
+
+### 🔧 Interpolación no soportaba acceso a campo (R7.5 Fase 2)
+- **Causa raíz:** `builtin_imprimir_interpolado` buscaba `variables.get(contenido)` por
+  nombre EXACTO; `{args.nombre}` no resolvía → imprimía vacío.
+- **Fix:** si el segmento contiene `.`, compilar `Expresion::AccesoCampo` real
+  (1 nivel: base.campo) e imprimir con `imprimir_valor_interpolado` por tipo.
+- **Archivos:** `src/codegen/builtins.rs`, `src/codegen/tipos.rs` (inferir_tipo
+  AccesoCampo).
 
 ---
 

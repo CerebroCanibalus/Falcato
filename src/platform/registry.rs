@@ -121,6 +121,15 @@ impl BuiltinRegistry {
         r.insert("fecha_unix", "falcato_fecha_unix", &[], Some(types::I64));
         r.insert("fecha_ms", "falcato_fecha_ms", &[], Some(types::I64));
 
+        // Argumentos de línea de comandos (R7.5)
+        r.insert("argumentos", "falcato_argumentos", &[], Some(types::I64));
+
+        // Conversión texto→número (R7.5 Fase 2): reciben (ptr, len)
+        r.insert("texto_a_entero", "falcato_texto_a_entero", &[types::I64, types::I64], Some(types::I64));
+        r.insert("texto_a_natural", "falcato_texto_a_natural", &[types::I64, types::I64], Some(types::I64));
+        r.insert("texto_a_flotante", "falcato_texto_a_flotante", &[types::I64, types::I64], Some(types::I64));
+        r.insert("texto_a_booleano", "falcato_texto_a_booleano", &[types::I64, types::I64], Some(types::I64));
+
         // DHT (R8.2): índice P2P
         r.insert("dht_nuevo", "falcato_dht_nuevo", &[types::I32], Some(types::I64));
         r.insert("dht_publicar", "falcato_dht_publicar", &[types::I64, types::I64, types::I64, types::I64, types::I64], Some(types::I32));
@@ -209,6 +218,15 @@ impl BuiltinRegistry {
         // Reloj de pared (R7.4)
         r.insert("fecha_unix", "falcato_fecha_unix", &[], Some(types::I64));
         r.insert("fecha_ms", "falcato_fecha_ms", &[], Some(types::I64));
+
+        // Argumentos de línea de comandos (R7.5)
+        r.insert("argumentos", "falcato_argumentos", &[], Some(types::I64));
+
+        // Conversión texto→número (R7.5 Fase 2): reciben (ptr, len)
+        r.insert("texto_a_entero", "falcato_texto_a_entero", &[types::I64, types::I64], Some(types::I64));
+        r.insert("texto_a_natural", "falcato_texto_a_natural", &[types::I64, types::I64], Some(types::I64));
+        r.insert("texto_a_flotante", "falcato_texto_a_flotante", &[types::I64, types::I64], Some(types::I64));
+        r.insert("texto_a_booleano", "falcato_texto_a_booleano", &[types::I64, types::I64], Some(types::I64));
 
         // DHT (R8.2): índice P2P
         r.insert("dht_nuevo", "falcato_dht_nuevo", &[types::I32], Some(types::I64));

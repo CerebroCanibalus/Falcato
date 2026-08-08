@@ -516,6 +516,16 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // Argumentos de línea de comandos (R7.5)
+        self.funciones.insert("argumentos".to_string(), FirmaFuncion {
+            nombre: "argumentos".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Vector(Box::new(Tipo::Texto))), // argv crudo
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
         // Reloj de pared (R7.4)
         self.funciones.insert("fecha_unix".to_string(), FirmaFuncion {
             nombre: "fecha_unix".to_string(),
@@ -739,6 +749,39 @@ impl AnalizadorSemantico {
             span: span_vacio.clone(),
             es_publica: true,
         });
+        // R7.5 Fase 2: conversión de Texto a número
+        self.funciones.insert("texto_a_entero".to_string(), FirmaFuncion {
+            nombre: "texto_a_entero".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_a_natural".to_string(), FirmaFuncion {
+            nombre: "texto_a_natural".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_a_flotante".to_string(), FirmaFuncion {
+            nombre: "texto_a_flotante".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_a_booleano".to_string(), FirmaFuncion {
+            nombre: "texto_a_booleano".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
         // Fase GUI-1: como_entero64(e: Entero32) -> Entero64
         // Convierte un Entero32 a Entero64 con signo. Útil para FFI donde se esperan punteros NULL.
         self.funciones.insert("como_entero64".to_string(), FirmaFuncion {
@@ -746,6 +789,16 @@ impl AnalizadorSemantico {
             parametros_genericos: vec![],
             parametros: vec![("valor".to_string(), Tipo::Entero32)],
             retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        // R7.5 Fase 2: como_entero32(e: Entero64) -> Entero32
+        // Trunca Entero64 a Entero32 (para parseo tipado de args).
+        self.funciones.insert("como_entero32".to_string(), FirmaFuncion {
+            nombre: "como_entero32".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("valor".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Entero32),
             span: span_vacio.clone(),
             es_publica: true,
         });

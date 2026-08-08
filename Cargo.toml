@@ -1,9 +1,9 @@
-[package]
+﻿[package]
 name = "falcato"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 authors = ["Falcato Team"]
-description = "Lenguaje de programación de sistemas iberohablante sobre Cranelift"
+description = "Lenguaje de programaciÃ³n de sistemas iberohablante sobre Cranelift"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/CerebroCanibalus/falcato"
 

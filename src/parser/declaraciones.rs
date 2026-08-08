@@ -364,6 +364,17 @@ fn parse_estructural(cursor: &mut ParserCursor) -> Result<Declaracion, ErrorSint
     while cursor.actual() != Some(&Token::LlaveCierra) && !cursor.esta_vacio() {
         let span_campo_inicio = cursor.span_actual();
 
+        // R7.5 Fase 2: artículo opcional del campo (el/un/la/los/las).
+        // Sin artículo = `el` (requerido) por compatibilidad.
+        let articulo = match cursor.actual() {
+            Some(Token::ArticuloEl) => { cursor.avanzar(); Articulo::El }
+            Some(Token::ArticuloLa) => { cursor.avanzar(); Articulo::La }
+            Some(Token::ArticuloUn) => { cursor.avanzar(); Articulo::Un }
+            Some(Token::ArticuloLos) => { cursor.avanzar(); Articulo::Los }
+            Some(Token::ArticuloLas) => { cursor.avanzar(); Articulo::Las }
+            _ => Articulo::El,
+        };
+
         let nombre_campo = match cursor.actual() {
             Some(Token::Identificador(n)) => {
                 let n = n.clone();
@@ -441,6 +452,7 @@ fn parse_estructural(cursor: &mut ParserCursor) -> Result<Declaracion, ErrorSint
 
         let span_campo = Span::combinar(&span_campo_inicio, &cursor.span_actual());
         campos.push(Campo {
+            articulo,
             nombre: nombre_campo,
             tipo,
             span: span_campo,

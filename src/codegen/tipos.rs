@@ -215,6 +215,14 @@ impl Codegen {
                     _ => Tipo::Entero32,
                 }
             }
+            Expresion::AccesoCampo(base, nombre_campo, _) => {
+                let tipo_base = self.inferir_tipo(base, variables);
+                if let Tipo::Nombre(nombre_struct) = tipo_base {
+                    self.buscar_tipo_campo(&nombre_struct, nombre_campo)
+                } else {
+                    Tipo::Entero32
+                }
+            }
             Expresion::Binaria(_, _, _, _) => Tipo::Entero32, // Simplificado
             Expresion::ConstructorEnum(enum_nombre, _, _, _) => {
                 // Para enums genÃƒÂ©ricos como Resultado, necesitamos inferir los tipos

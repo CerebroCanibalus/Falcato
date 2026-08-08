@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+mod args_tipados;
 mod ast;
 mod backend;
 mod codegen;
@@ -515,7 +516,7 @@ fn compilar_individual(
     let tokens = lexer.tokenizar();
     println!("[Falcato] {} tokens generados", tokens.len());
 
-    let programa = ParserFalcato::parse(tokens)
+    let mut programa = ParserFalcato::parse(tokens)
         .map_err(|errores| {
             let msgs: Vec<String> = errores.iter()
                 .map(|e| e.error.to_string())
@@ -523,6 +524,10 @@ fn compilar_individual(
             format!("Errores de parseo:\n{}", msgs.join("\n"))
         })?;
     println!("[Falcato] AST generado: {} declaraciones", programa.declaraciones.len());
+
+    // R7.5 Fase 2: transformar principal(args: Struct) → prólogo de parseo tipado
+    args_tipados::preprocesar(&mut programa)?;
+    println!("[Falcato] Argumentos tipados: procesados");
 
     let mut semantica = AnalizadorSemantico::nuevo();
     semantica.analizar(&programa)
@@ -619,7 +624,7 @@ fn verificar_fuente(archivo: &str, fuente: &str, json: bool, incremental: bool) 
     let lexer = LexerFalcato::nuevo(fuente, archivo);
     let tokens = lexer.tokenizar();
 
-    let programa = match ParserFalcato::parse(tokens) {
+    let mut programa = match ParserFalcato::parse(tokens) {
         Ok(p) => p,
         Err(errores) => {
             if json {
@@ -634,6 +639,11 @@ fn verificar_fuente(archivo: &str, fuente: &str, json: bool, incremental: bool) 
             return Err(format!("Errores de parseo en '{}':\n{}", archivo, msgs.join("\n")));
         }
     };
+
+    // R7.5 Fase 2: transformar principal(args: Struct) → prólogo de parseo tipado
+    if let Err(msg) = args_tipados::preprocesar(&mut programa) {
+        return Err(format!("Error en argumentos tipados: {}", msg));
+    }
 
     let mut semantica = AnalizadorSemantico::nuevo();
     match semantica.analizar(&programa) {
@@ -752,6 +762,9 @@ fn ejecutar_pruebas(archivos: &[String], _json: bool) -> Result<(), String> {
                 .collect();
             format!("Errores de parseo:\n{}", msgs.join("\n"))
         })?;
+
+    // R7.5 Fase 2: transformar principal(args: Struct) → prólogo de parseo tipado
+    args_tipados::preprocesar(&mut programa)?;
 
     // Extraer pruebas y eliminarlas del AST
     let pruebas: Vec<ast::PruebaDecl> = programa.declaraciones.iter()
@@ -1082,6 +1095,8 @@ fn link_objetos(
             .arg("ws2_32.lib")
             .arg("ntdll.lib")
             .arg("userenv.lib")
+            // R7.5: CommandLineToArgvW (parseo de argv) vive en shell32
+            .arg("shell32.lib")
             // cripto R8.2: getrandom (BCryptGenRandom) y SystemFunction036
             .arg("bcrypt.lib")
             .arg("advapi32.lib");

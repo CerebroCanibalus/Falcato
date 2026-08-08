@@ -1,0 +1,17 @@
+// R7.5 Fase 2 — argumentos tipados (la innovación)
+// Los artículos en los campos del struct codifican el esquema:
+//   el = requerido, un = opcional, la = inmutable/validado
+estructural Saludo {
+    el nombre: Texto,
+    un cuenta: Entero32,
+    la saludo: Texto,
+}
+
+función principal(el args: Saludo) -> Entero32 {
+    imprimir_linea("hola, {args.nombre}");
+    si args.cuenta > 0 {
+        imprimir_linea("  cuenta: {args.cuenta}");
+    }
+    imprimir_linea("  saludo: {args.saludo}");
+    retornar 0;
+}

@@ -467,6 +467,12 @@ pub struct EstructuralDecl {
 
 #[derive(Debug, Clone)]
 pub struct Campo {
+    /// Artículo del campo: codifica el esquema de args (R7.5 Fase 2)
+    /// - `el` = requerido (error si falta `--campo`)
+    /// - `un` = opcional (default si falta)
+    /// - `la` = inmutable/validado (se valida tipo, no se puede mutar)
+    /// - `los` = varargs posicionales (argumentos sin `--`)
+    pub articulo: Articulo,
     pub nombre: String,
     pub tipo: Tipo,
     pub span: Span,

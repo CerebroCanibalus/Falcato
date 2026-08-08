@@ -594,8 +594,25 @@ impl Codegen {
         // Imprimir cada segmento
         for (es_var, contenido) in &segmentos {
             if *es_var {
-                // Variable: imprimir segÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºn su tipo
-                if let Some((slot, tipo, _)) = variables.get(contenido) {
+                // Variable (o acceso a campo args.nombre): imprimir según su tipo
+                if contenido.contains('.') {
+                    // Acceso a campo: compilar la expresión AccesoCampo real.
+                    // Soporta un nivel: args.nombre (base.campo).
+                    let partes: Vec<&str> = contenido.split('.').collect();
+                    if partes.len() == 2 {
+                        let base = partes[0].to_string();
+                        let campo = partes[1].to_string();
+                        let expr_campo = Expresion::AccesoCampo(
+                            Box::new(Expresion::Identificador(base.clone(), Span::vacio())),
+                            campo.clone(),
+                            Span::vacio(),
+                        );
+                        // Compilar la expresión completa → devuelve el valor del campo cargado
+                        let val = self.compilar_expresion(&expr_campo, builder, variables)?;
+                        let tipo = self.inferir_tipo(&expr_campo, variables);
+                        self.imprimir_valor_interpolado(builder, variables, val, &tipo, contenido)?;
+                    }
+                } else if let Some((slot, tipo, _)) = variables.get(contenido) {
                     let slot = *slot;
                     let tipo = self.resolver_alias(tipo);
                     let (fmt_str, val) = match tipo {
@@ -702,6 +719,59 @@ impl Codegen {
         }
 
         Ok(builder.ins().iconst(types::I64, 0))
+    }
+
+    /// R7.5 Fase 2: imprime un valor ya cargado (resultado de compilar una
+    /// expresión como AccesoCampo) según su tipo, usando printf.
+    pub(crate) fn imprimir_valor_interpolado(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        val: cranelift_codegen::ir::Value,
+        tipo: &Tipo,
+        _contenido: &str,
+    ) -> Result<(), ()> {
+        let tipo = self.resolver_alias(tipo);
+        let (fmt_str, val_out) = match tipo {
+            Tipo::Entero8 | Tipo::Caracter => {
+                let ext = builder.ins().sextend(types::I64, val);
+                ("%d\0", ext)
+            }
+            Tipo::Entero16 => {
+                let ext = builder.ins().sextend(types::I64, val);
+                ("%d\0", ext)
+            }
+            Tipo::Entero32 => {
+                let ext = builder.ins().sextend(types::I64, val);
+                ("%d\0", ext)
+            }
+            Tipo::Entero64 => ("%lld\0", val),
+            Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Booleano => {
+                let ext = builder.ins().uextend(types::I64, val);
+                ("%u\0", ext)
+            }
+            Tipo::Natural64 => ("%llu\0", val),
+            Tipo::Flotante32 => {
+                let f = builder.ins().fpromote(types::F64, val);
+                let bits = builder.ins().bitcast(types::I64, cranelift_codegen::ir::MemFlags::new(), f);
+                ("%f\0", bits)
+            }
+            Tipo::Flotante64 => {
+                let bits = builder.ins().bitcast(types::I64, cranelift_codegen::ir::MemFlags::new(), val);
+                ("%f\0", bits)
+            }
+            Tipo::Texto => {
+                // val es puntero al descriptor {ptr, len, cap} → extraer ptr de datos
+                let v = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), val, Self::OFFSET_PTR);
+                ("%s\0", v)
+            }
+            _ => ("%s\0", val),
+        };
+        let fmt_ptr = self.crear_string_literal(builder, fmt_str);
+        let func_id = self.asegurar_funcion_c("printf", &[types::I64, types::I64], Some(types::I32));
+        let func_ref = self.module.declare_func_in_func(func_id, builder.func);
+        builder.ins().call(func_ref, &[fmt_ptr, val_out]);
+        Ok(())
     }
 
     /// Crea un string global desde un &str (agrega \0 si no lo tiene)
@@ -1092,6 +1162,78 @@ impl Codegen {
     ) -> Result<cranelift_codegen::ir::Value, ()> {
         let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
         Ok(builder.ins().sextend(types::I64, val))
+    }
+
+    /// R7.5 Fase 2: como_entero32(valor: Entero64) -> Entero32
+    /// Trunca Entero64 a Entero32 (para parseo tipado de args).
+    pub(crate) fn builtin_como_entero32(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        Ok(builder.ins().ireduce(types::I32, val))
+    }
+
+    /// R7.5 Fase 2: conversión de Texto a número (texto_a_entero/natural/flotante/booleano).
+    /// Extrae (ptr, len) del descriptor Texto y llama a la función C del runtime
+    /// `falcato_texto_a_*` que parsea respetando `len` (sin asumir null terminator).
+    fn builtin_texto_convertir(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+        nombre_c: &str,
+        retorno: cranelift_codegen::ir::types::Type,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let ptr = self.cargar_campo_descriptor(builder, desc, Self::OFFSET_PTR);
+        let len = self.cargar_campo_descriptor(builder, desc, Self::OFFSET_LEN);
+        let func_id = self.asegurar_funcion_c(nombre_c, &[types::I64, types::I64], Some(retorno));
+        let func_ref = self.module.declare_func_in_func(func_id, builder.func);
+        let inst = builder.ins().call(func_ref, &[ptr, len]);
+        Ok(builder.func.dfg.first_result(inst))
+    }
+
+    /// R7.5 Fase 2: texto_a_entero(t: Texto) -> Entero64
+    pub(crate) fn builtin_texto_a_entero(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        self.builtin_texto_convertir(builder, variables, argumentos, "falcato_texto_a_entero", types::I64)
+    }
+
+    /// R7.5 Fase 2: texto_a_natural(t: Texto) -> Entero64 (-1 si no es número)
+    pub(crate) fn builtin_texto_a_natural(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        self.builtin_texto_convertir(builder, variables, argumentos, "falcato_texto_a_natural", types::I64)
+    }
+
+    /// R7.5 Fase 2: texto_a_flotante(t: Texto) -> Flotante64
+    pub(crate) fn builtin_texto_a_flotante(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        self.builtin_texto_convertir(builder, variables, argumentos, "falcato_texto_a_flotante", types::F64)
+    }
+
+    /// R7.5 Fase 2: texto_a_booleano(t: Texto) -> Booleano (1/0)
+    pub(crate) fn builtin_texto_a_booleano(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        self.builtin_texto_convertir(builder, variables, argumentos, "falcato_texto_a_booleano", types::I64)
     }
 
     /// Fase 15D: archivo_leer(ruta: Palabra) -> Texto
@@ -1522,11 +1664,11 @@ impl Codegen {
 
         let desc = self.compilar_expresion(&argumentos[0], builder, variables)?;
         let idx = self.compilar_expresion(&argumentos[1], builder, variables)?;
-        let idx_i64 = if cranelift_t == types::I32 {
-            builder.ins().sextend(types::I64, idx)
-        } else {
-            idx
-        };
+        // El índice siempre es Entero32 → extender a I64 para el cálculo de offset
+        // (el offset se suma a un puntero I64). Bug preexistente: la condición
+        // anterior dependía del tipo del ELEMENTO, no del índice → con Texto
+        // (I64) no convertía y `iadd(I64, I32)` rompía el verifier.
+        let idx_i64 = builder.ins().sextend(types::I64, idx);
 
         let data = self.cargar_campo_descriptor(builder, desc, Self::OFFSET_PTR);
         let offset = builder.ins().imul_imm(idx_i64, tamano_t);
@@ -2156,6 +2298,56 @@ impl Codegen {
         self.guardar_campo_descriptor(builder, desc, Self::OFFSET_LEN, len);
         self.guardar_campo_descriptor(builder, desc, Self::OFFSET_CAP, cap);
         Ok(desc)
+    }
+
+    // ============================================================
+    // Argumentos de línea de comandos (R7.5)
+    // ============================================================
+
+    /// argumentos() -> Vector<Texto> — argv del binario (crudo, estilo C).
+    /// El runtime construye el descriptor completo; acá solo se recibe.
+    pub(crate) fn builtin_argumentos(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // falcato_argumentos() -> *mut descriptor Vector<Texto> (i64)
+        let fn_id = self.asegurar_funcion_c("falcato_argumentos", &[], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[]);
+        let desc = builder.inst_results(call)[0];
+
+        // Si el runtime devolvió NULL, devolver un Vector vacío válido.
+        // Patrón: merge block con parámetro de bloque (como canal_intentar).
+        let bloque_nulo = builder.create_block();
+        let bloque_ok = builder.create_block();
+        let bloque_fin = builder.create_block();
+        builder.append_block_param(bloque_fin, types::I64);
+
+        let cero = builder.ins().iconst(types::I64, 0);
+        let es_nulo = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            desc,
+            cero,
+        );
+        builder.ins().brif(es_nulo, bloque_nulo, &[], bloque_ok, &[]);
+
+        // Nulo: crear Vector vacío (descriptor con ptr=0, len=0, cap=0)
+        builder.switch_to_block(bloque_nulo);
+        builder.seal_block(bloque_nulo);
+        let vacio = self.descriptor_nuevo(builder);
+        builder.ins().jump(bloque_fin, &[vacio]);
+
+        // OK: usar el descriptor del runtime
+        builder.switch_to_block(bloque_ok);
+        builder.seal_block(bloque_ok);
+        builder.ins().jump(bloque_fin, &[desc]);
+
+        // Merge
+        builder.switch_to_block(bloque_fin);
+        builder.seal_block(bloque_fin);
+        Ok(builder.block_params(bloque_fin)[0])
     }
 
     // ============================================================
