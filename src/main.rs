@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -25,11 +25,28 @@ use crate::resolver::Resolver;
 use crate::semantic::AnalizadorSemantico;
 // Cranelift - puro Rust, sin dependencias del sistema
 
+/// Template de ayuda en español — TODO el CLI habla español (regla Day-0 absoluta).
+const TEMPLATE_AYUDA: &str = "\
+{name} {version}
+{about}
+
+Uso: {usage}
+
+Argumentos:
+{positionals}
+
+Opciones:
+{options}
+
+Subcomandos:
+{subcommands}";
+
 /// CLI de Falcato
 #[derive(Parser)]
 #[command(name = "falcato")]
 #[command(about = "Compilador del lenguaje Falcato")]
-#[command(version = "0.1.0")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(help_template = TEMPLATE_AYUDA)]
 struct Cli {
     #[command(subcommand)]
     comando: Comandos,
@@ -38,21 +55,29 @@ struct Cli {
 #[derive(Subcommand)]
 enum Comandos {
     /// Compila archivos .fc a binario
+    #[command(name = "compila", alias = "build", alias = "compilar", help_template = TEMPLATE_AYUDA)]
     Build {
         /// Archivo(s) fuente .fc (principal + dependencias)
         #[arg(required = true)]
         archivos: Vec<String>,
         /// Ruta de salida del binario
-        #[arg(short, long)]
+        #[arg(short = 'o', long = "salida", alias = "output")]
         output: Option<String>,
-        /// Target triple (default: nativo)
-        #[arg(long)]
+        /// Triple de plataforma destino (default: nativo)
+        #[arg(long = "destino", alias = "target")]
         target: Option<String>,
-        /// Modo release (optimizaciones)
-        #[arg(long)]
+        /// Modo lanzamiento (release: binario optimizado para entrega)
+        #[arg(long = "lanzar", alias = "release")]
         release: bool,
+        /// Emitir CLIF de Cranelift (debuggear codegen propio)
+        #[arg(long = "emitir-clif", alias = "emit-clif")]
+        emit_clif: bool,
+        /// Diagnósticos como JSON estructurado (agentes LLM, CI)
+        #[arg(long)]
+        json: bool,
     },
     /// Compila y ejecuta archivos .fc
+    #[command(name = "corre", alias = "run", alias = "ejecutar", help_template = TEMPLATE_AYUDA)]
     Run {
         /// Archivo(s) fuente .fc (principal + dependencias)
         #[arg(required = true)]
@@ -62,40 +87,57 @@ enum Comandos {
         args: Vec<String>,
     },
     /// Solo análisis (sin generar binario)
+    #[command(name = "verifica", alias = "check", alias = "verificar", help_template = TEMPLATE_AYUDA)]
     Check {
-        /// Archivo(s) fuente .fc
-        #[arg(required = true)]
+        /// Archivo(s) fuente .fc (usa "-" o --entrada para leer de stdin)
+        #[arg(required_unless_present = "stdin")]
         archivos: Vec<String>,
+        /// Diagnósticos como JSON estructurado (agentes LLM, CI)
+        #[arg(long)]
+        json: bool,
+        /// Leer código desde stdin (`echo "código" | falcato check -`)
+        #[arg(long = "entrada", alias = "stdin")]
+        stdin: bool,
+        /// Cache de verificación por hash de fuente — iteración LLM <100ms
+        #[arg(long)]
+        incremental: bool,
     },
     /// Instala componentes adicionales (VS Code extension, agentes, etc.)
+    #[command(name = "instala", alias = "setup", alias = "instalar", help_template = TEMPLATE_AYUDA)]
     Setup {
         /// Instalar VS Code extension
         #[arg(long)]
         vscode: bool,
         /// Instalar agentes y skills para OpenCode/Claude
-        #[arg(long)]
+        #[arg(long = "agentes", alias = "agents")]
         agents: bool,
         /// Instalar todo (VS Code + agentes)
-        #[arg(long)]
+        #[arg(long = "todo", alias = "all")]
         all: bool,
         /// Desinstalar componentes adicionales
-        #[arg(long)]
+        #[arg(long = "desinstalar", alias = "uninstall")]
         uninstall: bool,
         /// Ruta al directorio de recursos (VSIX, skills, agents)
-        #[arg(long)]
+        #[arg(long = "recursos", alias = "resources")]
         resources: Option<String>,
     },
     /// Muestra la versión
     Version,
     /// Ejecuta las pruebas definidas con `prueba "nombre" { ... }`
+    #[command(name = "prueba", alias = "test", alias = "probar", help_template = TEMPLATE_AYUDA)]
     Test {
         /// Archivo(s) fuente .fc
         #[arg(required = true)]
         archivos: Vec<String>,
+        /// Diagnósticos como JSON estructurado (agentes LLM, CI)
+        #[arg(long)]
+        json: bool,
     },
     /// Inicia el servidor LSP (Language Server Protocol)
+    #[command(help_template = TEMPLATE_AYUDA)]
     Lsp,
     /// Sistema de paquetes (R8): manifiesto, dependencias, resolución
+    #[command(help_template = TEMPLATE_AYUDA)]
     #[command(subcommand)]
     Paquete(PaqueteComandos),
 }
@@ -104,6 +146,7 @@ enum Comandos {
 #[derive(Subcommand)]
 enum PaqueteComandos {
     /// Crea un proyecto nuevo con falcato.toml + falcato.lock
+    #[command(name = "inicia", alias = "init", alias = "iniciar", help_template = TEMPLATE_AYUDA)]
     Init {
         /// Directorio del proyecto (default: actual)
         #[arg(default_value = ".")]
@@ -113,6 +156,7 @@ enum PaqueteComandos {
         nombre: Option<String>,
     },
     /// Añade una dependencia al falcato.toml
+    #[command(name = "agrega", alias = "add", alias = "agregar", help_template = TEMPLATE_AYUDA)]
     Add {
         /// Nombre del paquete dependencia
         nombre: String,
@@ -124,6 +168,7 @@ enum PaqueteComandos {
         dir: String,
     },
     /// Muestra el manifiesto y dependencias del proyecto
+    #[command(name = "muestra", alias = "mostrar", help_template = TEMPLATE_AYUDA)]
     Mostrar {
         /// Directorio del proyecto
         #[arg(default_value = ".")]
@@ -131,8 +176,38 @@ enum PaqueteComandos {
     },
 }
 
+/// Construye el comando con el template de ayuda en español y los textos de
+/// help/version hispanizados, recursivamente en TODOS los subcomandos.
+fn parsear_cli() -> Cli {
+    use clap::CommandFactory;
+
+    fn hispanizar(mut cmd: clap::Command) -> clap::Command {
+        // Aplicar mut_arg solo si el arg existe (los sub-subcomandos no tienen --version)
+        let tiene_help = cmd.get_arguments().any(|a| a.get_id() == "help");
+        let tiene_version = cmd.get_arguments().any(|a| a.get_id() == "version");
+        if tiene_help {
+            cmd = cmd.mut_arg("help", |a| a.help("Muestra esta ayuda"));
+        }
+        if tiene_version {
+            cmd = cmd.mut_arg("version", |a| a.help("Muestra la versión"));
+        }
+        cmd = cmd
+            .help_template(TEMPLATE_AYUDA)
+            .mut_subcommands(hispanizar);
+        cmd
+    }
+
+    let mut cmd = <Cli as CommandFactory>::command();
+    cmd = cmd.disable_help_subcommand(true); // oculta el subcomando `help` genérico en inglés
+    cmd.build(); // materializa los args help/version antes de mut_arg
+    cmd = hispanizar(cmd);
+    let matches = cmd.get_matches();
+    Cli::from_arg_matches(&matches)
+        .unwrap_or_else(|e| e.exit())
+}
+
 fn main() {
-    let cli = Cli::parse();
+    let cli = parsear_cli();
 
     match cli.comando {
         Comandos::Build {
@@ -140,11 +215,15 @@ fn main() {
             output,
             target,
             release,
+            emit_clif,
+            json,
         } => {
             if let Err(e) = compilar(&archivos,
                 output.as_deref(),
                 target.as_deref(),
                 release,
+                emit_clif,
+                json,
             ) {
                 eprintln!("[ERROR] {}", e);
                 std::process::exit(1);
@@ -156,8 +235,8 @@ fn main() {
                 std::process::exit(1);
             }
         }
-        Comandos::Check { archivos } => {
-            if let Err(e) = verificar(&archivos) {
+        Comandos::Check { archivos, json, stdin, incremental } => {
+            if let Err(e) = verificar(&archivos, json, stdin, incremental) {
                 eprintln!("[ERROR] {}", e);
                 std::process::exit(1);
             }
@@ -171,11 +250,11 @@ fn main() {
             }
         }
         Comandos::Version => {
-            println!("Falcato 0.3.0");
+            println!("Falcato {}", env!("CARGO_PKG_VERSION"));
             println!("Lenguaje de programación de sistemas iberohablante");
         }
-        Comandos::Test { archivos } => {
-            if let Err(e) = ejecutar_pruebas(&archivos) {
+        Comandos::Test { archivos, json } => {
+            if let Err(e) = ejecutar_pruebas(&archivos, json) {
                 eprintln!("[ERROR] {}", e);
                 std::process::exit(1);
             }
@@ -367,6 +446,8 @@ fn compilar(
     output: Option<&str>,
     target: Option<&str>,
     release: bool,
+    emit_clif: bool,
+    json: bool,
 ) -> Result<(), String> {
     if archivos.is_empty() {
         return Err("No se especificaron archivos fuente.".to_string());
@@ -376,7 +457,7 @@ fn compilar(
     // El resolver multi-archivo se usa solo cuando se pasan múltiples archivos explícitamente.
     if archivos.len() == 1 {
         let archivo = &archivos[0];
-        return compilar_individual(archivo, output, target, release);
+        return compilar_individual(archivo, output, target, release, emit_clif, json);
     }
 
     // Ruta multi-archivo con Resolver
@@ -422,6 +503,8 @@ fn compilar_individual(
     output: Option<&str>,
     target: Option<&str>,
     _release: bool,
+    emit_clif: bool,
+    _json: bool,
 ) -> Result<(), String> {
     println!("[Falcato] Compilando '{}'...", archivo);
 
@@ -448,6 +531,7 @@ fn compilar_individual(
 
     let mut codegen = Codegen::nuevo("main")
         .map_err(|e| format!("Error inicializando codegen: {}", e))?;
+    codegen.con_emit_clif(emit_clif);
     codegen.compilar_programa(&programa)
         .map_err(|e| format!("Errores de compilación:\n{:?}", e))?;
 
@@ -477,7 +561,7 @@ fn compilar_y_ejecutar(archivos: &[String], args: &[String]) -> Result<(), Strin
     let primer = &archivos[0];
     let binario = format!("{}.exe", primer.strip_suffix(".fc").unwrap_or(primer));
     
-    compilar(archivos, Some(&binario), None, false)?;
+    compilar(archivos, Some(&binario), None, false, false, false)?;
 
     println!("[Falcato] Ejecutando '{}'...", binario);
     
@@ -495,40 +579,159 @@ fn compilar_y_ejecutar(archivos: &[String], args: &[String]) -> Result<(), Strin
     Ok(())
 }
 
-fn verificar(archivos: &[String]) -> Result<(), String> {
+fn verificar(archivos: &[String], json: bool, stdin: bool, incremental: bool) -> Result<(), String> {
+    // Modo stdin: leer TODO el código de la entrada estándar
+    if stdin || (archivos.len() == 1 && archivos[0] == "-") {
+        use std::io::Read;
+        let mut fuente = String::new();
+        std::io::stdin().read_to_string(&mut fuente)
+            .map_err(|e| format!("No se pudo leer stdin: {}", e))?;
+        return verificar_fuente("<stdin>", &fuente, json, incremental);
+    }
+
     if archivos.is_empty() {
         return Err("No se especificaron archivos fuente.".to_string());
     }
 
     for archivo in archivos {
-        println!("[Falcato] Verificando '{}'...", archivo);
-
         let fuente = fs::read_to_string(archivo)
             .map_err(|e| format!("No se pudo leer '{}': {}", archivo, e))?;
-
-        let lexer = LexerFalcato::nuevo(&fuente, archivo);
-        let tokens = lexer.tokenizar();
-
-        let programa = ParserFalcato::parse(tokens)
-            .map_err(|errores| {
-                let msgs: Vec<String> = errores.iter()
-                    .map(|e| e.error.to_string())
-                    .collect();
-                format!("Errores de parseo en '{}':\n{}", archivo, msgs.join("\n"))
-            })?;
-
-        let mut semantica = AnalizadorSemantico::nuevo();
-        semantica.analizar(&programa)
-            .map_err(|e| format!("Errores semánticos en '{}':\n{}", archivo, e))?;
-
-        println!("[Falcato] '{}' verificado: sin errores", archivo);
+        verificar_fuente(archivo, &fuente, json, incremental)?;
     }
 
     Ok(())
 }
 
+/// Verifica un fuente en memoria (archivo o stdin) con cache incremental opcional.
+fn verificar_fuente(archivo: &str, fuente: &str, json: bool, incremental: bool) -> Result<(), String> {
+    // Cache incremental: si el hash de fuente ya fue verificado OK, responder sin re-analizar.
+    if incremental && !json {
+        if let Some(cache) = leer_cache_check(archivo, fuente) {
+            println!("[Falcato] (cache) '{}' verificado: sin errores", archivo);
+            return Ok(());
+        }
+    }
+
+    if !json {
+        println!("[Falcato] Verificando '{}'...", archivo);
+    }
+
+    let lexer = LexerFalcato::nuevo(fuente, archivo);
+    let tokens = lexer.tokenizar();
+
+    let programa = match ParserFalcato::parse(tokens) {
+        Ok(p) => p,
+        Err(errores) => {
+            if json {
+                println!("{{\"ok\":false,\"archivo\":\"{}\",\"errores\":[{}]}}",
+                    escapar_json(archivo),
+                    errores.iter().map(|e| formato_error_json(&e.error)).collect::<Vec<_>>().join(","));
+                return Ok(());
+            }
+            let msgs: Vec<String> = errores.iter()
+                .map(|e| e.error.to_string())
+                .collect();
+            return Err(format!("Errores de parseo en '{}':\n{}", archivo, msgs.join("\n")));
+        }
+    };
+
+    let mut semantica = AnalizadorSemantico::nuevo();
+    match semantica.analizar(&programa) {
+        Ok(_) => {}
+        Err(errores) => {
+            if json {
+                println!("{{\"ok\":false,\"archivo\":\"{}\",\"errores\":[{}]}}",
+                    escapar_json(archivo),
+                    errores.errores.iter().map(formato_error_json).collect::<Vec<_>>().join(","));
+                return Ok(());
+            }
+            return Err(format!("Errores semánticos en '{}':\n{}", archivo, errores));
+        }
+    }
+
+    if json {
+        println!("{{\"ok\":true,\"archivo\":\"{}\"}}", escapar_json(archivo));
+    } else {
+        println!("[Falcato] '{}' verificado: sin errores", archivo);
+        if incremental {
+            escribir_cache_check(archivo, fuente);
+        }
+    }
+
+    Ok(())
+}
+
+/// Hash estable de (versión compilador + archivo + fuente) para el cache.
+fn hash_cache(archivo: &str, fuente: &str) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut h = DefaultHasher::new();
+    // Incluir versión para invalidar el cache al cambiar el compilador
+    env!("CARGO_PKG_VERSION").hash(&mut h);
+    archivo.hash(&mut h);
+    fuente.hash(&mut h);
+    h.finish()
+}
+
+fn ruta_cache_check(archivo: &str, fuente: &str) -> std::path::PathBuf {
+    let hash = hash_cache(archivo, fuente);
+    let nombre_archivo = Path::new(archivo)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("stdin");
+    let base = nombre_archivo.replace(".fc", "");
+    std::path::Path::new(".falcato-cache").join(format!("{}-{:016x}.ok", base, hash))
+}
+
+fn leer_cache_check(archivo: &str, fuente: &str) -> Option<String> {
+    let ruta = ruta_cache_check(archivo, fuente);
+    fs::read_to_string(&ruta).ok()
+}
+
+fn escribir_cache_check(archivo: &str, fuente: &str) {
+    let ruta = ruta_cache_check(archivo, fuente);
+    if let Some(parent) = ruta.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(&ruta, "ok");
+}
+
+/// Escapa una cadena para JSON (comillas, backslash, control chars).
+fn escapar_json(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Formatea un error del compilador como objeto JSON.
+fn formato_error_json(e: &crate::error::ErrorCompilador) -> String {
+    let sugerencia = match &e.sugerencia {
+        Some(s) => format!("\"{}\"", escapar_json(s)),
+        None => "null".to_string(),
+    };
+    format!(
+        "{{\"codigo\":\"{}\",\"archivo\":\"{}\",\"linea\":{},\"columna\":{},\"mensaje\":\"{}\",\"sugerencia\":{}}}",
+        e.codigo_str(),
+        escapar_json(&e.span.archivo),
+        e.span.inicio.linea,
+        e.span.inicio.columna,
+        escapar_json(&e.mensaje),
+        sugerencia
+    )
+}
+
 /// Compila y ejecuta las pruebas definidas con `prueba "nombre" { ... }`
-fn ejecutar_pruebas(archivos: &[String]) -> Result<(), String> {
+fn ejecutar_pruebas(archivos: &[String], _json: bool) -> Result<(), String> {
     if archivos.is_empty() {
         return Err("No se especificaron archivos fuente.".to_string());
     }
@@ -744,6 +947,89 @@ fn link_objeto(
     link_objetos(&[obj], binario, target, _release)
 }
 
+/// Busca el `link.exe` de MSVC de forma robusta en Windows.
+///
+/// 1. **vswhere** (herramienta oficial del instalador de VS): localiza la
+///    instalación y busca la versión de MSVC instalada dinámicamente (sin
+///    hardcodear versiones, que es lo que rompía CI con versiones nuevas).
+/// 2. **Ubicaciones comunes** hardcodeadas como fallback.
+/// 3. **`where link.exe` filtrado**: descarta el `link` de coreutils de Git
+///    Bash (`/usr/bin/link`), que no es el linker MSVC y rompe con `/OUT:`.
+fn buscar_link_msvc() -> Option<String> {
+    // 1. vswhere → ruta dinámica de la instalación
+    let vswhere = r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe";
+    if std::path::Path::new(vswhere).exists() {
+        if let Ok(output) = Command::new(vswhere)
+            .args([
+                "-latest",
+                "-products",
+                "*",
+                "-requires",
+                "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                "-property",
+                "installationPath",
+            ])
+            .output()
+        {
+            if let Ok(s) = String::from_utf8(output.stdout) {
+                let inst = s.trim();
+                if !inst.is_empty() {
+                    let msvc_root = format!("{}\\VC\\Tools\\MSVC", inst);
+                    if let Ok(entries) = fs::read_dir(&msvc_root) {
+                        // Buscar la versión de MSVC más reciente (lexicográfica ≈ semver)
+                        let mut versiones: Vec<String> = entries
+                            .filter_map(|e| e.ok())
+                            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+                            .map(|e| e.file_name().to_string_lossy().to_string())
+                            .collect();
+                        versiones.sort_by(|a, b| b.cmp(a)); // descendente: más reciente primero
+                        for v in versiones {
+                            let link = format!(
+                                "{}\\{}\\bin\\Hostx64\\x64\\link.exe",
+                                msvc_root, v
+                            );
+                            if std::path::Path::new(&link).exists() {
+                                return Some(link);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Ubicaciones comunes hardcodeadas (fallback)
+    let link_paths = [
+        r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.29.30133\bin\HostX64\x64\link.exe",
+        r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.16.27023\bin\HostX64\x64\link.exe",
+        r"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.29.30133\bin\HostX64\x64\link.exe",
+        r"C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\HostX64\x64\link.exe",
+    ];
+    for p in &link_paths {
+        if std::path::Path::new(p).exists() {
+            return Some(p.to_string());
+        }
+    }
+
+    // 3. `where link.exe` filtrado — descarta coreutils de Git Bash
+    if let Ok(output) = Command::new("where").arg("link.exe").output() {
+        if let Ok(s) = String::from_utf8(output.stdout) {
+            for line in s.lines() {
+                let l = line.trim().to_lowercase();
+                // El link de MSVC siempre está bajo una ruta con "microsoft visual studio"
+                // o "windows kits"; el de Git Bash está en ...\usr\bin\link.exe
+                if (l.contains("visual studio") || l.contains("windows kits"))
+                    && !l.contains("\\usr\\bin\\")
+                {
+                    return Some(line.trim().to_string());
+                }
+            }
+        }
+    }
+
+    None
+}
+
 fn link_objetos(
     objetos: &[&str],
     binario: &str,
@@ -753,22 +1039,12 @@ fn link_objetos(
     let target = target.unwrap_or("x86_64-pc-windows-msvc");
 
     if target.contains("windows") {
-        // Buscar link.exe en ubicaciones comunes de Visual Studio
-        let link_paths = [
-            r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.29.30133\bin\HostX64\x64\link.exe",
-            r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.16.27023\bin\HostX64\x64\link.exe",
-            r"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.29.30133\bin\HostX64\x64\link.exe",
-        ];
-        
-        let link_exe = link_paths.iter()
-            .find(|p| std::path::Path::new(p).exists())
-            .map(|p| p.to_string())
-            .or_else(|| {
-                // Intentar encontrar en PATH
-                Command::new("where").arg("link.exe").output().ok()
-                    .and_then(|o| String::from_utf8(o.stdout).ok())
-                    .and_then(|s| s.lines().next().map(|l| l.trim().to_string()))
-            })
+        // Buscar link.exe de MSVC de forma robusta:
+        // 1. vswhere (herramienta oficial de VS) → ruta dinámica, sin versiones hardcodeadas
+        // 2. ubicaciones comunes hardcodeadas (fallback)
+        // 3. `where link.exe` FILTRADO — descarta el `link` de coreutils de Git Bash
+        //    (/usr/bin/link, que no es el linker MSVC y rompe con /OUT:)
+        let link_exe = buscar_link_msvc()
             .ok_or("No se encontró link.exe. Instala Visual Studio Build Tools o añádelo al PATH.")?;
         
         let mut cmd = Command::new(&link_exe);

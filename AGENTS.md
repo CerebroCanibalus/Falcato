@@ -27,6 +27,17 @@ Cranelift no es "lo que tocó" — es el backend oficial y estratégico. Bytecod
 
 ## Day-0 (no negociable)
 
+- **🚨 TODO VA EN ESPAÑOL — REGLA ABSOLUTA, NI UNA SOLA COSA EN INGLÉS**: el lenguaje,
+  los errores, los flags del CLI, los subcomandos, la documentación, los mensajes del
+  compilador — TODO en español. Nada en inglés, salvo (a) términos técnicos sin
+  traducción cómoda (Cranelift, CLIF, JSON, LSP, WASM, ed25519, TCP) y (b) nombres de
+  funciones C / builtins que son identidad de API (printf, malloc). Se permite
+  **hispanizar** términos en inglés cuando la solución al español es incómoda o muy
+  larga (ej: `check` → `verificar`, `build` → `compilar`). Los nombres en inglés del
+  CLI existen SOLO como aliases ocultos para compatibilidad con scripts/CI, nunca como
+  interfaz visible. Excepción implícita: si un día queremos enseñar Falcato a
+  angloparlantes, esa versión será una doc aparte — el lenguaje y el toolchain siguen
+  en español.
 - **C ABI por defecto**: layout C, calling conv SystemV/C, mangling off, salida `.o`
 - **Span en cada nodo AST**: `Span { inicio, fin, archivo }` — sin span no hay LSP
 - **Errores en español con códigos**: `[T001] archivo.fc:7:12: mensaje` — S/T/O/C/M/I/W
@@ -43,6 +54,20 @@ Cranelift no es "lo que tocó" — es el backend oficial y estratégico. Bytecod
   memoria/CPU. Cada builtin nuevo con superficie externa lleva su análisis de vectores
   de ataque en la descripción del commit. Si un PR toca red/sistema sin nota de
   seguridad, NO se mergea.
+- **NINGÚN FLAG CAMBIA SEMÁNTICA**: si una opción decide qué programas compilan o qué
+  significan (ownership, const/mut, permisos, sanitizers, niveles), NO es flag — es
+  lenguaje puro o directiva por módulo. Un flag solo decide CÓMO se produce el binario
+  (optimización, output, verbosidad) o CUÁNTO se te dice (diagnósticos). El día que un
+  flag decide si el código compila, es una promesa que el compilador no puede verificar.
+- **`--target` es el ÚNICO flag de plataforma**: el código `.fc` nunca sabe en qué
+  plataforma corre. Las diferencias (procesos, terminal, stdin, fecha, rutas, EOL) las
+  absorbe el runtime (Capa B/C) con builtins neutros + dispatch interno. Prohibidos
+  `--windows`/`--linux`/`--compat-*`/`--cfg(os)` — crearían dos lenguajes.
+- **Código portable o no compila**: un builtin sin impl para el target es **error de
+  compilación** (con builtin + plataforma en el mensaje), nunca warning ni crash.
+- **Impls juntas**: toda pieza nueva que toque sistema (procesos, terminal, red) lleva
+  impl Windows + POSIX en la misma tanda (aunque solo se pruebe Windows; POSIX se
+  verifica en WSL / CI matrix), más su nota de seguridad.
 
 ## Stack técnico
 
@@ -118,7 +143,7 @@ wix/main.wxs             # Plantilla MSI (cargo-dist)
 dist-workspace.toml      # Config cargo-dist
 ```
 
-## Estado del proyecto (v0.3.0)
+## Estado del proyecto (v0.5.0)
 
 Pipeline end-to-end operativo. Turing-completo con:
 - **Core:** variables, ops, condicionales, bucles, arrays, structs, enums, generics (const+type)
@@ -129,22 +154,64 @@ Pipeline end-to-end operativo. Turing-completo con:
 - **LSP:** 6 features, integrado OpenCode, signature help, code actions, context-aware completion
 - **Documentación:** GUIA.md + 15 capítulos, REFERENCIA.md, ERRORES.md, skill falcato-language, VS Code Extension (Falcato Dorado)
 - **Instalación:** cargo-dist (MSI+shell+powershell), `falcato setup --all`, install.ps1 legacy
-- **47/47 tests pasan. 66/73 ejemplos compilan** (7 restantes son errores intencionales de demostración).
+- **54/54 tests pasan. 66/73 ejemplos compilan** (7 restantes son errores intencionales de demostración).
 
 ## Comandos CLI
 
 ```bash
-falcato build <file.fc>      # Compila a binario nativo
-falcato run <file.fc>        # Compila y ejecuta
-falcato check <file.fc>      # Solo análisis (lexer + parser + semántica)
-falcato test <file.fc>       # Ejecuta pruebas del lenguaje
-falcato lsp                  # Inicia servidor LSP (stdio)
-falcato setup --all          # Instala VS Code extension + agentes
-falcato setup --vscode       # Solo VS Code extension
-falcato setup --agents       # Solo agentes/skills OpenCode/Claude
-falcato setup --uninstall    # Desinstala componentes adicionales
-falcato version              # Muestra versión
+falcato compila <file.fc> --salida out.exe   # Compila a binario nativo (alias: build, compilar)
+falcato corre <file.fc>                      # Compila y ejecuta (alias: run, ejecutar)
+falcato verifica <file.fc>                   # Solo análisis (alias: check, verificar)
+falcato prueba <file.fc>                     # Ejecuta pruebas del lenguaje (alias: test, probar)
+falcato lsp                                  # Inicia servidor LSP (stdio)
+falcato instala --todo                       # Instala VS Code extension + agentes (alias: setup --all)
+falcato instala --agentes                    # Solo agentes/skills OpenCode/Claude
+falcato instala --desinstalar                # Desinstala componentes adicionales
+falcato version                              # Muestra versión
 ```
+
+**Subcomandos en presente simple** (regla de estilo: cortos y verbales — `compila`,
+`corre`, `verifica`, `prueba`, `instala`). Los nombres en inglés (build, run, check,
+test, setup…) e infinitivos anteriores (compilar, ejecutar, verificar, probar,
+instalar) funcionan como aliases ocultos para compatibilidad con scripts/CI — nunca
+como interfaz visible.
+
+## Flags del toolchain (2026-08-07)
+
+**Regla:** un flag solo decide CÓMO se produce el binario (optimización, output,
+verbosidad) o CUÁNTO se te dice (diagnósticos). Lo que decide qué compila o qué
+significa el código NO es flag — es lenguaje puro, directiva de módulo o `falcato.toml`.
+**Los flags están en español** (el lenguaje es español); los nombres en inglés
+funcionan como aliases ocultos para compatibilidad con scripts/CI.
+
+### Aprobados (decisión de invocación)
+
+| Flag (ES) | Alias (EN) | Para qué | Prioridad |
+|------|----------|-----------|-----------|
+| `--lanzar` (+ `--opt-level N`) | `release` / `opt-level` | Optimización global (inlining, layout); la optimización *semántica* vive en efectos `puro`/`muta`/`lee` | 🔴 R8 |
+| `--emitir-clif` | `emit-clif` | Salida de Cranelift CLIF — debuggear el codegen propio (backend propietario) | ✅ 2026-08-07 |
+| `--json` | — | Diagnósticos como JSON estructurado (agentes LLM, CI, IDEs — mismo contrato que el LSP) | ✅ 2026-08-07 (check/build) |
+| `--incremental` | — | Cache de verificación por hash de fuente — iteración LLM write→check→fix <100ms | ✅ 2026-08-07 (check) |
+| `--entrada` | `stdin` | `echo "código" \| falcato check -` — agentes sin archivos temporales | ✅ 2026-08-07 (check) |
+| `--destino <triple>` | `target` | Cross-compile (`x86_64-unknown-linux-gnu`, `aarch64-apple-darwin`, …). **Único flag de plataforma** | 🟡 R8 |
+| `--enlazador <path>` / `--raiz-sistema <dir>` | `linker` / `sysroot` | Cross-linking (lld, gcc, link.exe) | 🟡 R8 |
+| `--crt-estatico` / `--crt-dinamico` | `crt-static` / `crt-dynamic` | CRT estático (default, funciona en cualquier máquina) vs DLLs del sistema (binario menor). R8 distribuye estático | 🟡 R8 |
+| `-o, --salida <ruta>` / `--detallado` / `-g` / `-j N` | `output` / `verbose` / — / — | Output, verbosidad, debug info, paralelismo | 🟢 Baja |
+| `--edicion` | `edition` | Versionar sintaxis — diseñar el formato YA aunque no haya cambios aún | 🟢 Baja |
+| `--todo` / `--agentes` / `--desinstalar` / `--recursos` | `all` / `agents` / `uninstall` / `resources` | Subcomando `setup` — instalar VS Code extension, agentes, skills | ✅ |
+
+### Prohibidos (semántica → lenguaje puro)
+
+| Cosa | Hogar correcto |
+|------|----------------|
+| Nivel N0/N1/N2 | Directiva por módulo (`# nivel 2`), NUNCA flag global |
+| Warnings/sugerencias educativas | El compiler sugiere en N0; el nivel de módulo ES el `-Werror`. Sin `--deny-warnings` |
+| Permisos (R8.3 Capa 4) | Efectos `puro/muta/lee` + `falcato.toml` — un flag de bypass de seguridad NO existe |
+| Ownership, const/mut, ABI | Artículos, `es`/`está`, C ABI por defecto |
+| Bounds checks / sanitizers | Efecto declarado en el tipo o directiva de módulo |
+| `--windows` / `--linux` / `--cfg(os)` / `--compat-*` | Nunca — el runtime (Capa B/C) absorbe la diferencia |
+
+**Nota:** los flags están en español; los nombres en inglés son aliases ocultos (funcionan, no se muestran en help).
 
 ## Roadmap — Pendiente real
 
@@ -259,7 +326,7 @@ IPFS (Benet 2014): Kademlia + BitTorrent + Git, tamper-resistance por construcci
 - [ ] Publicar en winget + Scoop
 - [ ] Fix interpolación (`{var}` en strings, roto desde antes de migración)
 
-## Estado de distribución (v0.3.0 — Alpha)
+## Estado de distribución (v0.5.0 — Alpha)
 
 | Aspecto | Estado |
 |---------|--------|
@@ -314,7 +381,7 @@ Sebesta, HumanEval.
 | 5 pilares implementados | I–IV ✅, V ⛔ retirado (2026-08-03) |
 | Legibilidad: errores con span+sugerencia | 100% (Day-0) |
 | Escribibilidad: ejemplo 500+ líneas (R5) | 1 proyecto real compilable |
-| Fiabilidad: `falcato test` | 47/47 ✅ |
+| Fiabilidad: `falcato test` | 54/54 ✅ |
 | Expresividad: linked list, bitfields, self-ref sin pelear | Checklist "superar a Rust" |
 | Paridad doc/código (GUIA.md↔features) | 100% |
 | Ejemplos | 66/73 compilan (7 intencionales) |
@@ -344,7 +411,7 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 5 de 5 puntos d
 - **Causa raíz (2 bugs):**
   1. **`printf` variádica mal declarada** (`src/platform/registry.rs:227`): el registry la registraba con firma `&[I64]` (1 param) y `remap()` sobrescribía la firma pedida por el caller (2 params) → `call fn1(v4, v3): got 2, expected 1` → Verifier error. Fix: flag `variadic` en `BuiltinEntry` + `insert_variadic()` — el registry solo remapea el nombre, la firma exacta la decide el caller.
   2. **Mojibake en string de match** (`src/codegen/expresiones.rs:1049,1076`): `"tamaño_de"` tenía la ñ corrupta (`E2 94 9C E2 96 92` en vez de `C3 B1`) → el match exacto fallaba → "Función 'tamaño_de' no encontrada". Fix: reemplazo de bytes a ñ UTF-8 correcta.
-- **Estado actual:** **66/73 ejemplos compilan** (los 7 restantes son errores intencionales de demostración: borrow_error, efecto_puro_error, feedback_educativo, field_borrow_error, rasgo_error_existe, rasgo_error_metodo, use_after_move). **47/47 unit tests pasan.** Verificado con release oficial `build.ps1`.
+- **Estado actual:** **66/73 ejemplos compilan** (los 7 restantes son errores intencionales de demostración: borrow_error, efecto_puro_error, feedback_educativo, field_borrow_error, rasgo_error_existe, rasgo_error_metodo, use_after_move). **54/54 unit tests pasan.** Verificado con release oficial `build.ps1`.
 - **Pendiente:** los errores internos de codegen siguen con `sugerencia: None` — hacer que pasen por la tubería de errores con span+sugerencia (violación Day-0).
 
 ### 🔴 Bloquei #2. Arquitectura rota
@@ -360,7 +427,7 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 5 de 5 puntos d
 - **Código muerto:** BlockBuilder, VariableManager, MemoryHelper, CodegenBuilder, PlatformLinker, BackendFalcato trait — NUNCA construidos (roadmap 15G no conectado).
 
 ### ✅ Bloqueo4. Documentación miente — RESUELTO (2026-08-03)
-- ~~AGENTS.md dice v0.4.0 y "40/40 tests"~~ → sincronizado: **0.3.0**, **47 tests**.
+- ~~AGENTS.md dice v0.4.0 y "40/40 tests"~~ → sincronizado: **0.5.0**, **54 tests**.
 - ~~AGENTS.md dice "50+ ejemplos compilan y corren"~~ → sincronizado: **66/73** (7 intencionales).
 - AGENTS.md dice "Build: build.ps1" → **sí existe** (build.ps1, build.bat, build_release.bat).
 - AGENTS.md dice "Pilar V (prefijos) 📝 parcial" → **no existe en el lexer** → ⛔ **RETIRADO (2026-08-03)** — riesgo de colisión con `retornar`/`prestar`/`desde`; `des-` cubierto por R6 (drop automático).
@@ -371,7 +438,7 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 5 de 5 puntos d
 - **Código muerto confirmado:** BlockBuilder, VariableManager, MemoryHelper, CodegenBuilder, PlatformLinker, BackendFalcato trait — todos "never constructed" (roadmap 15G no conectado).
 
 ### ✅ Lo que SÍ está bien (no tocar)
-- **47/47 unit tests pasan** (0.01s).
+- **54/54 unit tests pasan** (0.01s).
 - **LSP completo:** 11 handlers (initialize, did_open/change/close, completion, signature_help, code_action, document_symbol, hover, references, goto_definition).
 - **0 `unsafe`** en todo el codebase.
 - **CI verde:** ci.yml + release.yml (build + test + e2e + artifact).
@@ -382,8 +449,46 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 5 de 5 puntos d
 1. **Bug #1 (bloqueante):** ✅ RESUELTO — printf variádica + mojibake tamaño_de (2026-08-03).
 2. **Quick win:** ✅ `cargo fix --bin falcato` — 100 → 61 warnings (2026-08-03).
 3. **Arquitectura:** ✅ `call_conv_default` movido a `PlatformRuntime` — 0 cfg(target_os) fuera de platform/ (2026-08-03).
-4. **Docs:** ✅ AGENTS.md sincronizado (0.3.0, 47 tests, 66/73 ejemplos) (2026-08-03).
+4. **Docs:** ✅ AGENTS.md sincronizado (0.5.0, 54 tests, 66/73 ejemplos) (2026-08-03, actualizado 2026-08-07).
 5. **Pilar V:** ✅ **RETIRADO (2026-08-03)** — riesgo de colisión con `retornar`/`prestar`/`desde`; `des-` cubierto por R6 (drop automático).
+6. **Flags toolchain:** ✅ `--emit-clif`, `--json`, `--stdin`, `--incremental` implementados y verificados (2026-08-07).
+7. **build.bat:** ✅ CRLF fix — cmd.exe no parsea `.bat` con finales de línea LF; el archivo tenía LF-only y rompía todos los `if errorlevel`.
+
+---
+
+## Descubrimientos (2026-08-07)
+
+### 🔧 build.bat tenía LF-only — cmd.exe lo rompía
+- **Causa raíz:** `build.bat` con finales de línea `\n` (LF) en vez de `\r\n` (CRLF). cmd.exe
+  no parsea LF-only de forma fiable → todos los `if errorlevel` se rompían
+  (`"rlevel" no se reconoce como un comando interno...`).
+- **Fix:** convertir a CRLF (PowerShell: `-replace "\r?\n", "\r\n"`, guardar sin BOM).
+- **Archivos:** `build.bat`. **Lección:** los `.bat` SIEMPRE en CRLF; verificar
+  `file`/bytes si cmd empieza a dar errores raros.
+
+### 🔧 PowerShell `Set-Content` corrompe archivos UTF-8 con acentos
+- **Causa raíz:** `Set-Content -Encoding UTF8` de Windows PowerShell 5.1 re-codifica y
+  corrompe `í`/`ó`/`ñ` en `.fc` (BOM + re-encoding) → el lexer escupe `[S008] carácter
+  no válido` en cada acento.
+- **Fix:** restaurar con `git checkout -- <archivo>`. **Lección:** NUNCA editar `.fc`
+  con `Set-Content`; usar las tools de edición del agente (UTF-8 correcto).
+
+### 🔧 `cargo build` directo falla con LNK1104 (msvcrt.lib)
+- **Causa raíz:** cargo usa el linker de VS Insiders sin entorno MSVC configurado.
+- **Fix:** compilar vía `build.bat` (que llama `VsDevCmd.bat -arch=x64`) o preceder con
+  `call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=x64`.
+
+### 🚀 API de cranelift: no hay `get_ctx` para extraer CLIF post-compilación
+- **Hallazgo:** `cranelift-module 0.112` no expone método público para obtener el CLIF de
+  una función ya definida. El `--emit-clif` se implementó imprimiendo `ctx.func.display()`
+  ANTES de cada `define_function` (cuando el Context aún tiene el IR). Puntos cubiertos:
+  funciones normales, futures (`__init`/`__poll`/wrapper), closures e hilos (6 sitios).
+
+### 📏 Métricas de la iteración LLM (R7 flags)
+- `check --incremental` cache hit: **23 ms** (objetivo <100 ms) — hash por
+  versión+archivo+fuente, cache `.falcato-cache/` solo para resultados OK.
+- `check --json` y `--stdin` verificados con release oficial: el JSON sigue el contrato
+  del LSP (código/archivo/línea/columna/mensaje/sugerencia).
 
 ---
 

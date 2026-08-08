@@ -33,7 +33,7 @@ if errorlevel 1 (
 )
 
 echo [3/4] Compilando ejemplo hola_mundo.fc...
-target\release\falcato.exe build ejemplos\hola_mundo.fc -o hola_mundo.exe
+target\release\falcato.exe compila ejemplos\hola_mundo.fc --salida hola_mundo.exe
 
 if errorlevel 1 (
     echo [ERROR] Falló la compilación del ejemplo

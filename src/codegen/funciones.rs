@@ -108,7 +108,7 @@ impl Codegen {
             }
         };
 
-        self.module.define_function(func_id, &mut ctx)
+        self.definir_funcion(func_id, &mut ctx, &func.nombre)
             .map_err(|e| {
                 self.errores.agregar(ErrorCompilador::nuevo(
                     CategoriaError::Interno,
@@ -213,7 +213,7 @@ impl Codegen {
         builder.ins().return_(&[ptr]);
         builder.finalize();
 
-        self.module.define_function(func_id, &mut ctx).map_err(|e| {
+        self.definir_funcion(func_id, &mut ctx, &nombre_init).map_err(|e| {
             self.errores.agregar(ErrorCompilador::nuevo(
                 CategoriaError::Interno, 10, func.span.clone(),
                 format!("Error definiendo __init: {}", e),
@@ -394,7 +394,7 @@ impl Codegen {
 
         builder.finalize();
 
-        self.module.define_function(func_id, &mut ctx).map_err(|e| {
+        self.definir_funcion(func_id, &mut ctx, &func.nombre).map_err(|e| {
             self.errores.agregar(ErrorCompilador::nuevo(
                 CategoriaError::Interno, 10, func.span.clone(),
                 format!("Error definiendo __poll: {}", e),
@@ -490,7 +490,7 @@ impl Codegen {
         builder.finalize();
 
         let func_id = *self.funciones.get(&func.nombre).unwrap();
-        self.module.define_function(func_id, &mut ctx).map_err(|e| {
+        self.definir_funcion(func_id, &mut ctx, &func.nombre).map_err(|e| {
             self.errores.agregar(ErrorCompilador::nuevo(
                 CategoriaError::Interno, 10, func.span.clone(),
                 format!("Error definiendo wrapper sync: {}", e),
@@ -768,10 +768,10 @@ impl Codegen {
             }
         };
 
-        self.module.define_function(func_id, &mut ctx).map_err(|e| {
+        self.definir_funcion(func_id, &mut ctx, &func.nombre).map_err(|e| {
             self.errores.agregar(ErrorCompilador::nuevo(
                 CategoriaError::Interno, 10, func.span.clone(),
-                format!("Error definiendo funciÃ³n: {}", e),
+                format!("Error definiendo función: {}", e),
             ));
         })?;
 
