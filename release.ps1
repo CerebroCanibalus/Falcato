@@ -28,32 +28,39 @@ function Fail([string]$msg) {
     exit 1
 }
 
-Write-Host "=== Validación pre-release para $Tag ===" -ForegroundColor Cyan
+Write-Host "=== Validacion pre-release para $Tag ===" -ForegroundColor Cyan
 
-# ── 1. Mojibake en Cargo.toml ────────────────────────────────────────────────
+# -- 1. Mojibake en Cargo.toml -----------------------------------------------
+# Detecta doble-codificacion UTF-8: bytes 0xC3 0x83 (A-tilde) son el prefijo
+# de un caracter ya codificado dos veces. La 'o' correcta es 0xC3 0xB3.
 Write-Host "[1/5] Verificando Cargo.toml sin mojibake..."
 $cargoBytes = [System.IO.File]::ReadAllBytes("$repo\Cargo.toml")
-$cargoText = [System.Text.Encoding]::UTF8.GetString($cargoBytes)
-# Patrón de doble-codificación: Ã  Â  â€  â€™  etc. (caracteres UTF-8 corruptos comunes)
-if ($cargoText -match "[ÃÂâ€œ™]") {
-    Fail "Cargo.toml contiene caracteres doble-codificados (mojibake). Revisa description/license con: git show HEAD:Cargo.toml | findstr description"
+$mojibake = $false
+for ($i = 0; $i -lt $cargoBytes.Length - 1; $i++) {
+    if ($cargoBytes[$i] -eq 0xC3 -and $cargoBytes[$i+1] -eq 0x83) { $mojibake = $true }
+    if ($cargoBytes[$i] -eq 0xC3 -and $cargoBytes[$i+1] -eq 0x82) { $mojibake = $true }
+    if ($cargoBytes[$i] -eq 0xE2 -and $i+1 -lt $cargoBytes.Length -and $cargoBytes[$i+1] -eq 0x80) { $mojibake = $true }
+}
+if ($mojibake) {
+    Fail "Cargo.toml contiene bytes doble-codificados (mojibake). Revisa description/license. Git: git show HEAD:Cargo.toml"
 }
 Write-Host "      OK" -ForegroundColor Green
 
-# ── 2. wix/main.wxs EOL ─────────────────────────────────────────────────────
+# -- 2. wix/main.wxs EOL -----------------------------------------------------
 Write-Host "[2/5] Verificando wix/main.wxs en CRLF puro..."
 $wxsText = [System.IO.File]::ReadAllText("$repo\wix\main.wxs", [System.Text.Encoding]::UTF8)
 $crlfCount = ([regex]::Matches($wxsText, "`r`n")).Count
 $lfTotal = ([regex]::Matches($wxsText, "`n")).Count
 if ($crlfCount -ne $lfTotal) {
-    Fail "wix/main.wxs tiene líneas mixtas ($crlfCount CRLF vs $lfTotal LF). cargo-dist falla el plan. Normaliza con: (Get-Content wix/main.wxs -Raw) -replace \"`r?`n\", \"`r`n\" | Set-Content wix/main.wxs -NoNewline"
+    Fail "wix/main.wxs tiene lineas mixtas ($crlfCount CRLF vs $lfTotal LF). cargo-dist falla el plan. Normaliza el archivo a CRLF."
 }
-Write-Host "      OK ($crlfCount líneas CRLF)" -ForegroundColor Green
+Write-Host "      OK ($crlfCount lineas CRLF)" -ForegroundColor Green
 
-# ── 3. Versión de Cargo.toml == tag ─────────────────────────────────────────
-Write-Host "[3/5] Verificando versión de Cargo.toml == tag..."
+# -- 3. Version de Cargo.toml == tag -----------------------------------------
+Write-Host "[3/5] Verificando version de Cargo.toml == tag..."
+$cargoText = [System.Text.Encoding]::UTF8.GetString($cargoBytes)
 $verMatch = [regex]::Match($cargoText, 'version\s*=\s*"([^"]+)"')
-if (-not $verMatch.Success) { Fail "No se pudo leer la versión de Cargo.toml" }
+if (-not $verMatch.Success) { Fail "No se pudo leer la version de Cargo.toml" }
 $cargoVer = $verMatch.Groups[1].Value
 $tagVer = $Tag.TrimStart('v')
 if ($cargoVer -ne $tagVer) {
@@ -61,20 +68,20 @@ if ($cargoVer -ne $tagVer) {
 }
 Write-Host "      OK (v$cargoVer)" -ForegroundColor Green
 
-# ── 4. Working tree limpio ──────────────────────────────────────────────────
+# -- 4. Working tree limpio --------------------------------------------------
 Write-Host "[4/5] Verificando working tree limpio..."
 $status = git status --porcelain
 if ($status) {
     Write-Host "      Archivos sin commitear:" -ForegroundColor Yellow
     $status | ForEach-Object { Write-Host "      $_" -ForegroundColor Yellow }
-    Fail "Hay cambios sin commitear. Commitéalos antes del release."
+    Fail "Hay cambios sin commitear. Commitealos antes del release."
 }
 Write-Host "      OK" -ForegroundColor Green
 
-# ── 5. Build de verificación + tag + push ───────────────────────────────────
-Write-Host "[5/5] Build de verificación (debug)..."
+# -- 5. Build de verificacion + tag + push -----------------------------------
+Write-Host "[5/5] Build de verificacion (debug)..."
 cargo build 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { Fail "cargo build falló" }
+if ($LASTEXITCODE -ne 0) { Fail "cargo build fallo" }
 Write-Host "      OK" -ForegroundColor Green
 
 Write-Host ""
@@ -84,8 +91,8 @@ if (-not $exists) {
     git tag -a $Tag -m "Release $Tag"
 }
 git push origin $Tag
-if ($LASTEXITCODE -ne 0) { Fail "git push del tag falló" }
+if ($LASTEXITCODE -ne 0) { Fail "git push del tag fallo" }
 
 Write-Host ""
-Write-Host "✅ Release $Tag pusheado. El workflow de GitHub Actions lo construye." -ForegroundColor Green
-Write-Host "   Monitorea: https://github.com/CerebroCanibalus/falcato/actions" -ForegroundColor Green
+Write-Host "[OK] Release $Tag pusheado. El workflow de GitHub Actions lo construye." -ForegroundColor Green
+Write-Host "     Monitorea: https://github.com/CerebroCanibalus/falcato/actions" -ForegroundColor Green
