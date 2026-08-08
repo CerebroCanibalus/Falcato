@@ -184,9 +184,68 @@ cuerpo empieza con un prólogo generado que:
 El código del usuario queda intacto después del prólogo, viendo `args` con tipos
 correctos.
 
+## Fase 3: la librería `args_avanzados`
+
+Cuando el patrón de `principal(el args: Struct)` se queda corto (subcomandos,
+repetición de etiquetas, posicionales), existe la librería
+`librerias/args_avanzados.fc` — pura `.fc`, sin tocar el compilador.
+
+### Uso
+
+```falcato
+usar args_avanzados::*;
+
+función principal() -> Entero32 {
+    los argv: Vector<Texto> = argumentos();
+
+    // Subcomando: `app desplegar --nombre sebas`
+    el sub: Texto = args_subcomando(argv);        // "desplegar"
+    imprimir_linea("subcomando: {sub}");
+    texto_liberar(sub);
+
+    // Etiqueta con valor (default si falta)
+    el nombre: Texto = args_obtener(argv, "--nombre");  // "sebas"
+    si texto_longitud(nombre) == 0 {
+        nombre = texto_desde("invitado");               // default manual
+    }
+    imprimir_linea("hola, {nombre}");
+    texto_liberar(nombre);
+
+    // Repetición: `--tag a --tag b --tag c`
+    los tags: Vector<Texto> = args_todos(argv, "--tag");  // [a, b, c]
+    vector_liberar<Texto>(tags);
+
+    // Posicionales después del subcomando
+    los pos: Vector<Texto> = args_posicionales(argv);     // [item1, item2]
+    vector_liberar<Texto>(pos);
+
+    vector_liberar<Texto>(argv);
+    retornar 0;
+}
+```
+
+### Compilar
+
+```bash
+falcato compila app.fc librerias/args_avanzados.fc --salida app.exe
+```
+
+### API
+
+| Función | Devuelve | Descripción |
+|---------|----------|-------------|
+| `args_tiene(argv, "--x")` | `Booleano` | ¿Existe la etiqueta? |
+| `args_obtener(argv, "--x")` | `Texto` | Valor de la primera aparición (`""` si falta) |
+| `args_todos(argv, "--x")` | `Vector<Texto>` | Todos los valores (repetición) |
+| `args_subcomando(argv)` | `Texto` | Primer token sin `--` |
+| `args_posicionales(argv)` | `Vector<Texto>` | Tokens sin `--` tras la primera etiqueta |
+| `args_cuenta(argv)` | `Entero32` | Nº de argumentos crudos |
+
+**Contrato de memoria:** todas las funciones devuelven **copias independientes**
+(`malloc` propias). El caller libera con `texto_liberar`/`vector_liberar`. Nunca se
+comparten descriptores con `argv` — así se evita el double-free.
+
 ## Próximos pasos
 
-- **Fase 3:** `args_avanzados` — subcomandos, valores por defecto explícitos y
-  repetición de etiquetas (como librería `.fc`, sin tocar el compilador).
 - Error tipado `[T001]` con sugerencia cuando el valor no convierte al tipo.
-- Soporte de `los`/`las` para argumentos posicionales (varargs).
+- Soporte de `los`/`las` para argumentos posicionales (varargs) en `principal`.`

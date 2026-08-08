@@ -1928,6 +1928,15 @@ No puedes modificar algo que no es 'tuyo'.",
                 sustituciones.get(nombre).cloned().unwrap_or(tipo.clone())
             }
             Tipo::Vector(t) => Tipo::Vector(Box::new(self.sustituir_genericos(t, sustituciones))),
+            Tipo::Diccionario(k, v) => Tipo::Diccionario(
+                Box::new(self.sustituir_genericos(k, sustituciones)),
+                Box::new(self.sustituir_genericos(v, sustituciones)),
+            ),
+            Tipo::Conjunto(t) => Tipo::Conjunto(Box::new(self.sustituir_genericos(t, sustituciones))),
+            Tipo::Resultado(t, e) => Tipo::Resultado(
+                Box::new(self.sustituir_genericos(t, sustituciones)),
+                Box::new(self.sustituir_genericos(e, sustituciones)),
+            ),
             Tipo::Puntero(t) => Tipo::Puntero(Box::new(self.sustituir_genericos(t, sustituciones))),
             Tipo::Referencia(t) => Tipo::Referencia(Box::new(self.sustituir_genericos(t, sustituciones))),
             Tipo::ReferenciaMut(t) => Tipo::ReferenciaMut(Box::new(self.sustituir_genericos(t, sustituciones))),

@@ -168,6 +168,15 @@ pub fn parse_tipo(cursor: &mut ParserCursor) -> Result<Tipo, ErrorSintaxis> {
                 if nombre == "Vector" && argumentos.len() == 1 {
                     return Ok(Tipo::Vector(Box::new(argumentos.into_iter().next().unwrap())));
                 }
+                if nombre == "Diccionario" && argumentos.len() == 2 {
+                    let mut args = argumentos.into_iter();
+                    let k = args.next().unwrap();
+                    let v = args.next().unwrap();
+                    return Ok(Tipo::Diccionario(Box::new(k), Box::new(v)));
+                }
+                if nombre == "Conjunto" && argumentos.len() == 1 {
+                    return Ok(Tipo::Conjunto(Box::new(argumentos.into_iter().next().unwrap())));
+                }
                 
                 Ok(Tipo::NombreGenerico(nombre, argumentos))
             } else {

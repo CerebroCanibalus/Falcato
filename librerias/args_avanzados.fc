@@ -1,0 +1,142 @@
+// args_avanzados — librería de argumentos de línea de comandos (Fase 3)
+// ============================================================================
+// Sin tocar el compiler: pura librería `.fc` sobre `argumentos()`.
+//
+// Uso:
+//   usar args_avanzados::*;
+//   ... en principal:
+//   los argv: Vector<Texto> = argumentos();
+//   el nombre: Texto = args_obtener(argv, "--nombre");   // copia propia, liberar
+//   los tags: Vector<Texto> = args_todos(argv, "--tag");  // copias propias
+//
+// Compilar con ambos archivos:
+//   falcato compila app.fc args_avanzados.fc --salida app.exe
+//
+// CONTRATO DE MEMORIA: todas las funciones devuelven COPIAS independientes
+// (malloc propias). El caller libera con texto_liberar/vector_liberar. Nunca
+// se comparten descriptores con el vector crudo `argv` (evita double-free).
+// ============================================================================
+
+// == Helpers internos ========================================================
+
+// Copia un Texto a heap propio (malloc + memcpy). Usa texto_subtexto(0, len).
+función _texto_copiar(el t: Texto) -> Texto {
+    retornar texto_subtexto(t, 0, texto_longitud(t));
+}
+
+// Compara un Texto contra un literal Palabra. Devuelve verdadero si iguales.
+// Crea un Texto temporal del literal, compara y lo libera.
+función _texto_igual_palabra(el t: Texto, la p: Palabra) -> Booleano {
+    el tmp: Texto = texto_desde(p);
+    el r: Entero32 = texto_comparar(t, tmp);
+    texto_liberar(tmp);
+    retornar r == 0;
+}
+
+// ¿El token es una etiqueta? (empieza con "--")
+función _es_etiqueta(el t: Texto) -> Booleano {
+    si texto_longitud(t) >= 2 {
+        si texto_obtener_byte(t, 0) == 45 && texto_obtener_byte(t, 1) == 45 {
+            retornar verdadero;
+        }
+    }
+    retornar falso;
+}
+
+// == Consultas públicas ======================================================
+
+// ¿Existe la etiqueta `--campo` en los argumentos?
+función args_tiene(los argv: Vector<Texto>, la etiqueta: Palabra) -> Booleano {
+    el n: Entero32 = vector_longitud<Texto>(argv);
+    el i: Entero32 = 1;  // saltar argv[0] = ejecutable
+    mientras i < n {
+        el t: Texto = vector_obtener<Texto>(argv, i);
+        si _texto_igual_palabra(t, etiqueta) {
+            retornar verdadero;
+        }
+        i = i + 1;
+    }
+    retornar falso;
+}
+
+// Valor de la primera aparición de `--campo valor` ("" si no existe).
+// Devuelve una COPIA independiente (liberar con texto_liberar).
+función args_obtener(los argv: Vector<Texto>, la etiqueta: Palabra) -> Texto {
+    el n: Entero32 = vector_longitud<Texto>(argv);
+    el i: Entero32 = 1;
+    mientras i < n {
+        el t: Texto = vector_obtener<Texto>(argv, i);
+        si _texto_igual_palabra(t, etiqueta) {
+            si i + 1 < n {
+                retornar _texto_copiar(vector_obtener<Texto>(argv, i + 1));
+            }
+            retornar texto_nuevo();
+        }
+        i = i + 1;
+    }
+    retornar texto_nuevo();
+}
+
+// TODOS los valores de una etiqueta repetida: `--tag a --tag b` → [a, b].
+// Devuelve un Vector<Texto> nuevo con COPIAS (liberar con vector_liberar).
+función args_todos(los argv: Vector<Texto>, la etiqueta: Palabra) -> Vector<Texto> {
+    los valores: Vector<Texto> = vector_nuevo<Texto>();
+    el n: Entero32 = vector_longitud<Texto>(argv);
+    el i: Entero32 = 1;
+    mientras i < n {
+        el t: Texto = vector_obtener<Texto>(argv, i);
+        si _texto_igual_palabra(t, etiqueta) {
+            si i + 1 < n {
+                vector_agregar<Texto>(valores, _texto_copiar(vector_obtener<Texto>(argv, i + 1)));
+            }
+            i = i + 1;
+        }
+        i = i + 1;
+    }
+    retornar valores;
+}
+
+// Primer argumento sin `--` (el "subcomando"), "" si no hay.
+// Ej: `app correr --x 1` → "correr". Devuelve COPIA (liberar).
+función args_subcomando(los argv: Vector<Texto>) -> Texto {
+    el n: Entero32 = vector_longitud<Texto>(argv);
+    el i: Entero32 = 1;
+    mientras i < n {
+        el t: Texto = vector_obtener<Texto>(argv, i);
+        si _es_etiqueta(t) {
+            // Saltar también el valor de la etiqueta (--x valor)
+            i = i + 1;
+        } sino {
+            retornar _texto_copiar(t);
+        }
+        i = i + 1;
+    }
+    retornar texto_nuevo();
+}
+
+// Argumentos posicionales (sin `--`) DESPUÉS del subcomando, como Vector<Texto>
+// de COPIAS (liberar con vector_liberar).
+función args_posicionales(los argv: Vector<Texto>) -> Vector<Texto> {
+    los pos: Vector<Texto> = vector_nuevo<Texto>();
+    el n: Entero32 = vector_longitud<Texto>(argv);
+    el i: Entero32 = 1;
+    el viendo_etiquetas: Booleano = falso;
+    mientras i < n {
+        el t: Texto = vector_obtener<Texto>(argv, i);
+        si _es_etiqueta(t) {
+            viendo_etiquetas = verdadero;
+            i = i + 1;  // saltar también el valor de la etiqueta
+        } sino {
+            si viendo_etiquetas {
+                vector_agregar<Texto>(pos, _texto_copiar(t));
+            }
+        }
+        i = i + 1;
+    }
+    retornar pos;
+}
+
+// Número de argumentos crudos (argv[0] incluido).
+función args_cuenta(los argv: Vector<Texto>) -> Entero32 {
+    retornar vector_longitud<Texto>(argv);
+}

@@ -278,8 +278,14 @@ todo lo demás (JSON, HTTP, SSE, MCP) son librerías `.fc` y NO tocan el compile
         `.\saludo_app.exe --nombre sebas --cuenta 3` → "hola, sebas". Tipos soportados:
         Texto, Entero32/64, Natural32/64, Flotante64, Booleano. Interpolación ahora
         soporta acceso a campo `{args.nombre}`.
-  - [ ] **Fase 3:** librería `.fc` `args_avanzados` (subcomandos, defaults, repetición)
-        — sin tocar el compiler.
+  - [x] **Fase 3:** librería `.fc` `librerias/args_avanzados.fc` — subcomandos
+        (`args_subcomando`), defaults (opcional → default), repetición
+        (`args_todos`), posicionales (`args_posicionales`), consultas
+        (`args_tiene`, `args_obtener`, `args_cuenta`). **✅ 2026-08-08.**
+        Contrato de memoria: TODAS las funciones devuelven COPIAS independientes
+        (el caller libera; nunca comparte descriptores con argv → evita double-free).
+        Uso: `usar args_avanzados::*` + `falcato compila app.fc args_avanzados.fc`.
+        Sin tocar el compiler.
   - [x] **Criterio:** `.\saludo_app.exe --nombre sebas` → imprime "hola, sebas" ✅
   - [ ] *Bloqueante:* Cid necesita args en Fase 2 (loop agente con opciones)
   - [ ] *NO es etiqueta* — es lenguaje puro post-compilado (regla: lo post-compilado se
@@ -555,6 +561,35 @@ La documentación NO reflejaba la realidad. Progreso 2026-08-03: 5 de 5 puntos d
   (1 nivel: base.campo) e imprimir con `imprimir_valor_interpolado` por tipo.
 - **Archivos:** `src/codegen/builtins.rs`, `src/codegen/tipos.rs` (inferir_tipo
   AccesoCampo).
+
+### ✅ `Diccionario<K,V>`/`Conjunto<T>` no resolvían tipos concretos — RESUELTO (2026-08-08)
+- **Causa raíz:** el parser mapeaba `Vector<T>` a `Tipo::Vector` pero `Diccionario`/
+  `Conjunto` caían en `Tipo::NombreGenerico`; además `sustituir_genericos` no recorría
+  `Diccionario`/`Conjunto`/`Resultado` → el retorno de `diccionario_nuevo<T,V>` quedaba
+  con `Generico("K")` sin sustituir → disconcordancia con la declaración.
+- **Fix:** parser mapea `Diccionario<K,V>` y `Conjunto<T>` a tipos reales (como Vector);
+  `sustituir_genericos` recorre los 3 contenedores.
+- **Nota:** `Diccionario` con tipos compuestos (ej: valor `Vector<Texto>`) aún rompe el
+  verifier de Cranelift (`FunctionBuilder finalized, but block blockN is not sealed`) —
+  bug de codegen en `builtin_diccionario_insertar`, pendiente.
+
+### ✅ `texto_nuevo()` imprimía "(null)" — RESUELTO (2026-08-08)
+- **Causa raíz:** `builtin_texto_nuevo` delegaba en `descriptor_nuevo` que ponía
+  `ptr = 0` (NULL) → `printf("%s", NULL)` imprime "(null)".
+- **Fix:** `builtin_texto_nuevo` crea un buffer real de 1 byte con `'\0'`
+  (`ptr` válido, `len=0`, `cap=1`). `descriptor_nuevo` sigue con `ptr=0/cap=0`
+  (para vectores/diccionarios — NO tocar: un cap=1 falso rompe `vector_agregar`).
+
+### ✅ `vector_agregar<Texto>` escribía fuera de heap — RESUELTO (2026-08-08)
+- **Síntoma:** `vector_agregar<Texto>` crasheaba (0xC0000005) al segundo elemento.
+- **Causa raíz:** mi fix anterior de `descriptor_nuevo` (cap=1 falso) hacía que
+  `vector_nuevo<Texto>` creara el descriptor del vector con `cap=1` y `ptr` a un
+  buffer de 1 byte → `vector_agregar` NO reallocaba (len=0 < cap=1) y escribía el
+  puntero del elemento en el buffer de 1 byte → heap overflow.
+- **Fix:** separar responsabilidades — `descriptor_nuevo` vuelve a `ptr=0/cap=0`
+  (correcto para colecciones), `builtin_texto_nuevo` crea el buffer vacío real.
+- **Lección:** `descriptor_nuevo` es compartido por Texto Y colecciones; cambiar su
+  layout rompe los builtins de Vector/Diccionario.
 
 ---
 

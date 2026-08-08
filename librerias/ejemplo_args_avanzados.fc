@@ -1,0 +1,61 @@
+// App de demostración de args_avanzados (Fase 3)
+// Compilar: falcato compila app_args.fc args_avanzados.fc --salida app_args.exe
+usar args_avanzados::*;
+
+función principal() -> Entero32 {
+    los argv: Vector<Texto> = argumentos();
+
+    // Subcomando (copia — liberar)
+    el sub: Texto = args_subcomando(argv);
+    imprimir_linea("subcomando: {sub}");
+    texto_liberar(sub);
+
+    // Requerido con default (copia — liberar)
+    el nombre: Texto = args_obtener(argv, "--nombre");
+    si texto_longitud(nombre) == 0 {
+        imprimir_linea("Falta --nombre (uso: app [subcomando] --nombre X [--tag A] [--tag B])");
+        texto_liberar(nombre);
+        retornar 1;
+    }
+    imprimir_linea("nombre: {nombre}");
+    texto_liberar(nombre);
+
+    // Opcional con default (copia — liberar)
+    el cuenta: Texto = args_obtener(argv, "--cuenta");
+    si texto_longitud(cuenta) == 0 {
+        imprimir_linea("cuenta: 0 (default)");
+    } sino {
+        imprimir_linea("cuenta: {cuenta}");
+    }
+    texto_liberar(cuenta);
+
+    // Repetición: --tag a --tag b --tag c (Vector de copias — liberar)
+    los tags: Vector<Texto> = args_todos(argv, "--tag");
+    el n_tags: Entero32 = vector_longitud<Texto>(tags);
+    imprimir_linea("tags ({n_tags}):");
+    el i: Entero32 = 0;
+    mientras i < n_tags {
+        el t: Texto = vector_obtener<Texto>(tags, i);
+        imprimir_linea("  - {t}");
+        texto_liberar(t);
+        i = i + 1;
+    }
+    vector_liberar<Texto>(tags);
+
+    // Posicionales después del subcomando (Vector de copias — liberar)
+    los pos: Vector<Texto> = args_posicionales(argv);
+    el n_pos: Entero32 = vector_longitud<Texto>(pos);
+    imprimir_linea("posicionales ({n_pos}):");
+    el j: Entero32 = 0;
+    mientras j < n_pos {
+        el p: Texto = vector_obtener<Texto>(pos, j);
+        imprimir_linea("  @ {p}");
+        texto_liberar(p);
+        j = j + 1;
+    }
+    vector_liberar<Texto>(pos);
+
+    // Liberar el vector crudo de argumentos
+    vector_liberar<Texto>(argv);
+    retornar 0;
+}

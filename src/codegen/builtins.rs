@@ -826,7 +826,17 @@ impl Codegen {
         &mut self,
         builder: &mut FunctionBuilder,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        Ok(self.descriptor_nuevo(builder))
+        // Texto vacío REAL: descriptor con ptr a un buffer de 1 byte ('\0'),
+        // len=0, cap=1. printf("%s") con NULL imprimiría "(null)".
+        let desc = self.descriptor_nuevo(builder);
+        let uno = builder.ins().iconst(types::I64, 1);
+        let data = self.llamar_malloc(builder, uno);
+        let cero_byte = builder.ins().iconst(types::I8, 0);
+        builder.ins().store(cranelift_codegen::ir::MemFlags::new(), cero_byte, data, 0);
+        let flags = cranelift_codegen::ir::MemFlags::new();
+        builder.ins().store(flags, data, desc, Self::OFFSET_PTR);
+        builder.ins().store(flags, uno, desc, Self::OFFSET_CAP);
+        Ok(desc)
     }
 
     pub(crate) fn builtin_texto_desde(
