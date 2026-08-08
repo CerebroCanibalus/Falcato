@@ -16,6 +16,133 @@
 
 ---
 
+## Diccionario\<K,V\> (mapa clave→valor)
+
+Hash map con open addressing y resize automático. Claves y valores viven en heap.
+
+| Función | Firma | Qué hace |
+|---------|-------|----------|
+| `diccionario_nuevo` | `::<K,V>() -> Diccionario<K,V>` | Crea un diccionario vacío |
+| `diccionario_insertar` | `::<K,V>(Dict, K, V) -> Entero64` | Inserta clave→valor (devuelve puntero para chaining) |
+| `diccionario_obtener` | `::<K,V>(Dict, K) -> V` | Valor de la clave (⚠️ usa `existe()` antes — si no existe devuelve basura) |
+| `diccionario_existe` | `::<K,V>(Dict, K) -> Booleano` | ¿Existe la clave? |
+| `diccionario_eliminar` | `::<K,V>(Dict, K) -> Booleano` | Elimina la clave (true si estaba) |
+| `diccionario_longitud` | `::<K,V>(Dict) -> Entero32` | Cuántas entradas tiene |
+| `diccionario_liberar` | `::<K,V>(Dict) -> Vacío` | Libera la memoria |
+
+**Forma preferida (métodos):**
+```falcato
+el d: Diccionario<Texto, Entero32> = diccionario_nuevo<Texto, Entero32>();
+d.insertar(Texto.desde("edad"), 30);
+si d.existe(Texto.desde("edad")) {
+    el v: Entero32 = d.obtener(Texto.desde("edad"));
+    decir(v);
+}
+d.eliminar(Texto.desde("edad"));
+d.tam();   // diccionario_longitud
+d.liberar();
+```
+
+> **⚠️ Tipo compuesto como valor:** `Diccionario<Texto, Vector<Texto>>` aún rompe el
+> verifier de Cranelift (`blockN is not sealed`) — bug conocido en
+> `builtin_diccionario_insertar`, pendiente. Usa valores simples por ahora.
+
+---
+
+## Conjunto\<T\> (set de valores únicos)
+
+Wrapper de `Diccionario` (claves sin valores). Valores en heap.
+
+| Función | Firma | Qué hace |
+|---------|-------|----------|
+| `conjunto_nuevo` | `::<T>() -> Conjunto<T>` | Crea un conjunto vacío |
+| `conjunto_insertar` | `::<T>(Conj, T) -> Vacío` | Añade un valor (si no existe) |
+| `conjunto_contiene` | `::<T>(Conj, T) -> Booleano` | ¿Está el valor? |
+| `conjunto_eliminar` | `::<T>(Conj, T) -> Booleano` | Elimina un valor (true si estaba) |
+| `conjunto_longitud` | `::<T>(Conj) -> Entero32` | Cuántos valores tiene |
+| `conjunto_liberar` | `::<T>(Conj) -> Vacío` | Libera la memoria |
+
+**Forma preferida (métodos):**
+```falcato
+el c: Conjunto<Entero32> = conjunto_nuevo<Entero32>();
+c.insertar(10);
+si c.contiene(10) { decir("está"); }
+c.eliminar(10);
+c.tam();   // conjunto_longitud
+c.liberar();
+```
+
+---
+
+## Argumentos de línea de comandos
+
+| Función | Firma | Qué hace |
+|---------|-------|----------|
+| `argumentos` | `() -> Vector<Texto>` | argv crudo estilo C (args[0]=ejecutable) |
+
+**Forma tipada (recomendada):** `función principal(el args: Struct)` — el compilador
+genera el parseo de `--etiqueta valor`, validación y `--ayuda` automáticos.
+Ver [GUIA 16](GUIA/16-argumentos.md).
+
+**Librería avanzada:** `librerias/args_avanzados.fc` — subcomandos, repetición,
+posicionales (`args_tiene`, `args_obtener`, `args_todos`, `args_subcomando`,
+`args_posicionales`, `args_cuenta`). Ver [GUIA 16](GUIA/16-argumentos.md).
+
+---
+
+## Conversión texto → número
+
+| Función | Firma | Qué hace |
+|---------|-------|----------|
+| `texto_a_entero` | `(Texto) -> Entero64` | Parsea a Entero64 (0 si falla) |
+| `texto_a_natural` | `(Texto) -> Natural64` | Parsea a Natural64 (0 si falla) |
+| `texto_a_flotante` | `(Texto) -> Flotante64` | Parsea a Flotante64 (0.0 si falla) |
+| `texto_a_booleano` | `(Texto) -> Booleano` | `"true"`, `"1"`, `"sí"` → verdadero |
+| `como_entero32` | `(Entero64) -> Entero32` | Convierte a Entero32 (trunca) |
+
+> Usados internamente por el parseo tipado de `principal(el args: Struct)`.
+
+---
+
+## Sistema (procesos, terminal, stdin, fecha)
+
+Primitivas del runtime para CLIs y agentes (R7).
+
+| Función | Firma | Qué hace |
+|---------|-------|----------|
+| `proceso_crear` | `(Palabra) -> Entero64` | Lanza un proceso; devuelve handle (0=error) |
+| `proceso_esperar` | `(Entero64) -> Entero32` | Espera al proceso; devuelve exit code |
+| `proceso_leer_salida` | `(Entero64) -> Texto` | stdout+stderr capturados |
+| `proceso_cerrar` | `(Entero64) -> Vacío` | Cierra el handle |
+| `terminal_modo_raw` | `(Entero32) -> Entero32` | 1=modo raw (sin echo, sin Enter; activa ANSI VT), 0=restaura |
+| `terminal_leer_tecla` | `() -> Entero32` | Lee una tecla sin Enter (flechas = 0x100+) |
+| `entrada_leer` | `() -> Texto` | Lee TODO el stdin hasta EOF |
+| `fecha_unix` | `() -> Entero64` | Segundos desde epoch |
+| `fecha_ms` | `() -> Entero64` | Milisegundos desde epoch |
+
+**Ejemplo (procesos):**
+```falcato
+el h: Entero64 = proceso_crear("falcato verifica app.fc");
+el codigo: Entero32 = proceso_esperar(h);
+el salida: Texto = proceso_leer_salida(h);
+decir(salida);
+salida.liberar();
+proceso_cerrar(h);
+```
+
+**Ejemplo (terminal TUI):**
+```falcato
+terminal_modo_raw(1);
+el tecla: Entero32 = terminal_leer_tecla();
+si tecla es 27 { decir("ESC"); }          // 27 = escape
+terminal_modo_raw(0);
+```
+
+> `fecha_unix`/`fecha_ms` son reloj de pared real; `timestamp` mide ms desde boot
+> (intervalos).
+
+---
+
 ## I/O (entrada/salida)
 
 | Función | Firma real | Qué hace |

@@ -29,6 +29,7 @@ Bienvenido. Cada capítulo son 5-10 minutos y empieza desde lo más básico.
 | 14 | [Ownership](GUIA/14-ownership.md) | Mover, copiar, prestar, regiones |
 | 15 | [Glosario](GUIA/15-glosario.md) | Términos rápidos |
 | 16 | [Argumentos (etiquetas tipadas)](GUIA/16-argumentos.md) | `principal(el args: Struct)` — parseo automático |
+| 17 | [Etiquetas del toolchain](GUIA/17-etiquetas.md) | `compila`, `corre`, `verifica`, `--json`, `--lanzar`… |
 | — | — | — |
 | 🖼️ | [GUI Nativa (docs)](docs/diseno_gui.md) | Ventanas Win32, MessageBox, GDI |
 

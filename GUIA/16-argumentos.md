@@ -1,6 +1,6 @@
 # 16 — Argumentos de línea de comandos (etiquetas tipadas)
 
-← [14: Ownership](14-ownership.md) | [Indice](../GUIA.md)
+← [14: Ownership](14-ownership.md) | [Indice](../GUIA.md) | [Siguiente: Etiquetas →](17-etiquetas.md)
 
 ---
 
@@ -59,7 +59,7 @@ Los **artículos de los campos** dicen si cada argumento es obligatorio u opcion
 | `el campo` | **Requerido** — error si falta `--campo` |
 | `un campo` | **Opcional** — valor por defecto si falta |
 | `la campo` | **Inmutable/validado** — se valida tipo al asignar |
-| `los campo` | Varargs posicionales (en desarrollo) |
+| `los campo` | Varargs posicionales (Fase 3 — ver librería `args_avanzados`) |
 
 ```falcato
 estructural Saludo {
