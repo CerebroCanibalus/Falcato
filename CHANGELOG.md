@@ -1,5 +1,52 @@
 # Changelog de Falcato
 
+## [0.6.1] - 2026-08-08 — Fase 3 de argumentos + arreglos vitales
+
+### Librería `args_avanzados` (Fase 3 de R7.5)
+- `librerias/args_avanzados.fc`: subcomandos, valores por defecto, repetición de
+  etiquetas y argumentos posicionales, sobre `argumentos()` — sin tocar el compilador.
+- API: `args_tiene`, `args_obtener`, `args_todos`, `args_subcomando`,
+  `args_posicionales`, `args_cuenta`.
+- Contrato de memoria: todas devuelven copias independientes (el caller libera;
+  nunca comparten descriptores con `argv` → evita double-free).
+- Compilación: `falcato compila app.fc librerias/args_avanzados.fc --salida app.exe`.
+
+### Arreglos (bugs reales del lenguaje)
+- `Diccionario<K,V>` / `Conjunto<T>` no resolvían tipos concretos (parser +
+  sustitución de genéricos) → ahora sí.
+- `texto_nuevo()` imprimía "(null)" (descriptor con puntero NULL) → ahora crea un
+  buffer vacío real con terminador nulo.
+- `vector_agregar<Texto>` crasheaba por escritura fuera de heap (cap falso en el
+  descriptor del vector) → separadas las responsabilidades de descriptor.
+
+### Infraestructura
+- `release.ps1`: validación pre-release anti-frágil (mojibake, EOL, versión, árbol).
+- `.gitattributes`: fuerza EOL por tipo de archivo (CRLF para wix/bat/ps1).
+- Release en español: título/cuerpo generados desde el CHANGELOG.md.
+
+## [0.6.0] - 2026-08-08 — Argumentos tipados (Fase 2 de R7.5)
+
+### La innovación: etiquetas tipadas
+- `función principal(el args: Struct) -> Entero32` — el compilador genera el parseo
+  automático de `--etiqueta valor`, validación de tipos y `--ayuda` en español.
+- Los artículos de los campos codifican el esquema: `el`=requerido, `un`=opcional,
+  `la`=inmutable/validado, `los`=varargs (Fase 3).
+- `src/args_tipados.rs`: preprocesa el AST, sintetiza el prólogo de parseo.
+- Interpolación ahora soporta acceso a campo: `{args.nombre}`.
+- Tipos soportados: Texto, Entero32/64, Natural32/64, Flotante64, Booleano.
+
+### Builtin `argumentos()` (Fase 1)
+- `argumentos() -> Vector<Texto>`: argv crudo estilo C, con null terminator.
+- Runtime multiplataforma: Windows (`CommandLineToArgvW`), POSIX (`__argc`/`__argv`).
+
+### Arreglo preexistente
+- `vector_obtener<Texto>` rompía el verifier de Cranelift → el índice siempre se
+  extiende a I64.
+
+### Infraestructura
+- Terminología: "etiquetas" en lugar de "flags" en toda la documentación.
+- CLI 100 % en español (subcomandos, opciones y ayuda).
+
 ## [0.1.0] - Pre-alpha funcional con LSP completo
 
 ### Core del lenguaje

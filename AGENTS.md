@@ -72,6 +72,12 @@ Cranelift no es "lo que tocó" — es el backend oficial y estratégico. Bytecod
 - **VERSIONADO ACORDE A LA ESCALA DEL CAMBIO**: `MAYOR.menor.parche`
   - **MAYOR** (x.0.0): cambios gigantes — sintaxis nueva, rompe compatibilidad, rediseño
     del lenguaje o del CLI visible.
+- **🚨 RELEASES EN ESPAÑOL — REGLA Day-0**: el título y el cuerpo del GitHub Release se
+  publican en español (el changelog `CHANGELOG.md` alimenta el body de cargo-dist vía
+  `package.changelog`). Prohibido el cuerpo generado por defecto en inglés. El
+  `release.ps1` valida mojibake/EOL/versión antes de pushear el tag. Regenerar el
+  release con `dist generate` si cambia la config; el job 'plan' falla si `wix/main.wxs`
+  tiene contenido desactualizado (la descripción del Cargo.toml debe coincidir).
 - **menor** (0.x.0): refactorizaciones, cambios importantes o moderados — features
   nuevas del lenguaje/toolchain, etiquetas nuevas, cambios de workflow. NO rompe
   compatibilidad (aliases cubren lo viejo).
