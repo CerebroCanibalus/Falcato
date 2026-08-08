@@ -80,7 +80,13 @@ Write-Host "      OK" -ForegroundColor Green
 
 # -- 5. Build de verificacion + tag + push -----------------------------------
 Write-Host "[5/5] Build de verificacion (debug)..."
-cargo build 2>&1 | Out-Null
+# cargo necesita el entorno MSVC (linker) — mismo patrón que build.bat
+$vsDevCmd = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
+if (Test-Path $vsDevCmd) {
+    cmd /c "call ""$vsDevCmd"" -arch=x64 > nul && cargo build 2>&1" | Out-Null
+} else {
+    cargo build 2>&1 | Out-Null
+}
 if ($LASTEXITCODE -ne 0) { Fail "cargo build fallo" }
 Write-Host "      OK" -ForegroundColor Green
 
