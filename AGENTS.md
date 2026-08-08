@@ -78,6 +78,14 @@ Cranelift no es "lo que tocó" — es el backend oficial y estratégico. Bytecod
   `release.ps1` valida mojibake/EOL/versión antes de pushear el tag. Regenerar el
   release con `dist generate` si cambia la config; el job 'plan' falla si `wix/main.wxs`
   tiene contenido desactualizado (la descripción del Cargo.toml debe coincidir).
+- **🚨 NOVEDADES DEL RELEASE — REGLA Day-0**: las novedades se clasifican por efecto
+  para el USUARIO, nunca por fase interna del roadmap:
+  - **➕ ADICIÓN** — algo nuevo que antes no existía (builtin, librería, función)
+  - **🔧 ARREGLO** — bug corregido (crash, verifier, comportamiento erróneo)
+  - **🔁 REDISEÑO** — algo que existía y cambió de forma (API, layout, sintaxis)
+  Prohibido escribir "Fase 2 — X", "R7.5", "hito del roadmap" en el cuerpo del release:
+  esa jerga interna no le dice nada al usuario. El CHANGELOG.md y el release body usan
+  esta misma clasificación.
 - **menor** (0.x.0): refactorizaciones, cambios importantes o moderados — features
   nuevas del lenguaje/toolchain, etiquetas nuevas, cambios de workflow. NO rompe
   compatibilidad (aliases cubren lo viejo).
