@@ -309,7 +309,7 @@ fn main() -> Entero32 {
 
 **Compilar y ejecutar:**
 ```bash
-falcato run calculadora.fc
+falcato corre calculadora.fc
 ```
 
 ---

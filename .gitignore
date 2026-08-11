@@ -30,6 +30,9 @@ deps/
 # Plugins/Config local
 .opencode/
 
+# Archivos locales del agente (rutas del PC del desarrollador, no versionar)
+AGENTS.md
+
 # VS Code Extension
 falcato-vscode/node_modules/
 falcato-vscode/*.vsix
@@ -51,6 +54,6 @@ test_*.o
 # Benchmarks
 bench_tokens/
 
-# Cache incremental de verificación (--incremental)
+# Cache incremental de verificaciï¿½n (--incremental)
 .falcato-cache/
 

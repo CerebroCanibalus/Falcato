@@ -28,3 +28,29 @@ prueba "conversion explicita" {
     el dias: Entero32 = como_entero32(e / 86400);
     afirmar(dias == 1);
 }
+
+prueba "enteros 64 bits" {
+    // Fix R7.6: printf usaba %d (32 bits) para TODOS los enteros →
+    // Entero64 se truncaba al imprimir (3000000000 → -1294967296)
+    el a: Entero64 = 3000000000;
+    afirmar(a == 3000000000);
+    el b: Entero64 = 100;
+    el c: Entero64 = b + 3000000000;
+    afirmar(c == 3000000100);
+    el max: Entero64 = 9223372036854775807;  // Entero64::MAX
+    afirmar(max == 9223372036854775807);
+    // wrap 64 bits → MIN. Nota: -9223372036854775808 NO parsea como literal
+    // (el lexer parsea el valor absoluto como i64 y no cabe) — límite documentado
+    el min: Entero64 = max + 1;
+    afirmar(min == max + 1);
+    afirmar(min < 0);
+}
+
+prueba "negacion flotante" {
+    // Fix R7.6: -x flotante usaba isub (entero) con F64 → Verifier panic
+    el x: Flotante64 = 2.5;
+    afirmar(-x == -2.5);
+    el y: Flotante32 = 2.5;
+    el esperado: Flotante32 = 2.5;
+    afirmar(-y == -esperado);
+}

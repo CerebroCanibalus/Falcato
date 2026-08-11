@@ -87,8 +87,19 @@ impl Codegen {
             OperadorUnario::Negacion => {
                 // Negación aritmética: 0 - val (el cero usa el ancho del valor)
                 let tipo_val = builder.func.dfg.value_type(val);
-                let cero = builder.ins().iconst(tipo_val, 0);
-                builder.ins().isub(cero, val)
+                // R7.6: flotantes necesitan fsub (isub con F64 = Verifier panic)
+                if matches!(tipo_val, types::F32 | types::F64) {
+                    let cero = builder.ins().f64const(0.0);
+                    let cero = if tipo_val == types::F32 {
+                        builder.ins().fdemote(types::F32, cero)
+                    } else {
+                        cero
+                    };
+                    builder.ins().fsub(cero, val)
+                } else {
+                    let cero = builder.ins().iconst(tipo_val, 0);
+                    builder.ins().isub(cero, val)
+                }
             }
             OperadorUnario::NegacionLogica => {
                 // NegaciÃƒÂ³n booleana: val XOR 1

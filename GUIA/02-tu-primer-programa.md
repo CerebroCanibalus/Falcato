@@ -16,7 +16,7 @@ función principal() -> Entero32 {
 Ejecuta:
 
 ```bash
-falcato run hola.fc
+falcato corre hola.fc
 ```
 
 Verás:

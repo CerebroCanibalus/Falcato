@@ -40,7 +40,16 @@ impl Codegen {
             Tipo::Entero32 | Tipo::Entero64 | Tipo::Entero8 | Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64 => {
                 // Enteros: printf %d ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â en Windows x64, args variÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡dicos se pasan como I64
                 let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
-                let fmt = if con_newline { "%d\n" } else { "%d" };
+                // R7.6: %d solo lee 32 bits — Entero64/Natural64 necesitan %lld
+                // (antes: el valor se truncaba al imprimir, p.ej. 3000000000 → -1294967296)
+                let fmt = match tipo_arg {
+                    Tipo::Entero64 | Tipo::Natural64 => {
+                        if con_newline { "%lld\n" } else { "%lld" }
+                    }
+                    _ => {
+                        if con_newline { "%d\n" } else { "%d" }
+                    }
+                };
                 let fmt_ptr = self.crear_string_literal(builder, fmt);
                 // Extender a I64 para passing variÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡dico correcto en Windows x64
                 let val_i64 = match tipo_arg {
