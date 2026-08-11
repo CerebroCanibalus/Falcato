@@ -113,6 +113,10 @@ pub enum Sentencia {
     Condicional(Condicional),
     BucleMientras(BucleMientras),
     BuclePara(BuclePara),
+    /// Romper el bucle más interno (break). Fuera de bucle → error semántico.
+    Romper(Span),
+    /// Saltar a la siguiente iteración del bucle más interno (continue).
+    Continuar(Span),
     Region { nombre: String, cuerpo: Vec<Sentencia>, span: Span },
     Seleccionar(Seleccionar),
     ConExecutor { hilos: Expresion, cuerpo: Vec<Sentencia>, span: Span },

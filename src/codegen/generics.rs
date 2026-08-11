@@ -231,6 +231,9 @@ impl Codegen {
                     self.sustituir_en_expresion(expr, sust_consts);
                 }
             }
+            // R7.7 — romper/continuar no contienen expresiones que sustituir
+            Sentencia::Romper(_) => {}
+            Sentencia::Continuar(_) => {}
             Sentencia::Condicional(cond) => {
                 self.sustituir_en_expresion(&mut cond.condicion, sust_consts);
                 for sent in &mut cond.bloque_entonces.sentencias {

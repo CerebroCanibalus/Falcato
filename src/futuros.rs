@@ -205,6 +205,9 @@ fn recolectar_usos_sentencia(sent: &Sentencia, usos: &mut HashSet<String>) {
                 recolectar_usos_expr(e, usos);
             }
         }
+        // R7.7 — romper/continuar no usan variables
+        Sentencia::Romper(_) => {}
+        Sentencia::Continuar(_) => {}
         Sentencia::Asignacion(asig) => {
             recolectar_usos_expr(&asig.valor, usos);
             // También el lugar si es array

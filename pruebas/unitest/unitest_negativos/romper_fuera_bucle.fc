@@ -1,0 +1,7 @@
+// unitest_negativos/romper_fuera_bucle.fc
+// ESPERADO: [T107] — romper fuera de bucle
+
+funcion principal() -> Entero32 {
+    romper;
+    retornar 0;
+}

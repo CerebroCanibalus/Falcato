@@ -115,10 +115,11 @@ impl Codegen {
                 builder.seal_block(bloque_fin);
             }
             Tipo::Flotante32 | Tipo::Flotante64 => {
-                // Floats: printf %f
+                // Floats: printf %.17g (round-trip exacto — antes %f truncaba a 6 decimales:
+                // 0.1+0.2 imprimía 0.300000 aunque el valor real es 0.30000000000000004)
                 // Windows x64 variadic ABI: doubles se pasan como bit pattern en reg entero
                 let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
-                let fmt = if con_newline { "%f\n" } else { "%f" };
+                let fmt = if con_newline { "%.17g\n" } else { "%.17g" };
                 let fmt_ptr = self.crear_string_literal(builder, fmt);
                 // Bitcast F64 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ I64 para passing variÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡dico correcto
                 let val_bits = builder.ins().bitcast(types::I64, cranelift_codegen::ir::MemFlags::new(), val);
@@ -667,17 +668,17 @@ impl Codegen {
                             // Cargar F32 y promover a F64 (el slot es de 4 bytes)
                             let v32 = builder.ins().stack_load(types::F32, slot, 0);
                             let v = builder.ins().fpromote(types::F64, v32);
-                            // printf %f espera un double; la firma Cranelift usa I64,
+                            // %.17g (round-trip exacto) espera un double; la firma Cranelift usa I64,
                             // así que pasamos los bits del F64 como I64 (bitcast).
                             let bits = builder.ins().bitcast(types::I64, cranelift_codegen::ir::MemFlags::new(), v);
-                            ("%f\0", bits)
+                            ("%.17g\0", bits)
                         }
                         Tipo::Flotante64 => {
                             let v = builder.ins().stack_load(types::F64, slot, 0);
-                            // printf %f espera un double; la firma Cranelift usa I64,
+                            // %.17g (round-trip exacto); la firma Cranelift usa I64,
                             // así que pasamos los bits del F64 como I64 (bitcast).
                             let bits = builder.ins().bitcast(types::I64, cranelift_codegen::ir::MemFlags::new(), v);
-                            ("%f\0", bits)
+                            ("%.17g\0", bits)
                         }
                         Tipo::Booleano => {
                             let v = builder.ins().stack_load(types::I8, slot, 0);

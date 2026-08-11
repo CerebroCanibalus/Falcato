@@ -1,0 +1,69 @@
+// unitest_control_flujo.fc — R7.7: romper (break) + continuar (continue) + notación científica
+// Spec: romper → salta al exit del bucle más interno. continuar → epilogue (i++) + header.
+// Notación científica: 1e3, 6.674e-11, 2.5e+3 → Flotante64
+
+prueba "romper termina el bucle" {
+    el total: Entero32 = 0;
+    para i en 0..10 {
+        si i es 5 { romper; }
+        total = total + i;
+    }
+    afirmar(total == 10);  // 0+1+2+3+4 = 10 (rompe en i=5)
+}
+
+prueba "continuar salta la iteracion" {
+    el total: Entero32 = 0;
+    para i en 0..5 {
+        si i es 2 { continuar; }
+        total = total + i;
+    }
+    afirmar(total == 8);  // 0+1+3+4 = 8 (salta i=2)
+}
+
+prueba "romper en bucle mientras" {
+    el i: Entero32 = 0;
+    el total: Entero32 = 0;
+    mientras i < 100 {
+        total = total + i;
+        si total > 10 { romper; }
+        i = i + 1;
+    }
+    afirmar(total > 10);      // rompió al superar 10
+    afirmar(i <= 10);         // no llegó a 100
+}
+
+prueba "continuar en mientras no se salta el incremento" {
+    el i: Entero32 = 0;
+    el pares: Entero32 = 0;
+    mientras i < 10 {
+        i = i + 1;
+        si i % 2 es 0 { continuar; }
+        pares = pares + 1;    // solo impares: 1,3,5,7,9
+    }
+    afirmar(pares == 5);
+}
+
+prueba "notacion cientifica 1e3" {
+    el a: Flotante64 = 1e3;
+    afirmar(a == 1000.0);
+}
+
+prueba "notacion cientifica exponente negativo" {
+    el g: Flotante64 = 6.674e-11;
+    afirmar(g > 6.0e-11);
+    afirmar(g < 7.0e-11);
+}
+
+prueba "notacion cientifica con signo y punto" {
+    el a: Flotante64 = 2.5e+3;
+    afirmar(a == 2500.0);
+    el b: Flotante64 = 1.0E5;
+    afirmar(b == 100000.0);
+}
+
+prueba "cientifico + checked juntos" {
+    // Notación científica con operación aritmética checked
+    el a: Flotante64 = 1e2;
+    el b: Flotante64 = 2.5e1;
+    afirmar(a + b == 125.0);
+}

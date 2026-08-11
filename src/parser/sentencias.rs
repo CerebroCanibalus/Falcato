@@ -12,6 +12,18 @@ pub fn parse_sentencia(cursor: &mut ParserCursor) -> Result<Sentencia, ErrorSint
         Some(Token::Si) => parse_condicional(cursor),
         Some(Token::Mientras) => parse_bucle_mientras(cursor),
         Some(Token::Para) => parse_bucle_para(cursor),
+        Some(Token::Romper) => {
+            let span = cursor.span_actual();
+            cursor.avanzar();
+            cursor.esperar(Token::PuntoYComa)?;
+            Ok(Sentencia::Romper(span))
+        }
+        Some(Token::Continuar) => {
+            let span = cursor.span_actual();
+            cursor.avanzar();
+            cursor.esperar(Token::PuntoYComa)?;
+            Ok(Sentencia::Continuar(span))
+        }
         Some(Token::Region) => parse_region(cursor),
         Some(Token::Seleccionar) => parse_seleccionar(cursor),
         Some(Token::ConExecutor) => parse_con_executor(cursor),

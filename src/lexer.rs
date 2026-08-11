@@ -35,6 +35,12 @@ pub enum Token {
     #[token("fuese")]
     Fuese,
     
+    #[token("romper")]
+    Romper,
+    
+    #[token("continuar")]
+    Continuar,
+    
     #[token("mientras")]
     Mientras,
     
@@ -251,8 +257,13 @@ pub enum Token {
     #[regex(r"[0-9]+", |lex| lex.slice().parse::<i64>().ok())]
     EnteroLiteral(Option<i64>),
     
-    #[regex(r"[0-9]+\.[0-9]+", |lex| Some(lex.slice().to_string()))]
+    // Flotante con punto: 6.674, 6.674e-11, 2.5e+3, 1.0E5
+    #[regex(r"[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?", |lex| Some(lex.slice().to_string()))]
     FlotanteLiteral(Option<String>),
+    
+    // Notación científica SIN punto: 1e3, 5E-2, 1e+10 (todo literal con e/E es flotante)
+    #[regex(r"[0-9]+[eE][+-]?[0-9]+", |lex| Some(lex.slice().to_string()))]
+    FlotanteExponente(Option<String>),
     
     #[regex(r#""([^"\\]|\\.)*""#, |lex| {
         let slice = lex.slice();

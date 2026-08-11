@@ -93,6 +93,9 @@ pub struct Codegen {
     pub(crate) heap_vivas: Vec<(String, Tipo)>,
     /// Índices de inicio de cada scope activo (función, rama, body de bucle).
     pub(crate) scope_marcas: Vec<usize>,
+    /// R7.7 — romper/continuar: pila de bucles activos (header, exit).
+    /// El mas interno es el destino de `romper` (exit) y `continuar` (header).
+    pub(crate) pila_bucles: Vec<(cranelift_codegen::ir::Block, cranelift_codegen::ir::Block)>,
 }
 
 /// Info para compilar un closure diferidamente
@@ -161,6 +164,7 @@ impl Codegen {
             declaraciones: HashMap::new(),
             heap_vivas: Vec::new(),
             scope_marcas: Vec::new(),
+            pila_bucles: Vec::new(),
         }.registrar_builtins_codegen())
     }
 

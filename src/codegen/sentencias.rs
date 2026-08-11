@@ -411,6 +411,47 @@ impl Codegen {
                     builder.ins().return_(&[]);
                 }
             }
+            // R7.7 — romper: salir del bucle más interno (jump al exit)
+            Sentencia::Romper(span) => {
+                match self.pila_bucles.last() {
+                    Some((_, exit_block)) => {
+                        builder.ins().jump(*exit_block, &[]);
+                        // El código después de romper es inalcanzable; crear bloque
+                        // huérfano para que el verifier no vea instrucciones muertas
+                        let muerto = builder.create_block();
+                        builder.switch_to_block(muerto);
+                        builder.seal_block(muerto);
+                    }
+                    None => {
+                        self.errores.agregar(ErrorCompilador::nuevo(
+                            CategoriaError::Interno,
+                            1,
+                            span.clone(),
+                            "'romper' fuera de bucle en codegen (semantic debería haberlo atrapado)".to_string(),
+                        ));
+                    }
+                }
+            }
+            // R7.7 — continuar: saltar a la siguiente iteración (jump al epilogue → header)
+            Sentencia::Continuar(span) => {
+                match self.pila_bucles.last() {
+                    Some((epilogue_block, _)) => {
+                        builder.ins().jump(*epilogue_block, &[]);
+                        // Código inalcanzable después de continuar
+                        let muerto = builder.create_block();
+                        builder.switch_to_block(muerto);
+                        builder.seal_block(muerto);
+                    }
+                    None => {
+                        self.errores.agregar(ErrorCompilador::nuevo(
+                            CategoriaError::Interno,
+                            1,
+                            span.clone(),
+                            "'continuar' fuera de bucle en codegen (semantic debería haberlo atrapado)".to_string(),
+                        ));
+                    }
+                }
+            }
             Sentencia::Condicional(cond) => {
                 let then_block = builder.create_block();
                 let else_block = builder.create_block();
@@ -508,7 +549,11 @@ impl Codegen {
             Sentencia::BucleMientras(bucle) => {
                 let header_block = builder.create_block();
                 let body_block = builder.create_block();
+                let epilogue_block = builder.create_block();
                 let exit_block = builder.create_block();
+
+                // R7.7: pila de bucles — romper → exit, continuar → epilogue (i++)
+                self.pila_bucles.push((epilogue_block, exit_block));
 
                 // Saltar al header inicialmente
                 builder.ins().jump(header_block, &[]);
@@ -532,18 +577,26 @@ impl Codegen {
                     self.compilar_sentencia(sentencia, builder, variables, _func_span)?;
                 }
                 if !body_terminado {
-                    // R6: liberar heap del scope del body antes de volver al header
-                    self.liberar_scope(m_body, builder, variables)?;
-                    builder.ins().jump(header_block, &[]);
+                    // El epilogue libera el scope del body (evitar doble liberación)
+                    builder.ins().jump(epilogue_block, &[]);
                 }
                 builder.seal_block(body_block);
+
+                // Epilogue: punto de reunión — libera scope del body y salta al header
+                // (destino de `continuar`; el body normal también pasa por aquí)
+                builder.switch_to_block(epilogue_block);
+                self.liberar_scope(m_body, builder, variables)?;
+                builder.ins().jump(header_block, &[]);
+                builder.seal_block(epilogue_block);
 
                 // Ahora que todos los saltos al header est├ín declarados, sellarlo
                 builder.seal_block(header_block);
 
-                // Exit: continuar despu├®s del bucle
+                // Exit: continuar despu├®s del bucle (destino de `romper`)
                 builder.switch_to_block(exit_block);
                 builder.seal_block(exit_block);
+
+                self.pila_bucles.pop();
             }
             Sentencia::BuclePara(bucle) => {
                 // Detectar si el iterable es un rango
@@ -551,7 +604,11 @@ impl Codegen {
                     // === PARA SOBRE RANGO: para i en 0..10 { ... } ===
                     let header_block = builder.create_block();
                     let body_block = builder.create_block();
+                    let epilogue_block = builder.create_block();
                     let exit_block = builder.create_block();
+
+                    // R7.7: pila de bucles — romper → exit, continuar → epilogue (i++)
+                    self.pila_bucles.push((epilogue_block, exit_block));
 
                     // Slot para la variable de iteraci├│n
                     let var_slot = builder.create_sized_stack_slot(
@@ -609,29 +666,40 @@ impl Codegen {
                     }
 
                     if !body_terminado {
-                        // R6: liberar heap del scope del body antes de i++ y volver al header
-                        self.liberar_scope(m_body, builder, variables)?;
-                        // i = i + 1
-                        let cur = builder.ins().stack_load(types::I32, var_slot, 0);
-                        let uno = builder.ins().iconst(types::I32, 1);
-                        let nuevo = builder.ins().iadd(cur, uno);
-                        builder.ins().stack_store(nuevo, var_slot, 0);
-                        builder.ins().jump(header_block, &[]);
+                        // El epilogue libera el scope y hace i++ (evitar doble liberación)
+                        builder.ins().jump(epilogue_block, &[]);
                     }
                     builder.seal_block(body_block);
+
+                    // Epilogue: punto de reunión — libera scope, i++, vuelve al header
+                    // (destino de `continuar`; el body normal también pasa por aquí)
+                    builder.switch_to_block(epilogue_block);
+                    self.liberar_scope(m_body, builder, variables)?;
+                    // i = i + 1
+                    let cur = builder.ins().stack_load(types::I32, var_slot, 0);
+                    let uno = builder.ins().iconst(types::I32, 1);
+                    let nuevo = builder.ins().iadd(cur, uno);
+                    builder.ins().stack_store(nuevo, var_slot, 0);
+                    builder.ins().jump(header_block, &[]);
+                    builder.seal_block(epilogue_block);
                     builder.seal_block(header_block);
 
-                    // Exit
+                    // Exit (destino de `romper`)
                     builder.switch_to_block(exit_block);
                     builder.seal_block(exit_block);
 
                     // Limpiar variable de iteraci├│n
                     variables.remove(&bucle.variable);
+                    self.pila_bucles.pop();
                 } else {
                     // === PARA SOBRE ARRAY (existente) ===
                     let header_block = builder.create_block();
                     let body_block = builder.create_block();
+                    let epilogue_block = builder.create_block();
                     let exit_block = builder.create_block();
+
+                    // R7.7: pila de bucles — romper → exit, continuar → epilogue (i++)
+                    self.pila_bucles.push((epilogue_block, exit_block));
 
                     // Crear slot para ├¡ndice (i = 0)
                     let idx_slot = builder.create_sized_stack_slot(
@@ -723,26 +791,33 @@ impl Codegen {
                     }
 
                     if !body_terminado {
-                        // R6: liberar heap del scope del body antes de i++ y volver al header
-                        self.liberar_scope(m_body, builder, variables)?;
-                        // i = i + 1
-                        let idx_val = builder.ins().stack_load(types::I32, idx_slot, 0);
-                        let uno = builder.ins().iconst(types::I32, 1);
-                        let nuevo_idx = builder.ins().iadd(idx_val, uno);
-                        builder.ins().stack_store(nuevo_idx, idx_slot, 0);
-
-                        builder.ins().jump(header_block, &[]);
+                        // El epilogue libera el scope y hace i++ (evitar doble liberación)
+                        builder.ins().jump(epilogue_block, &[]);
                     }
                     builder.seal_block(body_block);
+
+                    // Epilogue: punto de reunión — libera scope, i++, vuelve al header
+                    // (destino de `continuar`; el body normal también pasa por aquí)
+                    builder.switch_to_block(epilogue_block);
+                    self.liberar_scope(m_body, builder, variables)?;
+                    // i = i + 1
+                    let idx_val = builder.ins().stack_load(types::I32, idx_slot, 0);
+                    let uno = builder.ins().iconst(types::I32, 1);
+                    let nuevo_idx = builder.ins().iadd(idx_val, uno);
+                    builder.ins().stack_store(nuevo_idx, idx_slot, 0);
+
+                    builder.ins().jump(header_block, &[]);
+                    builder.seal_block(epilogue_block);
                     builder.seal_block(header_block);
 
-                    // Exit: continuar
+                    // Exit: continuar (destino de `romper`)
                     builder.switch_to_block(exit_block);
                     builder.seal_block(exit_block);
 
                     // Limpiar variables del bucle
                     variables.remove(&bucle.variable);
                     variables.remove(&idx_name);
+                    self.pila_bucles.pop();
                 }
             }
             Sentencia::Region { nombre: _, cuerpo, span: _ } => {

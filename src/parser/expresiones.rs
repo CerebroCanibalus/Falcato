@@ -416,6 +416,13 @@ fn parse_atom(cursor: &mut ParserCursor) -> Result<Expresion, ErrorSintaxis> {
             cursor.avanzar();
             Ok(Expresion::Literal(Literal::Flotante(val.parse().unwrap_or(0.0), span)))
         }
+        Some(Token::FlotanteExponente(Some(f))) => {
+            // Notación científica sin punto: 1e3, 5E-2 → Flotante64
+            let val = f.clone();
+            let span = cursor.span_actual();
+            cursor.avanzar();
+            Ok(Expresion::Literal(Literal::Flotante(val.parse().unwrap_or(0.0), span)))
+        }
         Some(Token::PalabraLiteral(Some(s))) => {
             let val = s.clone();
             let span = cursor.span_actual();

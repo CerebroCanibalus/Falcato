@@ -269,6 +269,7 @@ impl IndiceSemantico {
     ) -> Option<String> {
         match sentencia {
             Sentencia::Expresion(expr) => self.buscar_en_expresion(expr, linea, columna),
+            Sentencia::Romper(_) | Sentencia::Continuar(_) => None,
             Sentencia::DeclaracionVariable(decl) => {
                 // Buscar en el valor
                 if let Some(nombre) = self.buscar_en_expresion(&decl.valor, linea, columna) {
@@ -456,6 +457,7 @@ impl IndiceSemantico {
     fn colectar_referencias_en_sentencia(sentencia: &Sentencia, nombre: &str, refs: &mut Vec<Span>) {
         match sentencia {
             Sentencia::Expresion(expr) => Self::colectar_referencias_en_expresion(expr, nombre, refs),
+            Sentencia::Romper(_) | Sentencia::Continuar(_) => {},
             Sentencia::DeclaracionVariable(decl) => {
                 Self::colectar_referencias_en_expresion(&decl.valor, nombre, refs);
             }

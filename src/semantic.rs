@@ -277,6 +277,8 @@ pub struct AnalizadorSemantico {
     nivel_verificacion_actual: crate::ast::NivelVerificacion,
     /// Estado de borrow de cada variable (para borrowing rules)
     borrows: HashMap<String, BorrowState>,
+    /// Profundidad de bucles activos — para validar romper/continuar
+    profundidad_bucle: u32,
     /// Efecto de la función actual (para verificación de anotaciones)
     efecto_actual: crate::ast::Efecto,
     /// Rasgos (traits) registrados: nombre → InfoRasgo
@@ -303,6 +305,7 @@ impl AnalizadorSemantico {
             variables_movidas: std::collections::HashSet::new(),
             nivel_verificacion_actual: crate::ast::NivelVerificacion::Permisivo,
             borrows: HashMap::new(),
+            profundidad_bucle: 0,
             efecto_actual: crate::ast::Efecto::Conservador,
             rasgos: HashMap::new(),
             impls: HashMap::new(),
@@ -329,6 +332,7 @@ impl AnalizadorSemantico {
             variables_movidas: std::collections::HashSet::new(),
             nivel_verificacion_actual: crate::ast::NivelVerificacion::Permisivo,
             borrows: HashMap::new(),
+            profundidad_bucle: 0,
             efecto_actual: crate::ast::Efecto::Conservador,
             rasgos: HashMap::new(),
             impls: HashMap::new(),
@@ -1717,7 +1721,9 @@ No puedes modificar algo que no es 'tuyo'.",
                 
                 // Branch-aware: borrows dentro del bucle se resetean cada iteración
                 let borrows_antes = self.borrows.clone();
+                self.profundidad_bucle += 1;
                 self.analizar_bloque(&bucle.bloque);
+                self.profundidad_bucle -= 1;
                 self.borrows = borrows_antes;
             }
             Sentencia::BuclePara(bucle) => {
@@ -1770,11 +1776,35 @@ No puedes modificar algo que no es 'tuyo'.",
                 
                 // Branch-aware: borrows dentro del bucle se resetean cada iteración
                 let borrows_antes = self.borrows.clone();
+                self.profundidad_bucle += 1;
                 self.analizar_bloque(&bucle.bloque);
+                self.profundidad_bucle -= 1;
                 self.borrows = borrows_antes;
                 
                 // Restaurar entorno
                 self.entorno = *self.entorno.padre.take().unwrap_or_else(|| Box::new(Entorno::nuevo()));
+            }
+            Sentencia::Romper(span) => {
+                if self.profundidad_bucle == 0 {
+                    self.reportar_error(
+                        CategoriaError::Tipo,
+                        107, // T107: romper fuera de bucle
+                        span,
+                        "'romper' solo puede usarse dentro de un bucle (para/mientras)".to_string(),
+                        Some("Coloca 'romper' dentro del cuerpo de un bucle para salir temprano".to_string())
+                    );
+                }
+            }
+            Sentencia::Continuar(span) => {
+                if self.profundidad_bucle == 0 {
+                    self.reportar_error(
+                        CategoriaError::Tipo,
+                        108, // T108: continuar fuera de bucle
+                        span,
+                        "'continuar' solo puede usarse dentro de un bucle (para/mientras)".to_string(),
+                        Some("Coloca 'continuar' dentro del cuerpo de un bucle para saltar a la siguiente iteración".to_string())
+                    );
+                }
             }
             Sentencia::Region { nombre: _, cuerpo, span: _ } => {
                 // Región: nuevo entorno léxico (arena allocation scope)
