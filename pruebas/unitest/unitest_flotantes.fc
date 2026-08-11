@@ -1,0 +1,42 @@
+// unitest_flotantes.fc — aritmética flotante completa
+// Fix R7.6: TODAS las operaciones binarias flotantes estaban rotas
+// (sdiv/srem/icmp con F64 = Verifier error). Ahora fadd/fsub/fmul/fdiv/fcmp.
+// Spec: IEEE 754 — 1.0/0.0 = inf, 0.0/0.0 = nan (sin crash).
+// Modulo flotante: emulado a - floor(a/b)*b (Cranelift 0.112 sin frem nativo).
+
+prueba "division flotante normal" {
+    el a: Flotante64 = 1.0 / 2.0;
+    afirmar(a == 0.5);
+}
+
+prueba "division por cero flotante = inf" {
+    el uno: Flotante64 = 1.0;
+    el cero: Flotante64 = 0.0;
+    el a: Flotante64 = uno / cero;
+    afirmar(a > 1000000.0);  // inf > cualquier número finito
+}
+
+prueba "comparaciones flotantes" {
+    el a: Flotante64 = 1.5;
+    el b: Flotante64 = 2.5;
+    afirmar(a < b);
+    afirmar(b > a);
+    afirmar(a != b);
+    afirmar(a == 1.5);
+    afirmar(a <= 1.5);
+    afirmar(b >= 2.5);
+}
+
+prueba "modulo flotante emulado" {
+    el m: Flotante64 = 7.5 % 2.0;
+    afirmar(m == 1.5);
+}
+
+prueba "suma resta multiplicacion flotante" {
+    el a: Flotante64 = 1.5 + 2.5;
+    afirmar(a == 4.0);
+    el b: Flotante64 = a - 1.0;
+    afirmar(b == 3.0);
+    el c: Flotante64 = b * 2.0;
+    afirmar(c == 6.0);
+}

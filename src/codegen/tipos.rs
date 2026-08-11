@@ -10,20 +10,58 @@ impl Codegen {
         der: cranelift_codegen::ir::Value,
         builder: &mut FunctionBuilder,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        use cranelift_codegen::ir::condcodes::IntCC;
+        use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
+        
+        // Detectar operandos flotantes: F32/F64 requieren instrucciones flotantes
+        // (sdiv/srem/icmp con F64 = Verifier error — bug R7.6: división flotante nunca compiló)
+        let es_flotante = matches!(
+            builder.func.dfg.value_type(izq),
+            types::F32 | types::F64
+        );
         
         let val = match op {
-            OperadorBinario::Suma => builder.ins().iadd(izq, der),
-            OperadorBinario::Resta => builder.ins().isub(izq, der),
-            OperadorBinario::Multiplicacion => builder.ins().imul(izq, der),
-            OperadorBinario::Division => builder.ins().sdiv(izq, der),
-            OperadorBinario::Modulo => builder.ins().srem(izq, der),
-            OperadorBinario::Igual => builder.ins().icmp(IntCC::Equal, izq, der),
-            OperadorBinario::Distinto => builder.ins().icmp(IntCC::NotEqual, izq, der),
-            OperadorBinario::Menor => builder.ins().icmp(IntCC::SignedLessThan, izq, der),
-            OperadorBinario::Mayor => builder.ins().icmp(IntCC::SignedGreaterThan, izq, der),
-            OperadorBinario::MenorIgual => builder.ins().icmp(IntCC::SignedLessThanOrEqual, izq, der),
-            OperadorBinario::MayorIgual => builder.ins().icmp(IntCC::SignedGreaterThanOrEqual, izq, der),
+            OperadorBinario::Suma => {
+                if es_flotante { builder.ins().fadd(izq, der) } else { builder.ins().iadd(izq, der) }
+            }
+            OperadorBinario::Resta => {
+                if es_flotante { builder.ins().fsub(izq, der) } else { builder.ins().isub(izq, der) }
+            }
+            OperadorBinario::Multiplicacion => {
+                if es_flotante { builder.ins().fmul(izq, der) } else { builder.ins().imul(izq, der) }
+            }
+            OperadorBinario::Division => {
+                if es_flotante { builder.ins().fdiv(izq, der) } else { builder.ins().sdiv(izq, der) }
+            }
+            OperadorBinario::Modulo => {
+                if es_flotante {
+                    // Cranelift 0.112 NO tiene frem nativo → emular: a - floor(a/b) * b
+                    // (mod matemático, signo del divisor — spec R7.6)
+                    let div = builder.ins().fdiv(izq, der);
+                    let fl = builder.ins().floor(div);
+                    let mul = builder.ins().fmul(fl, der);
+                    builder.ins().fsub(izq, mul)
+                } else {
+                    builder.ins().srem(izq, der)
+                }
+            }
+            OperadorBinario::Igual => {
+                if es_flotante { builder.ins().fcmp(FloatCC::Equal, izq, der) } else { builder.ins().icmp(IntCC::Equal, izq, der) }
+            }
+            OperadorBinario::Distinto => {
+                if es_flotante { builder.ins().fcmp(FloatCC::NotEqual, izq, der) } else { builder.ins().icmp(IntCC::NotEqual, izq, der) }
+            }
+            OperadorBinario::Menor => {
+                if es_flotante { builder.ins().fcmp(FloatCC::LessThan, izq, der) } else { builder.ins().icmp(IntCC::SignedLessThan, izq, der) }
+            }
+            OperadorBinario::Mayor => {
+                if es_flotante { builder.ins().fcmp(FloatCC::GreaterThan, izq, der) } else { builder.ins().icmp(IntCC::SignedGreaterThan, izq, der) }
+            }
+            OperadorBinario::MenorIgual => {
+                if es_flotante { builder.ins().fcmp(FloatCC::LessThanOrEqual, izq, der) } else { builder.ins().icmp(IntCC::SignedLessThanOrEqual, izq, der) }
+            }
+            OperadorBinario::MayorIgual => {
+                if es_flotante { builder.ins().fcmp(FloatCC::GreaterThanOrEqual, izq, der) } else { builder.ins().icmp(IntCC::SignedGreaterThanOrEqual, izq, der) }
+            }
             OperadorBinario::Y => builder.ins().band(izq, der),
             OperadorBinario::O => builder.ins().bor(izq, der),
             // Bitwise
