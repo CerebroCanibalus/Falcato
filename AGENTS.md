@@ -148,21 +148,21 @@ falcato version                              # Muestra versión
 ### R7 — Primitivas nativas para el CLI (Cid)
 Piezas **NATIVAS** (Capa A/B/C); todo lo demás (JSON, HTTP, SSE, MCP) son librerías `.fc` y NO tocan el compiler.
 
-- [ ] **R7.1 — Spawn procesos + pipes** (CreateProcess/CreatePipe/WaitForSingleObject)
-  - [ ] Runtime C: `proceso_crear(comando) -> Handle`, `proceso_esperar(p) -> código`, `proceso_leer_salida(p) -> Texto` (stdout+stderr capturados)
-  - [ ] Registry: remapeo de los 3 nombres | Codegen: builtins `proceso_*` con Span
-  - [ ] **Criterio:** ejecutar `falcato check` desde un programa Falcato y capturar su salida
+- [x] **R7.1 — Spawn procesos + pipes** (CreateProcess/CreatePipe/WaitForSingleObject) **✅ 2026-08-10**
+  - [x] Runtime C: `proceso_crear(comando) -> Handle`, `proceso_esperar(p) -> código`, `proceso_leer_salida(p) -> Texto` (stdout+stderr capturados) + `proceso_cerrar(h)`
+  - [x] Registry: remapeo de los 4 nombres | Codegen: builtins `proceso_*` con Span
+  - [x] **Criterio verificado:** `proceso_crear("falcato.exe verifica x.fc")` + `proceso_esperar` → EXIT[0], `proceso_leer_salida` captura el stdout real
   - [ ] *Bloqueante:* sin esto no hay `cid run/build/test`, ni git, ni MCPs stdio
-- [ ] **R7.2 — Terminal raw mode + ANSI**
-  - [ ] PlatformRuntime: `terminal_modo_raw(activo)`, `terminal_leer_tecla() -> Entero32`
-  - [ ] Windows: `SetConsoleMode(ENABLE_VIRTUAL_TERMINAL_PROCESSING)`, `ReadConsoleInput`
-  - [ ] **Criterio:** leer teclas sin Enter y detectar flechas; colores ANSI activados
+- [x] **R7.2 — Terminal raw mode + ANSI** **✅ 2026-08-10**
+  - [x] PlatformRuntime: `terminal_modo_raw(activo)`, `terminal_leer_tecla() -> Entero32`
+  - [x] Windows: `SetConsoleMode(ENABLE_VIRTUAL_TERMINAL_PROCESSING)`, `ReadConsoleInput`
+  - [x] **Criterio verificado:** `terminal_modo_raw(1)` → 1 (activación OK); lectura de teclas sin Enter requiere consola interactiva (no verificable en pipe)
   - [ ] *Bloqueante:* sin esto no hay TUI de Cid (Pilar IV)
-- [ ] **R7.3 — Entrada estándar (stdin)**
-  - [ ] Registry: `entrada_leer() -> Texto` (ReadFile sobre STD_INPUT_HANDLE)
-  - [ ] **Criterio:** `echo hola | cid` lee el texto · *Bloqueante:* MCPs y LSP client hablan por stdio (JSON-RPC)
-- [ ] **R7.4 — Date/time formato** (timestamp ya existe; falta formatear)
-  - [ ] Librería `.fc` sobre `timestamp` (strftime manual o FFI) · **Criterio:** sesiones y logs con fecha legible · *No bloqueante*
+- [x] **R7.3 — Entrada estándar (stdin)** **✅ 2026-08-10**
+  - [x] Registry: `entrada_leer() -> Texto` (ReadFile sobre STD_INPUT_HANDLE)
+  - [x] **Criterio verificado:** `echo hola | prog` → `entrada_leer()` devuelve "hola" · *Bloqueante:* MCPs y LSP client hablan por stdio (JSON-RPC)
+- [ ] **R7.4 — Date/time formato** (`fecha_unix`/`fecha_ms` ya existen y devuelven epoch real — verificado 2026-08-10; falta formatear a texto legible)
+  - [ ] Librería `.fc` sobre `fecha_unix` (strftime manual o FFI) · **Criterio:** sesiones y logs con fecha legible · *No bloqueante*
 - [ ] **R7.5 — Argumentos de línea de comandos (argv tipado, INNOVACIÓN)**
   - [x] **Fase 1:** builtin `argumentos() -> Vector<Texto>` — crudo estilo C. `falcato corre` YA pasa args. Mapeo Capa B/C: `GetCommandLineW`/`CommandLineToArgvW` (Windows), `argv` (POSIX) — sin `--cfg(os)`. **✅ 2026-08-08** (Windows verificado; POSIX falta probar en WSL). Linker: `shell32.lib`.
   - [x] **Fase 2 (la innovación):** `función principal(el args: Struct) -> Entero32` — compiler genera parseo `--campo valor` + validación + `--ayuda` automático en español. **Artículos codifican el esquema**: `el`=requerido, `un`=opcional, `la`=inmutable/validado, `los`=varargs posicionales. No es sintaxis nueva — struct + artículos existentes. **✅ 2026-08-08.** Impl: `src/args_tipados.rs` (preprocesa AST, elimina param ABI, sintetiza prólogo Falcato que recorre argv con `argumentos()`/`vector_obtener`/`texto_comparar`, convierte con builtins `texto_a_entero/natural/flotante/booleano` + `como_entero32`, valida requeridos, construye struct `args`). Verificado: `.\saludo_app.exe --nombre sebas --cuenta 3` → "hola, sebas". Tipos: Texto, Entero32/64, Natural32/64, Flotante64, Booleano. Interpolación soporta `{args.nombre}`.
@@ -309,6 +309,7 @@ Auditoría completa en cada release mayor (v0.5.0, v0.6.0…). Semáforo: 🟢 c
 ---
 
 ## Descubrimientos (lecciones — causa raíz + fix)
+- **Rutas Windows con `\` en strings Falcato se comen la barra**: `"D:\Falcato\target"` → `\F`/`\t`/`\r` se interpretan como escapes → cmd.exe recibe `"D:Falcato"` y falla. Fix: usar forward slashes `"D:/Falcato/target"` o `\\` escapado. **Lección:** rutas en strings `.fc` SIEMPRE con `/` o `\\` (verificado 2026-08-10 en prueba R7.1).
 - **build.bat LF-only rompía cmd.exe**: `.bat` con `\n` (LF) en vez de `\r\n` (CRLF) → `if errorlevel` rotos. Fix: CRLF (`-replace "\r?\n", "\r\n"`, sin BOM). **Lección:** los `.bat` SIEMPRE en CRLF.
 - **PowerShell `Set-Content -Encoding UTF8` corrompe acentos**: re-codifica `í`/`ó`/`ñ` en `.fc` (BOM + re-encoding) → `[S008] carácter no válido`. Fix: `git checkout -- <archivo>`. **Lección: NUNCA editar `.fc` con Set-Content**; usar tools del agente (UTF-8 correcto).
 - **`cargo build` directo falla con LNK1104 (msvcrt.lib)**: cargo usa linker de VS Insiders sin entorno MSVC. Fix: `build.bat` (llama `VsDevCmd.bat -arch=x64`) o preceder con `call "...\VsDevCmd.bat" -arch=x64`.
