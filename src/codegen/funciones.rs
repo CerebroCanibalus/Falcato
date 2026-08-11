@@ -52,6 +52,10 @@ impl Codegen {
         // Variables locales: nombre â†’ (slot, tipo, artÃ­culo)
         let mut variables: HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)> = HashMap::new();
 
+        // R6: Drop automÃ¡tico — estado limpio por funciÃ³n
+        self.heap_vivas.clear();
+        self.scope_marcas.clear();
+
         // ParÃ¡metros como variables
         for (i, param) in func.parametros.iter().enumerate() {
             let val = builder.block_params(entry_block)[i];
@@ -65,6 +69,10 @@ impl Codegen {
             );
             builder.ins().stack_store(val, slot, 0);
             variables.insert(param.nombre.clone(), (slot, param.tipo.clone(), param.articulo));
+            // R6: parÃ¡metro owned (el/los) de tipo heap → el callee es dueÃ±o → liberar al final
+            if matches!(param.articulo, crate::ast::Articulo::El | crate::ast::Articulo::Los) {
+                self.registrar_heap(&param.nombre, &param.tipo);
+            }
         }
 
         // Compilar sentencias
@@ -77,15 +85,9 @@ impl Codegen {
             )?;
         }
 
-        // TODO: Drop automÃ¡tico (Fase 12B)
-        // El drop automÃ¡tico requiere anÃ¡lisis de flujo de control para insertar
-        // free() antes de cada retorno. Por ahora, el programador debe llamar
-        // a texto_liberar() / vector_liberar() manualmente.
-        // 
-        // LimitaciÃ³n conocida de Fase 12A:
-        // - Variables owned de tipos heap (Texto, Vector) no se liberan automÃ¡ticamente
-        // - El programador debe llamar a liberar() manualmente
-        // - Esto se resolverÃ¡ en Fase 12B con anÃ¡lisis de CFG
+        // R6: Drop automÃ¡tico — liberar variables heap owned vivas al final de la funciÃ³n
+        // (las movidas/liberadas/retornadas ya se quitaron de heap_vivas durante la compilaciÃ³n)
+        self.liberar_scope(0, &mut builder, &variables)?;
 
         // Si no hay retorno explÃ­cito, aÃ±adir retorno void
         if func.retorno.is_none() {

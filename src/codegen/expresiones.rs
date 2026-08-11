@@ -1033,6 +1033,25 @@ impl Codegen {
         builder: &mut FunctionBuilder,
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // R6: Drop automático — análisis de moves y liberaciones manuales.
+        // Esto decide qué variables heap NO se liberan al final del scope.
+        if llamada.funcion.ends_with("_liberar") {
+            // x.liberar() → liberación manual: la variable ya no necesita free automático
+            if let Some(Expresion::Identificador(nombre, _)) = llamada.argumentos.first() {
+                self.quitar_heap(nombre);
+            }
+        } else if !self.es_llamada_builtin(llamada) {
+            // Función de usuario: parámetro con artículo `el`/`los` → mueve la variable
+            for (i, arg) in llamada.argumentos.iter().enumerate() {
+                if let Expresion::Identificador(nombre, _) = arg {
+                    if self.parametro_mueve(&llamada.funcion, i)
+                        && self.heap_vivas.iter().any(|(n, _)| n == nombre) {
+                        self.quitar_heap(nombre);
+                    }
+                }
+            }
+        }
+
         // Verificar si es llamada a funci├│n built-in (Texto / Vector<T>)
         if self.es_llamada_builtin(llamada) {
             return self.compilar_llamada_builtin(llamada, builder, variables);

@@ -1,0 +1,59 @@
+// unitest_drop.fc — Drop automático (R6)
+// El compiler inserta free() al final de cada scope para variables heap owned
+// (el/los) que no fueron movidas, liberadas manualmente ni retornadas.
+// Conservador: si hay duda → leak, nunca double-free.
+
+función consumir(el t: Texto) -> Entero32 {
+    // Parámetro `el` → el callee es dueño → libera aquí
+    el len: Entero32 = texto_tam(t);
+    texto_liberar(t);
+    retornar len;
+}
+
+función crear() -> Texto {
+    // Retornar heap → el caller es dueño → R6 NO libera aquí
+    el t: Texto = texto_nuevo();
+    texto_agregar(t, "retornado");
+    retornar t;
+}
+
+prueba "bucle crea Textos sin leak" {
+    // ANTES de R6: leak acumulado por iteración (OOM en loops largos)
+    el total: Entero32 = 0;
+    para i en 0..50000 {
+        el t: Texto = texto_nuevo();
+        texto_agregar(t, "hola");
+        texto_agregar(t, " mundo");
+        total = total + texto_tam(t);
+        // R6 libera `t` al final de cada iteración
+    }
+    afirmar(total == 500000);
+}
+
+prueba "movida a funcion el no se libera dos veces" {
+    el a: Texto = texto_nuevo();
+    texto_agregar(a, "abc");
+    el r: Entero32 = consumir(a);  // consumir libera → R6 no
+    afirmar(r == 3);
+}
+
+prueba "liberacion manual no se repite" {
+    el b: Texto = texto_nuevo();
+    texto_agregar(b, "xyz");
+    texto_liberar(b);  // manual → R6 no libera de nuevo
+    afirmar(verdadero);
+}
+
+prueba "retornada la libera el caller" {
+    el c: Texto = crear();  // caller es dueño
+    afirmar(texto_tam(c) == 9);
+    texto_liberar(c);
+}
+
+prueba "variable heap al final de funcion" {
+    // Sin .liberar() manual → R6 libera al final de la función
+    el d: Texto = texto_nuevo();
+    texto_agregar(d, "auto");
+    afirmar(texto_tam(d) == 4);
+    // R6 libera `d` aquí (fin de función)
+}

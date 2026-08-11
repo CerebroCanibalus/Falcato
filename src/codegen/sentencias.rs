@@ -263,6 +263,11 @@ impl Codegen {
                     }
                 };
                 
+                // R6: Drop automático — variable owned (el/los) de tipo heap → candidata a free
+                // (registrar ANTES de mover `tipo` al insert)
+                if matches!(decl.articulo, crate::ast::Articulo::El | crate::ast::Articulo::Los) {
+                    self.registrar_heap(&decl.nombre, &tipo);
+                }
                 variables.insert(decl.nombre.clone(), (slot, tipo, decl.articulo));
             }
             Sentencia::Asignacion(asig) => {
@@ -380,6 +385,15 @@ impl Codegen {
                 }
             }
             Sentencia::Retornar(expr, _span) => {
+                // R6: Drop automático — si se retorna una variable heap owned, el caller
+                // es dueño → quitar de vivas (no liberar aquí)
+                if let Some(Expresion::Identificador(nombre, _)) = expr.as_ref() {
+                    if self.heap_vivas.iter().any(|(n, _)| n == nombre) {
+                        self.quitar_heap(nombre);
+                    }
+                }
+                // R6: liberar el resto de variables heap vivas ANTES del return
+                self.liberar_scope(0, builder, variables)?;
                 if let Some(expr) = expr {
                     let val = self.compilar_expresion(expr, builder, variables)?;
                     // Si la expresi├│n accede a una variable de tipo Resultado o enum peque├▒o,
@@ -414,6 +428,8 @@ impl Codegen {
                         // Construir ELSE primero (hot path, en l├¡nea)
                         builder.switch_to_block(else_block);
                         builder.seal_block(else_block);
+                        // R6: snapshot de scope de la rama (liberar heap declarado en ella)
+                        let m_else = self.marcar_scope();
                         let mut else_terminado = false;
                         if let Some(ref bloque_sino) = cond.bloque_sino {
                             for sentencia in &bloque_sino.sentencias {
@@ -424,12 +440,15 @@ impl Codegen {
                             }
                         }
                         if !else_terminado {
+                            self.liberar_scope(m_else, builder, variables)?;
                             builder.ins().jump(merge_block, &[]);
                         }
 
                         // Construir THEN despu├®s (cold path, fuera de l├¡nea)
                         builder.switch_to_block(then_block);
                         builder.seal_block(then_block);
+                        // R6: snapshot de scope de la rama
+                        let m_then = self.marcar_scope();
                         let mut then_terminado = false;
                         for sentencia in &cond.bloque_entonces.sentencias {
                             if matches!(sentencia, Sentencia::Retornar(_, _)) {
@@ -438,6 +457,7 @@ impl Codegen {
                             self.compilar_sentencia(sentencia, builder, variables, _func_span)?;
                         }
                         if !then_terminado {
+                            self.liberar_scope(m_then, builder, variables)?;
                             builder.ins().jump(merge_block, &[]);
                         }
                     }
@@ -446,6 +466,8 @@ impl Codegen {
                         // Construir THEN primero (hot path)
                         builder.switch_to_block(then_block);
                         builder.seal_block(then_block);
+                        // R6: snapshot de scope de la rama
+                        let m_then = self.marcar_scope();
                         let mut then_terminado = false;
                         for sentencia in &cond.bloque_entonces.sentencias {
                             if matches!(sentencia, Sentencia::Retornar(_, _)) {
@@ -454,12 +476,15 @@ impl Codegen {
                             self.compilar_sentencia(sentencia, builder, variables, _func_span)?;
                         }
                         if !then_terminado {
+                            self.liberar_scope(m_then, builder, variables)?;
                             builder.ins().jump(merge_block, &[]);
                         }
 
                         // Construir ELSE despu├®s
                         builder.switch_to_block(else_block);
                         builder.seal_block(else_block);
+                        // R6: snapshot de scope de la rama
+                        let m_else = self.marcar_scope();
                         let mut else_terminado = false;
                         if let Some(ref bloque_sino) = cond.bloque_sino {
                             for sentencia in &bloque_sino.sentencias {
@@ -470,6 +495,7 @@ impl Codegen {
                             }
                         }
                         if !else_terminado {
+                            self.liberar_scope(m_else, builder, variables)?;
                             builder.ins().jump(merge_block, &[]);
                         }
                     }
@@ -495,6 +521,9 @@ impl Codegen {
 
                 // Body: ejecutar sentencias y volver al header
                 builder.switch_to_block(body_block);
+                // R6: snapshot de scope — variables heap declaradas en el body se liberan
+                // al final de CADA iteración (crítico para loops largos: sin esto, leak acumulado)
+                let m_body = self.marcar_scope();
                 let mut body_terminado = false;
                 for sentencia in &bucle.bloque.sentencias {
                     if matches!(sentencia, Sentencia::Retornar(_, _)) {
@@ -503,6 +532,8 @@ impl Codegen {
                     self.compilar_sentencia(sentencia, builder, variables, _func_span)?;
                 }
                 if !body_terminado {
+                    // R6: liberar heap del scope del body antes de volver al header
+                    self.liberar_scope(m_body, builder, variables)?;
                     builder.ins().jump(header_block, &[]);
                 }
                 builder.seal_block(body_block);
@@ -567,6 +598,8 @@ impl Codegen {
 
                     // Body: ejecutar bloque
                     builder.switch_to_block(body_block);
+                    // R6: snapshot de scope del body (liberar heap por iteración)
+                    let m_body = self.marcar_scope();
                     let mut body_terminado = false;
                     for sentencia in &bucle.bloque.sentencias {
                         if matches!(sentencia, Sentencia::Retornar(_, _)) {
@@ -576,6 +609,8 @@ impl Codegen {
                     }
 
                     if !body_terminado {
+                        // R6: liberar heap del scope del body antes de i++ y volver al header
+                        self.liberar_scope(m_body, builder, variables)?;
                         // i = i + 1
                         let cur = builder.ins().stack_load(types::I32, var_slot, 0);
                         let uno = builder.ins().iconst(types::I32, 1);
@@ -678,6 +713,8 @@ impl Codegen {
 
                     // Ejecutar cuerpo
                     let mut body_terminado = false;
+                    // R6: snapshot de scope del body (liberar heap por iteración)
+                    let m_body = self.marcar_scope();
                     for sentencia in &bucle.bloque.sentencias {
                         if matches!(sentencia, Sentencia::Retornar(_, _)) {
                             body_terminado = true;
@@ -686,6 +723,8 @@ impl Codegen {
                     }
 
                     if !body_terminado {
+                        // R6: liberar heap del scope del body antes de i++ y volver al header
+                        self.liberar_scope(m_body, builder, variables)?;
                         // i = i + 1
                         let idx_val = builder.ins().stack_load(types::I32, idx_slot, 0);
                         let uno = builder.ins().iconst(types::I32, 1);
@@ -710,14 +749,18 @@ impl Codegen {
                 // Regi├│n: nuevo scope l├®xico (arena allocation)
                 // Guardar variables actuales para restaurar despu├®s
                 let variables_antes: Vec<String> = variables.keys().cloned().collect();
+                // R6: snapshot de scope — liberar heap declarado dentro de la regi├│n
+                let m_region = self.marcar_scope();
                 
                 // Compilar cuerpo de la regi├│n
                 for sentencia in cuerpo {
                     self.compilar_sentencia(sentencia, builder, variables, _func_span)?;
                 }
                 
+                // R6: liberar heap del scope de la regi├│n
+                self.liberar_scope(m_region, builder, variables)?;
+                
                 // Limpiar variables declaradas en la regi├│n (LIFO)
-                // En el futuro: insertar free() para heap allocations
                 let variables_despues: Vec<String> = variables.keys().cloned().collect();
                 for var in &variables_despues {
                     if !variables_antes.contains(var) {

@@ -142,8 +142,14 @@ falcato version                              # Muestra versión
 > ~~R5 — Proyecto ejemplo 500+ líneas~~ **SALTADO (2026-08-03).** Sustituido por R7: el primer gran proyecto es el CLI **Cid** (agente estilo OpenCode en Falcato, `D:\Cid`). Las primitivas nativas que exige el CLI son el dogfooding real.
 
 ### R6 — Drop automático
-- [ ] Análisis de CFG para insertar `free` al final de scope (Texto, Vector, Diccionario, TCP)
-- [ ] **Requisito para:** Fase 2 de Cid (loop agente con JSON trees por doquier)
+- [x] **Análisis de scope para insertar `free` al final de scope** (Texto, Vector, Diccionario, Conjunto) **✅ 2026-08-11**
+  - [x] `heap_vivas` (Vec con snapshots `marcar_scope`/`liberar_scope`) en Codegen — libera al final de: función, ramas de condicional, body de bucles (crítico: sin esto, leak acumulado en loops), regiones
+  - [x] **Conservador: si hay duda → leak, nunca double-free.** No libera variables: (a) movidas a función con parámetro `el`/`los` (consulta `declaraciones`/`funciones_genericas` por artículo), (b) liberadas manualmente (`.liberar()` → `ends_with("_liberar")`), (c) retornadas (`retornar x` → el caller es dueño)
+  - [x] Builtins NO mueven (imprimir/concatenar/agregar prestan o copian) — solo funciones de usuario con parámetro `el` mueven
+  - [x] Parámetros `el`/`los` de tipo heap se registran como vivas (el callee es dueño)
+  - [x] **Criterio verificado:** bucle 200k Textos sin OOM (antes: leak acumulado); movida/liberada/retornada sin double-free; suite 13/13 + 54/54 + 68/75 sin regresiones. Test: `unitest_drop.fc`
+  - [ ] *Limitaciones v2:* closures con captura heap, `compilar_funcion_futuro` (async), TCP, asignación que sobrescribe heap (leak del valor viejo), `vector_agregar<Texto>` copia shallow (semántica existente)
+  - [ ] **Requisito para:** Fase 2 de Cid (loop agente con JSON trees por doquier)
 
 ### R7 — Primitivas nativas para el CLI (Cid)
 Piezas **NATIVAS** (Capa A/B/C); todo lo demás (JSON, HTTP, SSE, MCP) son librerías `.fc` y NO tocan el compiler.

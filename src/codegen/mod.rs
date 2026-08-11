@@ -84,6 +84,15 @@ pub struct Codegen {
     pub(crate) executor_worker_generado: bool,
     /// Si true, imprime el CLIF de cada función antes de definirla (flag --emit-clif)
     pub(crate) emit_clif: bool,
+    // ─── R6: Drop automático ────────────────────────────────────────────────
+    /// Declaraciones de funciones no genéricas: nombre → declaración.
+    /// Para consultar el artículo de un parámetro (el=owned→mueve, la=presta).
+    pub(crate) declaraciones: HashMap<String, FuncionDecl>,
+    /// Variables heap owned vivas (declaradas, no movidas, no liberadas, no retornadas).
+    /// Vec en vez de HashMap para soportar snapshots por scope (marcar_scope/liberar_scope).
+    pub(crate) heap_vivas: Vec<(String, Tipo)>,
+    /// Índices de inicio de cada scope activo (función, rama, body de bucle).
+    pub(crate) scope_marcas: Vec<usize>,
 }
 
 /// Info para compilar un closure diferidamente
@@ -149,6 +158,9 @@ impl Codegen {
             executor_pool_var: None,
             executor_worker_generado: false,
             emit_clif: false,
+            declaraciones: HashMap::new(),
+            heap_vivas: Vec::new(),
+            scope_marcas: Vec::new(),
         }.registrar_builtins_codegen())
     }
 
@@ -260,6 +272,9 @@ impl Codegen {
         for (_prefijo, decl) in &todas {
             if let Declaracion::Funcion(func) = decl {
                 if func.parametros_genericos.is_empty() {
+                    // R6: guardar declaración para consultar artículos de parámetros
+                    // (el=owned→mueve al pasar, la=presta) en el drop automático
+                    self.declaraciones.insert(func.nombre.clone(), func.clone());
                     self.declarar_funcion(func);
                 } else {
                     // Almacenar funciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n genÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©rica para monomorfizaciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n
@@ -777,6 +792,99 @@ impl Codegen {
             .map_err(|e| format!("Error escribiendo archivo: {}", e))?;
 
         Ok(())
+    }
+
+    // ─── R6: Drop automático (conservador: si hay duda → leak, nunca double-free) ───
+
+    /// ¿Es un tipo heap con liberador automático? (Texto, Vector, Diccionario, Conjunto)
+    pub(crate) fn es_tipo_heap(&self, tipo: &Tipo) -> bool {
+        match self.resolver_alias(tipo) {
+            Tipo::Texto => true,
+            Tipo::Vector(_) | Tipo::Diccionario(_, _) | Tipo::Conjunto(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Nombre del builtin liberador para un tipo heap ("" si no tiene).
+    pub(crate) fn liberador_para(&self, tipo: &Tipo) -> &'static str {
+        match self.resolver_alias(tipo) {
+            Tipo::Texto => "texto_liberar",
+            Tipo::Vector(_) => "vector_liberar",
+            Tipo::Diccionario(_, _) => "diccionario_liberar",
+            Tipo::Conjunto(_) => "conjunto_liberar",
+            _ => "",
+        }
+    }
+
+    /// Registra una variable heap owned como viva (candidata a free al final de scope).
+    pub(crate) fn registrar_heap(&mut self, nombre: &str, tipo: &Tipo) {
+        if self.es_tipo_heap(tipo) {
+            // No duplicar si ya está (asignación no cuenta como re-declaración)
+            if !self.heap_vivas.iter().any(|(n, _)| n == nombre) {
+                self.heap_vivas.push((nombre.to_string(), tipo.clone()));
+            }
+        }
+    }
+
+    /// Quita una variable de las vivas (fue movida, liberada o retornada).
+    pub(crate) fn quitar_heap(&mut self, nombre: &str) {
+        self.heap_vivas.retain(|(n, _)| n != nombre);
+    }
+
+    /// Marca el inicio de un scope. Devuelve el índice para liberar_scope.
+    pub(crate) fn marcar_scope(&mut self) -> usize {
+        let idx = self.heap_vivas.len();
+        self.scope_marcas.push(idx);
+        idx
+    }
+
+    /// Libera todas las variables heap declaradas DESDE el índice (snapshot de scope).
+    /// Inserta llamadas a los liberadores en el builder actual.
+    pub(crate) fn liberar_scope(
+        &mut self,
+        desde: usize,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+    ) -> Result<(), ()> {
+        // Recoger los nombres a liberar (desde el snapshot hasta el final)
+        let a_liberar: Vec<(String, Tipo)> = self.heap_vivas[desde..].to_vec();
+        for (nombre, tipo) in &a_liberar {
+            let liberador = self.liberador_para(tipo);
+            if liberador.is_empty() {
+                continue;
+            }
+            // Construir llamada al liberador: liberador(nombre)
+            let llamada = crate::ast::Llamada {
+                funcion: liberador.to_string(),
+                tipo_args: vec![],
+                argumentos: vec![
+                    crate::ast::Expresion::Identificador(nombre.clone(), crate::span::Span::vacio())
+                ],
+                span: crate::span::Span::vacio(),
+            };
+            self.compilar_llamada(&llamada, builder, variables)?;
+            // Ya liberada: quitar de vivas
+            self.quitar_heap(nombre);
+        }
+        // Podar el vec hasta el snapshot
+        self.heap_vivas.truncate(desde);
+        Ok(())
+    }
+
+    /// ¿El parámetro `indice` de la función `nombre` mueve (artículo `el`/`los`)?
+    pub(crate) fn parametro_mueve(&self, nombre: &str, indice: usize) -> bool {
+        if let Some(decl) = self.declaraciones.get(nombre) {
+            if let Some(p) = decl.parametros.get(indice) {
+                return matches!(p.articulo, crate::ast::Articulo::El | crate::ast::Articulo::Los);
+            }
+        }
+        if let Some(decl) = self.funciones_genericas.get(nombre) {
+            if let Some(p) = decl.parametros.get(indice) {
+                return matches!(p.articulo, crate::ast::Articulo::El | crate::ast::Articulo::Los);
+            }
+        }
+        // Desconocida (builtin o externa): no mueve (conservador)
+        false
     }
 }
 
