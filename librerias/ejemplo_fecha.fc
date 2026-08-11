@@ -1,0 +1,32 @@
+// Ejemplo de fecha — R7.4 (librería fecha.fc)
+// Compilar: falcato compila ejemplo_fecha.fc fecha.fc --salida ejemplo_fecha.exe
+usar fecha::*;
+
+función principal() -> Entero32 {
+    // Fecha/hora actual (UTC)
+    el ahora: Texto = fecha_ahora();
+    imprimir_linea("ahora: {ahora}");
+    texto_liberar(ahora);
+
+    // Nombre de archivo con fecha
+    el archivo: Texto = fecha_archivo();
+    imprimir_linea("archivo: respaldo_{archivo}.log");
+    texto_liberar(archivo);
+
+    // Epochs conocidos para validar el algoritmo civil:
+    // 0        → 1970-01-01 00:00:00
+    // 951782400 → 2000-02-29 00:00:00 (año bisiesto)
+    // 1786408617 → 2026-08-10 (hoy, verificado con fecha_unix)
+    el e0: Texto = fecha_formatear(como_entero64(0), "YYYY-MM-DD HH:MI:SS");
+    imprimir_linea("epoch 0: {e0}");
+    texto_liberar(e0);
+
+    el e2000: Texto = fecha_formatear(como_entero64(951782400), "YYYY-MM-DD HH:MI:SS");
+    imprimir_linea("epoch 951782400: {e2000}");
+    texto_liberar(e2000);
+
+    // Nombre del mes actual (sin tocar el struct Fecha)
+    el mes: Palabra = fecha_mes_actual();
+    imprimir_linea("mes actual: {mes}");
+    retornar 0;
+}

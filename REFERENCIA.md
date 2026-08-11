@@ -141,6 +141,35 @@ terminal_modo_raw(0);
 > `fecha_unix`/`fecha_ms` son reloj de pared real; `timestamp` mide ms desde boot
 > (intervalos).
 
+### Librería `fecha.fc` — fecha/hora legible (R7.4)
+
+Pura librería `.fc` (algoritmo civil de Hinnant, aritmética sin FFI). Compilar:
+`falcato compila app.fc fecha.fc --salida app.exe`. Todas las fechas son UTC.
+
+| Función | Firma | Qué hace |
+|---------|-------|----------|
+| `fecha_ahora` | `() -> Texto` | "YYYY-MM-DD HH:MI:SS" actual — liberar |
+| `fecha_archivo` | `() -> Texto` | "YYYYMMDD_HHMI" (nombres de archivo) — liberar |
+| `fecha_formatear` | `(Entero64, Palabra) -> Texto` | Formatea epoch con tokens `YYYY MM DD HH MI SS` + separadores `- : / . , _ T Z` — liberar |
+| `fecha_anio/mes/dia/hora/minuto/segundo` | `(Entero64) -> Entero32` | Componente individual del epoch |
+| `fecha_mes_nombre` | `(Entero32) -> Palabra` | "Enero"…"Diciembre" |
+| `fecha_mes_actual` | `() -> Palabra` | Nombre del mes actual |
+
+**Ejemplo:**
+```falcato
+usar fecha::*;
+el ahora: Texto = fecha_ahora();
+decir("inicio: {ahora}");        // inicio: 2026-08-11 00:48:47
+ahora.liberar();
+el archivo: Texto = fecha_archivo();
+decir("log_{archivo}.txt");      // log_20260811_0048.txt
+archivo.liberar();
+```
+
+> **Nota codegen:** los structs no se pueden devolver entre archivos (bug
+> `src/codegen/tipos.rs:133`) — por eso los componentes son funciones
+> individuales, no un struct `Fecha`.
+
 ---
 
 ## I/O (entrada/salida)

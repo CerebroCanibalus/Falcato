@@ -1,0 +1,211 @@
+// fecha — librería de fecha/hora legible (R7.4)
+// ============================================================================
+// Pura librería `.fc` sobre los builtins `fecha_unix()`/`fecha_ms()`.
+// Algoritmo civil (Howard Hinnant) — aritmética pura, sin FFI a C.
+// TODAS las fechas se interpretan como UTC (sin zona horaria).
+//
+// Uso:
+//   usar fecha::*;
+//   el ahora: Texto = fecha_ahora();        // "2026-08-10 17:30:45" — liberar
+//   el anio: Entero32 = fecha_anio(fecha_unix());
+//
+// Compilar con ambos archivos:
+//   falcato compila app.fc fecha.fc --salida app.exe
+//
+// CONTRATO DE MEMORIA: `fecha_* -> Texto` devuelven copia propia (liberar con
+// texto_liberar). Los componentes devuelven Entero32 (sin heap).
+// NOTA: el codegen no soporta structs como retorno entre archivos — por eso
+// los componentes se exponen como funciones individuales.
+// ============================================================================
+
+// == Helpers internos ========================================================
+
+// Dígito (0-9) como Palabra literal
+función _digito_palabra(la d: Entero32) -> Palabra {
+    si d es 0 { retornar "0"; }
+    si d es 1 { retornar "1"; }
+    si d es 2 { retornar "2"; }
+    si d es 3 { retornar "3"; }
+    si d es 4 { retornar "4"; }
+    si d es 5 { retornar "5"; }
+    si d es 6 { retornar "6"; }
+    si d es 7 { retornar "7"; }
+    si d es 8 { retornar "8"; }
+    retornar "9";
+}
+
+// Agrega la representación decimal de `n` al final de `t` (in-place)
+función _agregar_entero(el t: Texto, el n: Entero32) {
+    los digitos: [Entero32; 20] = todos 0;
+    el i: Entero32 = 0;
+    si n es 0 {
+        digitos[0] = 0;
+        i = 1;
+    } sino {
+        el v: Entero32 = n;
+        mientras v > 0 {
+            digitos[i] = v % 10;
+            v = v / 10;
+            i = i + 1;
+        }
+    }
+    el j: Entero32 = i - 1;
+    mientras j >= 0 {
+        texto_agregar(t, _digito_palabra(digitos[j]));
+        j = j - 1;
+    }
+}
+
+// Agrega `n` con mínimo 2 dígitos (relleno con cero): 5 → "05"
+función _agregar_dos(el t: Texto, el n: Entero32) {
+    si n < 10 {
+        texto_agregar(t, "0");
+    }
+    _agregar_entero(t, n);
+}
+
+// Agrega un separador/literal común por su byte ASCII
+función _agregar_separador(el t: Texto, la b: Entero8) {
+    si b es 32 { texto_agregar(t, " "); }   // espacio
+    si b es 45 { texto_agregar(t, "-"); }   // guion
+    si b es 58 { texto_agregar(t, ":"); }   // dos puntos
+    si b es 47 { texto_agregar(t, "/"); }   // slash
+    si b es 46 { texto_agregar(t, "."); }   // punto
+    si b es 44 { texto_agregar(t, ","); }   // coma
+    si b es 95 { texto_agregar(t, "_"); }   // guion bajo
+    si b es 84 { texto_agregar(t, "T"); }   // T (ISO 8601)
+    si b es 90 { texto_agregar(t, "Z"); }   // Z (UTC)
+}
+
+// Algoritmo civil de Hinnant: epoch → componente (0=año, 1=mes, 2=día,
+// 3=hora, 4=minuto, 5=segundo). Recalcula cada vez — aritmética pura, barato.
+función _componente(la epoch: Entero64, la cual: Entero32) -> Entero32 {
+    el DIAS_BASE: Entero32 = 719468;  // días de 0000-03-01 a 1970-01-01
+    el dias: Entero32 = como_entero32(epoch / 86400);
+    el resto: Entero32 = como_entero32(epoch % 86400);
+
+    el z: Entero32 = dias + DIAS_BASE;
+    el era: Entero32 = z / 146097;
+    el doe: Entero32 = z - era * 146097;
+    el yoe: Entero32 = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    el y: Entero32 = yoe + era * 400;
+    el doy: Entero32 = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    el mp: Entero32 = (5 * doy + 2) / 153;
+    el d: Entero32 = doy - (153 * mp + 2) / 5 + 1;
+    el m: Entero32 = mp + 3;
+    si m > 12 {
+        m = m - 12;
+    }
+    si m <= 2 {
+        y = y + 1;
+    }
+
+    el h: Entero32 = resto / 3600;
+    el mi: Entero32 = (resto % 3600) / 60;
+    el s: Entero32 = resto % 60;
+
+    si cual es 0 { retornar y; }
+    si cual es 1 { retornar m; }
+    si cual es 2 { retornar d; }
+    si cual es 3 { retornar h; }
+    si cual es 4 { retornar mi; }
+    retornar s;
+}
+
+// == API pública — componentes ===============================================
+
+función fecha_anio(la epoch: Entero64) -> Entero32 { retornar _componente(epoch, 0); }
+función fecha_mes(la epoch: Entero64) -> Entero32 { retornar _componente(epoch, 1); }
+función fecha_dia(la epoch: Entero64) -> Entero32 { retornar _componente(epoch, 2); }
+función fecha_hora(la epoch: Entero64) -> Entero32 { retornar _componente(epoch, 3); }
+función fecha_minuto(la epoch: Entero64) -> Entero32 { retornar _componente(epoch, 4); }
+función fecha_segundo(la epoch: Entero64) -> Entero32 { retornar _componente(epoch, 5); }
+
+// == API pública — formato ===================================================
+
+// Formatea epoch con tokens: YYYY MM DD HH MI SS (2 letras) y separadores
+// comunes (espacio, -, :, /, ., ,, _, T, Z). Cualquier otro byte se ignora.
+función fecha_formatear(la epoch: Entero64, la formato: Palabra) -> Texto {
+    el salida: Texto = texto_nuevo();
+    el fmt: Texto = texto_desde(formato);
+    el n: Entero32 = texto_longitud(fmt);
+    el i: Entero32 = 0;
+    mientras i < n {
+        el consumido: Entero32 = 0;
+        // Token de 4 letras: YYYY
+        si i + 3 < n {
+            el c1: Entero8 = texto_obtener_byte(fmt, i);
+            el c2: Entero8 = texto_obtener_byte(fmt, i + 1);
+            el c3: Entero8 = texto_obtener_byte(fmt, i + 2);
+            el c4: Entero8 = texto_obtener_byte(fmt, i + 3);
+            si c1 == 89 && c2 == 89 && c3 == 89 && c4 == 89 {
+                _agregar_entero(salida, _componente(epoch, 0));
+                consumido = 4;
+            }
+        }
+        // Token de 2 letras: MM DD HH MI SS
+        si consumido == 0 && i + 1 < n {
+            el c1: Entero8 = texto_obtener_byte(fmt, i);
+            el c2: Entero8 = texto_obtener_byte(fmt, i + 1);
+            si c1 == 77 && c2 == 77 {
+                _agregar_dos(salida, _componente(epoch, 1));
+                consumido = 2;
+            }
+            si consumido == 0 && c1 == 68 && c2 == 68 {
+                _agregar_dos(salida, _componente(epoch, 2));
+                consumido = 2;
+            }
+            si consumido == 0 && c1 == 72 && c2 == 72 {
+                _agregar_dos(salida, _componente(epoch, 3));
+                consumido = 2;
+            }
+            si consumido == 0 && c1 == 77 && c2 == 73 {
+                _agregar_dos(salida, _componente(epoch, 4));
+                consumido = 2;
+            }
+            si consumido == 0 && c1 == 83 && c2 == 83 {
+                _agregar_dos(salida, _componente(epoch, 5));
+                consumido = 2;
+            }
+        }
+        // Separador o literal
+        si consumido == 0 {
+            _agregar_separador(salida, texto_obtener_byte(fmt, i));
+            consumido = 1;
+        }
+        i = i + consumido;
+    }
+    texto_liberar(fmt);
+    retornar salida;
+}
+
+// Fecha/hora actual como "YYYY-MM-DD HH:MI:SS" (UTC) — copia propia, liberar
+función fecha_ahora() -> Texto {
+    retornar fecha_formatear(fecha_unix(), "YYYY-MM-DD HH:MI:SS");
+}
+
+// Fecha actual como "YYYYMMDD_HHMI" — apta para nombres de archivo (UTC)
+función fecha_archivo() -> Texto {
+    retornar fecha_formatear(fecha_unix(), "YYYYMMDD_HHMI");
+}
+
+// Nombre del mes en español (1-12) como Palabra literal
+función fecha_mes_nombre(la m: Entero32) -> Palabra {
+    si m es 1 { retornar "Enero"; }
+    si m es 2 { retornar "Febrero"; }
+    si m es 3 { retornar "Marzo"; }
+    si m es 4 { retornar "Abril"; }
+    si m es 5 { retornar "Mayo"; }
+    si m es 6 { retornar "Junio"; }
+    si m es 7 { retornar "Julio"; }
+    si m es 8 { retornar "Agosto"; }
+    si m es 9 { retornar "Septiembre"; }
+    si m es 10 { retornar "Octubre"; }
+    si m es 11 { retornar "Noviembre"; }
+    retornar "Diciembre";
+}
+
+// Nombre del mes actual (UTC)
+función fecha_mes_actual() -> Palabra {
+    retornar fecha_mes_nombre(fecha_mes(fecha_unix()));
+}

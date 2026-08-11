@@ -161,14 +161,26 @@ Piezas **NATIVAS** (Capa A/B/C); todo lo demás (JSON, HTTP, SSE, MCP) son libre
 - [x] **R7.3 — Entrada estándar (stdin)** **✅ 2026-08-10**
   - [x] Registry: `entrada_leer() -> Texto` (ReadFile sobre STD_INPUT_HANDLE)
   - [x] **Criterio verificado:** `echo hola | prog` → `entrada_leer()` devuelve "hola" · *Bloqueante:* MCPs y LSP client hablan por stdio (JSON-RPC)
-- [ ] **R7.4 — Date/time formato** (`fecha_unix`/`fecha_ms` ya existen y devuelven epoch real — verificado 2026-08-10; falta formatear a texto legible)
-  - [ ] Librería `.fc` sobre `fecha_unix` (strftime manual o FFI) · **Criterio:** sesiones y logs con fecha legible · *No bloqueante*
+- [x] **R7.4 — Date/time formato** (`fecha_unix`/`fecha_ms` ya existen y devuelven epoch real — verificado 2026-08-10; falta formatear a texto legible) **✅ 2026-08-11**
+  - [x] Librería `librerias/fecha.fc` — algoritmo civil de Hinnant, aritmética pura sin FFI. API: `fecha_ahora() -> Texto` ("YYYY-MM-DD HH:MI:SS" UTC), `fecha_archivo() -> Texto` ("YYYYMMDD_HHMI"), `fecha_formatear(epoch, formato) -> Texto` (tokens YYYY MM DD HH MI SS + separadores), `fecha_anio/mes/dia/hora/minuto/segundo(epoch) -> Entero32`, `fecha_mes_nombre(m) -> Palabra`, `fecha_mes_actual() -> Palabra`. **Criterio verificado:** epoch 0 → "1970-01-01 00:00:00", 951782400 → "2000-02-29 00:00:00" (bisiesto), fecha actual correcta. *No bloqueante*
+  - [ ] **Nota codegen:** structs como retorno entre archivos NO resuelven (`No se puede compilar tipo Nombre 'X' sin resolver` en `src/codegen/tipos.rs:133`) — por eso los componentes se exponen como funciones individuales (`_componente(epoch, cual)`). Bug pendiente de fix en codegen.
 - [ ] **R7.5 — Argumentos de línea de comandos (argv tipado, INNOVACIÓN)**
   - [x] **Fase 1:** builtin `argumentos() -> Vector<Texto>` — crudo estilo C. `falcato corre` YA pasa args. Mapeo Capa B/C: `GetCommandLineW`/`CommandLineToArgvW` (Windows), `argv` (POSIX) — sin `--cfg(os)`. **✅ 2026-08-08** (Windows verificado; POSIX falta probar en WSL). Linker: `shell32.lib`.
   - [x] **Fase 2 (la innovación):** `función principal(el args: Struct) -> Entero32` — compiler genera parseo `--campo valor` + validación + `--ayuda` automático en español. **Artículos codifican el esquema**: `el`=requerido, `un`=opcional, `la`=inmutable/validado, `los`=varargs posicionales. No es sintaxis nueva — struct + artículos existentes. **✅ 2026-08-08.** Impl: `src/args_tipados.rs` (preprocesa AST, elimina param ABI, sintetiza prólogo Falcato que recorre argv con `argumentos()`/`vector_obtener`/`texto_comparar`, convierte con builtins `texto_a_entero/natural/flotante/booleano` + `como_entero32`, valida requeridos, construye struct `args`). Verificado: `.\saludo_app.exe --nombre sebas --cuenta 3` → "hola, sebas". Tipos: Texto, Entero32/64, Natural32/64, Flotante64, Booleano. Interpolación soporta `{args.nombre}`.
   - [x] **Fase 3:** librería `librerias/args_avanzados.fc` — subcomandos (`args_subcomando`), defaults, repetición (`args_todos`), posicionales (`args_posicionales`), consultas (`args_tiene`, `args_obtener`, `args_cuenta`). **✅ 2026-08-08.** Contrato de memoria: TODAS devuelven COPIAS independientes (el caller libera; nunca comparte descriptores con argv → evita double-free). Uso: `usar args_avanzados::*` + `falcato compila app.fc args_avanzados.fc`. Sin tocar el compiler.
   - [x] **Criterio:** `.\saludo_app.exe --nombre sebas` → "hola, sebas" ✅
   - [ ] *Bloqueante:* Cid necesita args en Fase 2 · *NO es etiqueta* — es lenguaje puro post-compilado (regla: lo post-compilado se hace en lenguaje). Documentar en GUIA.md ("Argumentos de línea de comandos").
+
+### R7.6 — Unitest de codebase (previa al Cid)
+Suite de pruebas de calidad del lenguaje — **requisito antes de empezar Cid** (el primer proyecto grande necesita red de seguridad). Un módulo de pruebas que ejercita el compiler contra casos que los ejemplos no cubren.
+
+- [ ] **Mutabilidad y ownership:** `el`/`la`/`un`/`los`/`las`, mover/copiar/prestar, `&T`/`&mut T`, field-level borrowing, use-after-move (N0 compila, N1/N2 detectan), branch-aware liveness
+- [ ] **Edge cases numéricos:** overflow de Entero32/64, división por cero, literales límite (Entero32::MAX/MIN), conversiones `como_entero32` truncando, aritmética mixta (Entero32/Entero64)
+- [ ] **Edge cases de texto/colecciones:** `texto_nuevo()` vacío, `vector_agregar` con realloc, `vector_obtener` fuera de rango, `Diccionario` con clave inexistente, liberar dos veces (doble free), strings con escapes `\n\t\\`
+- [ ] **Calidad de código:** complejidad ciclomática ≤10, módulos ≤1500 LOC, panics/unwrap <2/1000 LOC, spans en todos los errores (Day-0), `#[cfg(target_os)]` solo en platform/
+- [ ] **Formato:** `prueba "nombre" { afirmar(...) }` + `falcato prueba` — correr como parte del CI
+- [ ] **Criterio:** suite completa verde en `falcato prueba`, sin regresiones en 54/54 tests existentes
+- [ ] *Bloqueante:* Cid Fase 2 (loop agente con JSON trees) necesita confianza en mutabilidad y memoria
 
 ### R8 — Sistema de paquetes distribuido (P2P, sin servidores)
 Ecosistema estilo crates.io pero **sin registry central**: contenido por hash, índice en la **DHT de BitTorrent** (BEP44 mutable items firmados), transporte por torrent con seeding. Casi todo vive en el compiler Rust (como cargo); solo la distribución entra en Capa A. **Espíritu:** esfuerzo comunitario — confianza, denuncias y contenido los crean los pares (comunismo absoluto); semilla de confianza cero. Patrón validado por IPFS (Benet 2014): Kademlia + BitTorrent + Git, tamper-resistance por construcción.
