@@ -1,0 +1,11 @@
+// aritmetica_mixta.fc — DEBE FALLAR
+// ESPERADO: [T005]
+// Spec: aritmética exige operandos del mismo tipo (no promoción automática)
+
+función principal() -> Entero32 {
+    el a: Entero32 = 10;
+    el b: Entero64 = 20;
+    el c: Entero64 = a + b;
+    imprimir_linea(c);
+    retornar 0;
+}

@@ -1,0 +1,30 @@
+// unitest_texto.fc — edge cases de texto
+// Spec: texto_nuevo() imprime vacío (no "(null)"), escapes estándar
+
+prueba "texto vacio" {
+    el t: Texto = texto_nuevo();
+    afirmar(t.tam() == 0);
+    t.liberar();
+}
+
+prueba "texto desde" {
+    el t: Texto = texto_desde("hola");
+    afirmar(t.tam() == 4);
+    t.liberar();
+}
+
+prueba "escapes" {
+    el t: Texto = texto_desde("a\nb\tc\\d");
+    afirmar(t.tam() == 7);  // a, \n, b, \t, c, \\, d
+    t.liberar();
+}
+
+prueba "concatenacion" {
+    el a: Texto = texto_desde("hola ");
+    el b: Texto = texto_desde("mundo");
+    el c: Texto = a + b;
+    afirmar(c.tam() == 10);  // "hola " (5) + "mundo" (5)
+    c.liberar();
+    b.liberar();
+    a.liberar();
+}

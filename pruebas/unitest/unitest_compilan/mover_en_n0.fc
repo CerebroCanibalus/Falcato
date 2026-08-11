@@ -1,0 +1,9 @@
+// mover_en_n0.fc — DEBE COMPILAR (verifica exit 0), no se ejecuta
+// Spec: N0 permisivo — use-after-move compila, compiler sugiere
+
+función principal() -> Entero32 {
+    el x: Entero32 = 5;
+    mover x;
+    imprimir_linea(x);
+    retornar 0;
+}

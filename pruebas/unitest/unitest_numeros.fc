@@ -1,0 +1,30 @@
+// unitest_numeros.fc — edge cases numéricos
+// Spec: overflow wrap módulo 2^n (estilo Go), cast trunca, literales límite
+
+prueba "overflow enteros" {
+    el max: Entero32 = 2147483647;
+    afirmar(max + 1 == -2147483648);       // wrap signed
+    el min: Entero32 = -2147483648;
+    afirmar(min - 1 == 2147483647);        // wrap inverso
+    el umax: Natural32 = 4294967295;
+    afirmar(umax + 1 == 0);                // wrap unsigned
+}
+
+prueba "literales limite" {
+    el max: Entero32 = 2147483647;
+    el min: Entero32 = -2147483648;
+    afirmar(max > min);
+    afirmar(max == 2147483647);
+}
+
+prueba "cast trunca" {
+    el grande: Entero64 = 4294967297;  // 2^32 + 1
+    el chico: Entero32 = como_entero32(grande);
+    afirmar(chico == 1);               // 2^32 + 1 mod 2^32
+}
+
+prueba "conversion explicita" {
+    el e: Entero64 = 86400;
+    el dias: Entero32 = como_entero32(e / 86400);
+    afirmar(dias == 1);
+}

@@ -1,0 +1,25 @@
+// unitest_ownership.fc — ownership en niveles
+// Spec: N0 permisivo (use-after-move compila), N2 estricto (O001)
+// NOTA: escritura via *ref_mut = x NO soportada (S003) — &mut solo lectura/paso
+// NOTA: dereferencia en comparaciones requiere parentesis: (*ref1) == 42
+
+prueba "copiar antes de mover" {
+    el x: Entero32 = 5;
+    el y: Entero32 = copiar x;
+    mover x;
+    afirmar(y == 5);
+}
+
+prueba "prestar inmutable" {
+    el x: Entero32 = 42;
+    la ref1: &Entero32 = &x;
+    la ref2: &Entero32 = &x;
+    afirmar((*ref1) == 42);
+    afirmar((*ref2) == 42);
+}
+
+prueba "leer via mut" {
+    el x: Entero32 = 7;
+    el ref_mut: &mut Entero32 = &mut x;
+    afirmar((*ref_mut) == 7);
+}

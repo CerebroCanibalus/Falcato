@@ -1,0 +1,9 @@
+// mutar_inmutable.fc — DEBE FALLAR
+// ESPERADO: [O001]
+// Spec: mutar variable 'la' (inmutable) = O001 en N2
+
+función principal() -> Entero32 estricto {
+    la x: Entero32 = 5;
+    x = 10;
+    retornar x;
+}

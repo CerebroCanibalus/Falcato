@@ -188,13 +188,17 @@ pruebas/unitest/
 ├── unitest_ownership.fc        # + ejecutan (prueba "x" { afirmar })
 ├── unitest_numeros.fc          # + ejecutan
 ├── unitest_texto.fc            # + ejecutan
+├── unitest_vector.fc           # + ejecutan
 ├── unitest_compilan/           # DEBE compilar pero no se ejecuta (verifica exit 0)
 │   └── mover_en_n0.fc          # use-after-move en N0 → compila (spec: N0 permisivo)
 ├── unitest_negativos/          # DEBE fallar con código exacto (verifica --json)
 │   ├── mover_en_n2.fc          # // ESPERADO: [O001] — función estricto
-│   └── mutar_inmutable.fc      # // ESPERADO: [O001]
-├── ESPECIFICACIONES.md         # registro de decisiones por caso (🟢/🔴/🟡)
-└── correr_unitest.ps1          # orquestador: scan + prueba + verifica + semáforo
+│   ├── mutar_inmutable.fc      # // ESPERADO: [O001]
+│   ├── mutar_la_n0.fc          # // ESPERADO: [O001] — la es inmutable en TODOS los niveles
+│   ├── borrow_mut_inmut.fc     # // ESPERADO: [O002] — borrow conflict
+│   └── aritmetica_mixta.fc     # // ESPERADO: [T005] — sin promoción automática
+├── ESPECIFICACIONES.md         # registro de decisiones por caso (🟢/🔴/🟡) ✅ 2026-08-11
+└── correr_unitest.ps1          # orquestador: scan + prueba + verifica + semáforo ✅ 2026-08-11
 ```
 
 **Los 3 tipos de tests (clave del diseño):**
@@ -202,13 +206,32 @@ pruebas/unitest/
 - **Compilan (N0)** → `falcato verifica` exit 0 — la filosofía N0 es "todo compila, sugiere"; un test negativo en N2 es POSITIVO en N0
 - **Fallan** → `falcato verifica --json` exit 1 + comparar `codigo` con `// ESPERADO: [XNNN]` del header (nuestro trybuild: el contrato JSON ya existe, sin snapshots)
 
+**Estado 2026-08-11: suite 10/10 verde** (4 ejecutan + 1 compila + 5 negativos). 54/54 tests del compiler sin regresiones.
+
+**Descubrimientos de la pasada (ver ESPECIFICACIONES.md completo):**
+- 🟢 **Overflow = wrap módulo 2ⁿ** (estilo Go): MAX+1 → MIN, Natural MAX+1 → 0. Spec confirmada
+- 🟢 **Cast trunca** módulo 2ⁿ: `como_entero32(2^32+1)` → 1
+- 🟢 **Aritmética mixta NO compila** (T005): AGENTS.md decía "operando mayor manda" — INCORRECTO; fecha.fc usa `como_entero32()` explícito
+- 🟢 **Mutar `la` = O001 en TODOS los niveles** — el artículo es semántica estática (Pilar I), no regla N0/N2
+- 🟢 **Borrow mut+inmut = O002** (código propio, no O001)
+- 🟢 **`(*ref) == 42` requiere paréntesis** — `*ref == 42` se parsea como `*(ref == 42)` → T030
+- 🟢 **`función estricto principal()` es S004** — formato correcto: `función principal() -> T estricto`
+- 🟢 **Turbofish obligatorio** en builtins de colecciones: `vector_nuevo<Entero32>()`
+- 🔴 **`verifica --json` con error da exit 0** (debe ser 1; sin `--json` sí da 1) — bug del contrato
+- 🔴 **Diccionario con tipos simples PANICEA** (`block2 is not sealed`, exit 101) — no solo compuestos
+- 🔴 **`vector_obtener` fuera de rango = UB inestable** (lee memoria basura, corridas alternas 1/0)
+- 🟡 **División por cero** = crash 0xC0000095 (UB estilo C) — decidir: crash controlado N2 o UB documentado
+- 🟡 **Doble free** = crash 0xC0000005 — sin detección
+- 🟡 **Escritura vía `*ref_mut = x`** NO soportada (S003) — ¿feature o limitación?
+- 🟢 **`falcato prueba -` (stdin)** no soportado — solo archivos
+
 **Cobertura por categorías:**
-- [ ] **Mutabilidad y ownership:** `el`/`la`/`un`/`los`/`las`, mover/copiar/prestar, `&T`/`&mut T`, field-level borrowing, use-after-move (N0 compila, N1/N2 detectan), branch-aware liveness — niveles como dial por función
-- [ ] **Edge cases numéricos:** overflow de Entero32/64 (¿wrap como Go? ¿panic como Rust debug? → 🟡 por especificar), división por cero (¿crash controlado como Zig? ¿UB como C? → 🟡), literales límite (Entero32::MAX/MIN), conversiones `como_entero32` truncando, aritmética mixta (Entero32/Entero64 — el operando mayor manda, verificado en fecha.fc)
-- [ ] **Edge cases de texto/colecciones:** `texto_nuevo()` vacío (fix "(null)"), `vector_agregar` con realloc (fix cap=1), `vector_obtener` fuera de rango (¿bounds? → 🟡), `Diccionario` con clave inexistente, doble free (¿detección? → 🟡), strings con escapes `\n\t\\`
+- [x] **Mutabilidad y ownership:** `el`/`la`/`un`/`los`/`las`, mover/copiar/prestar, `&T`/`&mut T`, field-level borrowing, use-after-move (N0 compila, N1/N2 detectan), branch-aware liveness — niveles como dial por función
+- [x] **Edge cases numéricos:** overflow de Entero32/64 (wrap confirmado), división por cero (🟡), literales límite (Entero32::MAX/MIN), conversiones `como_entero32` truncando, aritmética mixta (T005 — sin promoción)
+- [x] **Edge cases de texto/colecciones:** `texto_nuevo()` vacío (fix "(null)"), `vector_agregar` con realloc (fix cap=1), `vector_obtener` fuera de rango (🔴 UB), `Diccionario` con clave inexistente (🔴 panic), doble free (🟡), strings con escapes `\n\t\\`
 - [ ] **Calidad de código:** complejidad ciclomática ≤10, módulos ≤1500 LOC, panics/unwrap <2/1000 LOC, spans en todos los errores (Day-0), `#[cfg(target_os)]` solo en platform/
 - [ ] **Formato:** suite verde en `falcato prueba` + orquestador `correr_unitest.ps1` en CI
-- [ ] **Criterio:** suite completa verde, sin regresiones en 54/54 tests existentes, ESPECIFICACIONES.md sin casos 🟡 abiertos (todos resueltos o con tarea)
+- [ ] **Criterio:** suite completa verde, sin regresiones en 54/54 tests existentes ✅, ESPECIFICACIONES.md sin casos 🟡 abiertos (todos resueltos o con tarea) — 5 🟡 abiertos con tarea
 - [ ] *Bloqueante:* Cid Fase 2 (loop agente con JSON trees) necesita confianza en mutabilidad y memoria
 
 ### R8 — Sistema de paquetes distribuido (P2P, sin servidores)

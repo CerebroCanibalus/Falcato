@@ -1,0 +1,10 @@
+// mutar_la_n0.fc — DEBE FALLAR (incluso en N0)
+// ESPERADO: [O001]
+// Spec: mutar variable 'la' (inmutable) es O001 en TODOS los niveles —
+// el artículo es semántica estática del lenguaje (Pilar I), no una regla N0/N2
+
+función principal() -> Entero32 {
+    la x: Entero32 = 5;
+    x = 10;
+    retornar x;
+}

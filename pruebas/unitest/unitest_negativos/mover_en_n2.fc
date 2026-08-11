@@ -1,0 +1,10 @@
+// mover_en_n2.fc — DEBE FALLAR
+// ESPERADO: [O001]
+// Spec: N2 estricto — use-after-move detectado
+
+función principal() -> Entero32 estricto {
+    el x: Entero32 = 5;
+    mover x;
+    imprimir_linea(x);
+    retornar 0;
+}
