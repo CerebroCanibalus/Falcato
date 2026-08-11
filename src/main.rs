@@ -26,6 +26,10 @@ use crate::resolver::Resolver;
 use crate::semantic::AnalizadorSemantico;
 // Cranelift - puro Rust, sin dependencias del sistema
 
+/// Marcador interno: el error ya se imprimió como JSON (modo --json).
+/// main.rs lo detecta para NO duplicar el mensaje y solo propagar exit code 1.
+const JSON_YA_IMPRESO: &str = "__json_ya_impreso__";
+
 /// Template de ayuda en español — TODO el CLI habla español (regla Day-0 absoluta).
 const TEMPLATE_AYUDA: &str = "\
 {name} {version}
@@ -238,7 +242,10 @@ fn main() {
         }
         Comandos::Check { archivos, json, stdin, incremental } => {
             if let Err(e) = verificar(&archivos, json, stdin, incremental) {
-                eprintln!("[ERROR] {}", e);
+                // En modo JSON el error ya se imprimió como JSON; solo propagar exit code 1
+                if e != JSON_YA_IMPRESO {
+                    eprintln!("[ERROR] {}", e);
+                }
                 std::process::exit(1);
             }
         }
@@ -631,7 +638,8 @@ fn verificar_fuente(archivo: &str, fuente: &str, json: bool, incremental: bool) 
                 println!("{{\"ok\":false,\"archivo\":\"{}\",\"errores\":[{}]}}",
                     escapar_json(archivo),
                     errores.iter().map(|e| formato_error_json(&e.error)).collect::<Vec<_>>().join(","));
-                return Ok(());
+                // El JSON ya se imprimió; el Err solo propaga exit code 1 (sin duplicar mensaje)
+                return Err(JSON_YA_IMPRESO.to_string());
             }
             let msgs: Vec<String> = errores.iter()
                 .map(|e| e.error.to_string())
@@ -653,7 +661,8 @@ fn verificar_fuente(archivo: &str, fuente: &str, json: bool, incremental: bool) 
                 println!("{{\"ok\":false,\"archivo\":\"{}\",\"errores\":[{}]}}",
                     escapar_json(archivo),
                     errores.errores.iter().map(formato_error_json).collect::<Vec<_>>().join(","));
-                return Ok(());
+                // El JSON ya se imprimió; el Err solo propaga exit code 1 (sin duplicar mensaje)
+                return Err(JSON_YA_IMPRESO.to_string());
             }
             return Err(format!("Errores semánticos en '{}':\n{}", archivo, errores));
         }

@@ -1,6 +1,5 @@
 // unitest_vector.fc — edge cases de colecciones
-// NOTA: vector_obtener fuera de rango = UB (lee memoria, inestable) — NO testear
-// Spec pendiente: ¿bounds check en N2 (Go-style) o UB documentado (C-style)?
+// NOTA: vector_obtener fuera de rango = 0 DEFINIDO (fix R7.6, antes UB inestable)
 
 prueba "vector basico" {
     el v: Vector<Entero32> = vector_nuevo<Entero32>();
@@ -19,5 +18,16 @@ prueba "vector realloc" {
     }
     afirmar(vector_tam<Entero32>(v) == 100);
     afirmar(vector_obtener<Entero32>(v, 99) == 99);
+    vector_liberar<Entero32>(v);
+}
+
+prueba "vector fuera de rango devuelve 0" {
+    // Fix R7.6: bounds check definido (antes UB inestable, corridas alternas 1/0)
+    el v: Vector<Entero32> = vector_nuevo<Entero32>();
+    vector_agregar<Entero32>(v, 1);
+    vector_agregar<Entero32>(v, 2);
+    afirmar(vector_obtener<Entero32>(v, 1) == 2);   // dentro de rango OK
+    afirmar(vector_obtener<Entero32>(v, 5) == 0);   // fuera de rango → 0 definido
+    afirmar(vector_obtener<Entero32>(v, 99) == 0);  // muy fuera → 0 definido
     vector_liberar<Entero32>(v);
 }

@@ -1,0 +1,42 @@
+// unitest_diccionario.fc — edge cases de Diccionario
+// Fix R7.6: antes PANICEA (block2 not sealed) con tipos simples; ahora funciona
+// con internado de strings + resize automático.
+
+prueba "diccionario basico" {
+    el d: Diccionario<Entero32, Entero32> = diccionario_nuevo<Entero32, Entero32>();
+    diccionario_insertar<Entero32, Entero32>(d, 7, 42);
+    afirmar(diccionario_obtener<Entero32, Entero32>(d, 7) == 42);
+    diccionario_liberar<Entero32, Entero32>(d);
+}
+
+prueba "diccionario con Palabra" {
+    // Internado de strings: "clave" en insertar y en obtener es el MISMO puntero
+    el d: Diccionario<Palabra, Entero32> = diccionario_nuevo<Palabra, Entero32>();
+    diccionario_insertar<Palabra, Entero32>(d, "clave", 42);
+    afirmar(diccionario_obtener<Palabra, Entero32>(d, "clave") == 42);
+    diccionario_liberar<Palabra, Entero32>(d);
+}
+
+prueba "diccionario resize" {
+    // Cap inicial 16 → insertar 30 fuerza realloc a 32 (fix R7.6)
+    el d: Diccionario<Entero32, Entero32> = diccionario_nuevo<Entero32, Entero32>();
+    para i en 0..30 {
+        diccionario_insertar<Entero32, Entero32>(d, i, i * 10);
+    }
+    el ok: Booleano = verdadero;
+    para i en 0..30 {
+        si diccionario_obtener<Entero32, Entero32>(d, i) != i * 10 {
+            ok = falso;
+        }
+    }
+    afirmar(ok);
+    diccionario_liberar<Entero32, Entero32>(d);
+}
+
+prueba "diccionario sobrescribir" {
+    el d: Diccionario<Entero32, Entero32> = diccionario_nuevo<Entero32, Entero32>();
+    diccionario_insertar<Entero32, Entero32>(d, 1, 10);
+    diccionario_insertar<Entero32, Entero32>(d, 1, 99);  // misma clave → overwrite
+    afirmar(diccionario_obtener<Entero32, Entero32>(d, 1) == 99);
+    diccionario_liberar<Entero32, Entero32>(d);
+}

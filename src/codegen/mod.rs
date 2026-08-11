@@ -71,6 +71,11 @@ pub struct Codegen {
     /// Convención de llamada nativa (WindowsFastcall en Win, SystemV en POSIX)
     pub(crate) call_conv: CallConv,
     pub(crate) contador_strings: u32,
+    /// Internado de strings (R7.6): contenido → DataId. Dos literales iguales
+    /// comparten el MISMO global → comparación de Palabra por puntero funciona
+    /// (Diccionario<Palabra, V>). Antes: cada literal creaba un global nuevo y
+    /// "clave" != "clave" (punteros distintos) → diccionario nunca encontraba.
+    pub(crate) strings_internados: HashMap<String, cranelift_module::DataId>,
     pub(crate) contador_variables: u32,
     pub(crate) contador_closures: u32,
     pub(crate) closures_pendientes: Vec<ClosurePendiente>,
@@ -136,6 +141,7 @@ impl Codegen {
             registry: platform::current_registry(),
             call_conv: platform::current_runtime().call_conv_default(),
             contador_strings: 0,
+            strings_internados: HashMap::new(),
             contador_variables: 0,
             contador_closures: 0,
             closures_pendientes: Vec::new(),

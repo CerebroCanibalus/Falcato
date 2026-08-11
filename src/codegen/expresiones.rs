@@ -139,7 +139,13 @@ impl Codegen {
                         Ok(builder.ins().iconst(types::I32, *n as i64))
                     }
                     Literal::Palabra(s, _span) => {
-                        // Para strings, creamos un global data con ID ├║nico
+                        // Internado (R7.6): mismo contenido → mismo global → mismo
+                        // puntero. Requisito para Diccionario<Palabra, V> (comparación
+                        // de claves por puntero) y reduce el tamaño del binario.
+                        if let Some(data_id) = self.strings_internados.get(s) {
+                            let global = self.module.declare_data_in_func(*data_id, builder.func);
+                            return Ok(builder.ins().global_value(types::I64, global));
+                        }
                         self.contador_strings += 1;
                         let data_id = self.module.declare_data(
                             &format!("str_{}_{}", self.contador_strings, s.len()),
@@ -155,6 +161,7 @@ impl Codegen {
                         desc.define(bytes.into_boxed_slice());
                         self.module.define_data(data_id, &desc)
                             .map_err(|_| ())?;
+                        self.strings_internados.insert(s.to_string(), data_id);
                         
                         // Crear puntero al string
                         let global = self.module.declare_data_in_func(data_id, builder.func);

@@ -43,30 +43,29 @@ Fecha de la pasada de descubrimiento: 2026-08-11 (compiler v0.6.1 debug)
 | Escapes `\n \t \\` | Funcionan | 🟢 | Test: `unitest_texto.fc` |
 | Concatenación `a + b` | Funciona (len correcto) | 🟢 | Test: `unitest_texto.fc` |
 | `vector_agregar` + realloc (100 items) | Funciona | 🟢 | Fix cap=1 verificado. Test: `unitest_vector.fc` |
-| `vector_obtener` fuera de rango | **UB INESTABLE** — corridas alternas 1/0, lee memoria basura | 🔴 | Sin bounds check. **TAREA**: bounds check en N2 (Go-style panic) o UB documentado (C-style). Hoy NO es "devuelve 0" — mi primer test era falso |
-| `Diccionario` con tipos simples | **PANIC del compiler**: `block2 is not sealed` (exit 101) | 🔴 | Bug conocido en AGENTS.md para tipos compuestos, pero ocurre con `Palabra, Entero32` simples. Fix en `builtin_diccionario_insertar` |
+| `vector_obtener` fuera de rango | **UB INESTABLE** — corridas alternas 1/0, lee memoria basura | 🔴→🟢 | **FIX 2026-08-11**: bounds check → devuelve 0 definido (5/5 corridas estables). Test: `unitest_vector.fc` |
+| `Diccionario` con tipos simples | **PANIC del compiler**: `block2 is not sealed` (exit 101) | 🔴→🟢 | **FIX 2026-08-11**: (a) `body_block` sin sellar en `compilar_buscar_en_diccionario`; (b) SSA dominance: `stride_i64`/`val_offset_val` definidos en found_block pero usados en not_found_block → movidos al bloque dominante; (c) `diccionario_nuevo` con cap=0 → `hash % 0` crash → cap inicial 16 buckets + resize realloc 2×; (d) **internado de strings**: dos literales "clave" eran punteros distintos → comparación por puntero fallaba → cache `strings_internados`. Tests: `unitest_diccionario.fc` (básico, Palabra, resize 30, overwrite) |
 | Doble free | Crash `0xC0000005` (ACCESS_VIOLATION) | 🟡 | Sin detección. **TAREA**: ¿detección en N2 o UB documentado? (R6 drop automático podría ayudar) |
 
 ## 4. Toolchain (contrato de tests)
 
 | Caso | Resultado | Clasificación | Decisión |
 |------|-----------|---------------|----------|
-| `verifica --json` con error | `{"ok":false,...}` pero **exit 0** | 🔴 | **Bug**: el exit code no se propaga con `--json` (sin `--json` sí da exit 1). El orquestador usa exit 1 sin `--json` + JSON para el código. Fix: exit 1 cuando `ok:false` |
+| `verifica --json` con error | `{"ok":false,...}` pero **exit 0** | 🔴→🟢 | **FIX 2026-08-11**: retorna `Err(JSON_YA_IMPRESO)` (marcador) → main hace exit(1) sin duplicar el mensaje. Contrato: JSON limpio + exit 1 con error, exit 0 sin error |
 | `verifica` sin `--json` con error | exit 1 | 🟢 | Contrato OK para Fase 3 |
 | Sintaxis `función estricto principal()` | `[S004]` — INCORRECTA | 🟢 | Formato correcto: `función principal() -> T estricto` (como `borrow_ok.fc`). Documentar en GUIA.md |
 | Turbofish en colecciones | `vector_nuevo<Entero32>()` obligatorio | 🟢 | Sin inferencia en builtins genéricos. Documentar en GUIA.md |
 | `falcato prueba -` (stdin) | No soportado | 🟢 | Solo archivos. OK |
 
-## 5. Bugs abiertos (🔴) — prioridad
+## 5. Bugs arreglados (🔴→🟢) — 2026-08-11
 
-1. **`verifica --json` exit code** — debe ser 1 con `ok:false` (contrato LSP/CI)
-2. **Diccionario panic** — `block2 is not sealed` con tipos simples (codegen)
-3. **`vector_obtener` sin bounds check** — UB inestable; decidir spec N2
+1. **`verifica --json` exit code** — ahora exit 1 con `ok:false` (marcador `JSON_YA_IMPRESO`)
+2. **Diccionario panic** — 4 causas raíz: body_block sin sellar, SSA dominance en insertar, cap=0 → div por cero, literales sin internar. Todo arreglado + resize automático
+3. **`vector_obtener` sin bounds check** — ahora devuelve 0 definido (estable 5/5)
 
 ## 6. Tareas abiertas (🟡)
 
 - [ ] Escritura vía `*ref_mut` — ¿soportar en N2 o documentar limitación?
 - [ ] División por cero — ¿crash controlado (Zig) o UB documentado (C)?
-- [ ] Bounds de vector — ¿panic en N2 (Go) o UB documentado (C)?
 - [ ] Doble free — ¿detección en N2 o UB documentado?
 - [ ] División por cero flotante — probar IEEE 754

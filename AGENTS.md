@@ -206,7 +206,7 @@ pruebas/unitest/
 - **Compilan (N0)** → `falcato verifica` exit 0 — la filosofía N0 es "todo compila, sugiere"; un test negativo en N2 es POSITIVO en N0
 - **Fallan** → `falcato verifica --json` exit 1 + comparar `codigo` con `// ESPERADO: [XNNN]` del header (nuestro trybuild: el contrato JSON ya existe, sin snapshots)
 
-**Estado 2026-08-11: suite 10/10 verde** (4 ejecutan + 1 compila + 5 negativos). 54/54 tests del compiler sin regresiones.
+**Estado 2026-08-11: suite 11/11 verde** (5 ejecutan + 1 compila + 5 negativos). 54/54 tests del compiler sin regresiones. 68/75 ejemplos compilan (7 intencionales).
 
 **Descubrimientos de la pasada (ver ESPECIFICACIONES.md completo):**
 - 🟢 **Overflow = wrap módulo 2ⁿ** (estilo Go): MAX+1 → MIN, Natural MAX+1 → 0. Spec confirmada
@@ -217,9 +217,9 @@ pruebas/unitest/
 - 🟢 **`(*ref) == 42` requiere paréntesis** — `*ref == 42` se parsea como `*(ref == 42)` → T030
 - 🟢 **`función estricto principal()` es S004** — formato correcto: `función principal() -> T estricto`
 - 🟢 **Turbofish obligatorio** en builtins de colecciones: `vector_nuevo<Entero32>()`
-- 🔴 **`verifica --json` con error da exit 0** (debe ser 1; sin `--json` sí da 1) — bug del contrato
-- 🔴 **Diccionario con tipos simples PANICEA** (`block2 is not sealed`, exit 101) — no solo compuestos
-- 🔴 **`vector_obtener` fuera de rango = UB inestable** (lee memoria basura, corridas alternas 1/0)
+- ✅ **`verifica --json` exit code FIXED 2026-08-11**: exit 1 con `ok:false` (marcador `JSON_YA_IMPRESO` en main.rs)
+- ✅ **Diccionario FIXED 2026-08-11**: 4 causas raíz — (a) `body_block` sin sellar en `compilar_buscar_en_diccionario`; (b) SSA dominance: `stride_i64`/`val_offset_val` en found_block usados en not_found_block → movidos al bloque dominante; (c) `diccionario_nuevo` cap=0 → `hash % 0` crash → cap inicial 16 + resize realloc 2×; (d) **internado de strings** (`strings_internados`): literales iguales = mismo global → comparación de Palabra por puntero funciona
+- ✅ **`vector_obtener` bounds check FIXED 2026-08-11**: fuera de rango → 0 definido (antes UB inestable, corridas alternas 1/0)
 - 🟡 **División por cero** = crash 0xC0000095 (UB estilo C) — decidir: crash controlado N2 o UB documentado
 - 🟡 **Doble free** = crash 0xC0000005 — sin detección
 - 🟡 **Escritura vía `*ref_mut = x`** NO soportada (S003) — ¿feature o limitación?
@@ -228,10 +228,10 @@ pruebas/unitest/
 **Cobertura por categorías:**
 - [x] **Mutabilidad y ownership:** `el`/`la`/`un`/`los`/`las`, mover/copiar/prestar, `&T`/`&mut T`, field-level borrowing, use-after-move (N0 compila, N1/N2 detectan), branch-aware liveness — niveles como dial por función
 - [x] **Edge cases numéricos:** overflow de Entero32/64 (wrap confirmado), división por cero (🟡), literales límite (Entero32::MAX/MIN), conversiones `como_entero32` truncando, aritmética mixta (T005 — sin promoción)
-- [x] **Edge cases de texto/colecciones:** `texto_nuevo()` vacío (fix "(null)"), `vector_agregar` con realloc (fix cap=1), `vector_obtener` fuera de rango (🔴 UB), `Diccionario` con clave inexistente (🔴 panic), doble free (🟡), strings con escapes `\n\t\\`
+- [x] **Edge cases de texto/colecciones:** `texto_nuevo()` vacío (fix "(null)"), `vector_agregar` con realloc (fix cap=1), `vector_obtener` fuera de rango (✅ 0 definido), `Diccionario` con clave inexistente (✅ fix completo), doble free (🟡), strings con escapes `\n\t\\`
 - [ ] **Calidad de código:** complejidad ciclomática ≤10, módulos ≤1500 LOC, panics/unwrap <2/1000 LOC, spans en todos los errores (Day-0), `#[cfg(target_os)]` solo en platform/
 - [ ] **Formato:** suite verde en `falcato prueba` + orquestador `correr_unitest.ps1` en CI
-- [ ] **Criterio:** suite completa verde, sin regresiones en 54/54 tests existentes ✅, ESPECIFICACIONES.md sin casos 🟡 abiertos (todos resueltos o con tarea) — 5 🟡 abiertos con tarea
+- [ ] **Criterio:** suite completa verde, sin regresiones en 54/54 tests existentes ✅, ESPECIFICACIONES.md sin casos 🟡 abiertos (todos resueltos o con tarea) — 4 🟡 abiertos con tarea
 - [ ] *Bloqueante:* Cid Fase 2 (loop agente con JSON trees) necesita confianza en mutabilidad y memoria
 
 ### R8 — Sistema de paquetes distribuido (P2P, sin servidores)

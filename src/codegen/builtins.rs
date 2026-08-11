@@ -774,8 +774,14 @@ impl Codegen {
         Ok(())
     }
 
-    /// Crea un string global desde un &str (agrega \0 si no lo tiene)
+    /// Crea un string global desde un &str (agrega \0 si no lo tiene).
+    /// INTERNADO (R7.6): mismo contenido → mismo DataId → mismo puntero.
+    /// Requisito para Diccionario<Palabra, V>: comparación de claves por puntero.
     pub(crate) fn crear_string_literal(&mut self, builder: &mut FunctionBuilder, s: &str) -> cranelift_codegen::ir::Value {
+        if let Some(data_id) = self.strings_internados.get(s) {
+            let global = self.module.declare_data_in_func(*data_id, builder.func);
+            return builder.ins().global_value(types::I64, global);
+        }
         self.contador_strings += 1;
         let data_id = self.module.declare_data(
             &format!("str_lit_{}", self.contador_strings),
@@ -788,6 +794,7 @@ impl Codegen {
         let mut desc = cranelift_module::DataDescription::new();
         desc.define(bytes.into_boxed_slice());
         self.module.define_data(data_id, &desc).unwrap();
+        self.strings_internados.insert(s.to_string(), data_id);
         let global = self.module.declare_data_in_func(data_id, builder.func);
         builder.ins().global_value(types::I64, global)
     }
@@ -1680,10 +1687,38 @@ impl Codegen {
         // (I64) no convertía y `iadd(I64, I32)` rompía el verifier.
         let idx_i64 = builder.ins().sextend(types::I64, idx);
 
+        // Bounds check (R7.6): si idx >= len → devolver 0 definido (no UB).
+        // Spec: acceso fuera de rango devuelve 0 en lugar de leer memoria basura.
+        let len = self.cargar_campo_descriptor(builder, desc, Self::OFFSET_LEN);
+        let en_rango = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::UnsignedLessThan, idx_i64, len);
+        let ok_block = builder.create_block();
+        let fuera_block = builder.create_block();
+        let merge_block = builder.create_block();
+        builder.append_block_param(merge_block, cranelift_t);
+        builder.ins().brif(en_rango, ok_block, &[], fuera_block, &[]);
+        builder.seal_block(ok_block);
+        builder.seal_block(fuera_block);
+
+        // Dentro de rango: leer el elemento
+        builder.switch_to_block(ok_block);
         let data = self.cargar_campo_descriptor(builder, desc, Self::OFFSET_PTR);
         let offset = builder.ins().imul_imm(idx_i64, tamano_t);
         let addr = builder.ins().iadd(data, offset);
-        Ok(builder.ins().load(cranelift_t, cranelift_codegen::ir::MemFlags::new(), addr, 0))
+        let valor = builder.ins().load(cranelift_t, cranelift_codegen::ir::MemFlags::new(), addr, 0);
+        builder.ins().jump(merge_block, &[valor]);
+
+        // Fuera de rango: devolver 0 (definido, no UB)
+        builder.switch_to_block(fuera_block);
+        let cero = match cranelift_t {
+            types::F32 => builder.ins().f32const(0.0),
+            types::F64 => builder.ins().f64const(0.0),
+            _ => builder.ins().iconst(cranelift_t, 0),
+        };
+        builder.ins().jump(merge_block, &[cero]);
+
+        builder.seal_block(merge_block);
+        builder.switch_to_block(merge_block);
+        Ok(builder.block_params(merge_block)[0])
     }
 
     pub(crate) fn builtin_vector_longitud(
@@ -1840,6 +1875,8 @@ impl Codegen {
         let i = builder.block_params(header_block)[0];
         let done = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::UnsignedGreaterThanOrEqual, i, cap);
         builder.ins().brif(done, exit_block, &[], body_block, &[]);
+        // body_block tiene 1 predecesor (el brif del header) → sellar inmediato es seguro
+        builder.seal_block(body_block);
 
         // Body: check if bucket is occupied and key matches
         builder.switch_to_block(body_block);
@@ -1895,9 +1932,23 @@ impl Codegen {
     pub(crate) fn builtin_diccionario_nuevo(
         &mut self,
         builder: &mut FunctionBuilder,
-        _tipo_args: &Vec<Tipo>,
+        tipo_args: &Vec<Tipo>,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        Ok(self.descriptor_nuevo(builder))
+        // Diccionario necesita buckets REALES desde el inicio: descriptor_nuevo
+        // deja cap=0 y compilar_buscar hace `hash % cap` → división por cero.
+        // Bug R7.6: cap inicial 16 buckets (stride = 8 + K + V, alineado a 8).
+        let tipo_k = &tipo_args[0];
+        let tipo_v = &tipo_args[1];
+        let stride = self.diccionario_bucket_stride(tipo_k, tipo_v);
+        let cap_inicial: i64 = 16;
+        let tam_buckets = builder.ins().iconst(types::I64, stride as i64 * cap_inicial);
+        let buckets = self.llamar_malloc(builder, tam_buckets);
+        let desc = self.descriptor_nuevo(builder);
+        let flags = cranelift_codegen::ir::MemFlags::new();
+        builder.ins().store(flags, buckets, desc, Self::OFFSET_PTR);
+        let cap_val = builder.ins().iconst(types::I64, cap_inicial);
+        builder.ins().store(flags, cap_val, desc, Self::OFFSET_CAP);
+        Ok(desc)
     }
 
     pub(crate) fn builtin_diccionario_insertar(
@@ -1920,6 +1971,13 @@ impl Codegen {
 
         let existing_idx = self.compilar_buscar_en_diccionario(builder, buckets_ptr, cap, tipo_k, key_val, hash_insert, stride);
         
+        // Constantes compartidas por AMBOS bloques (found/not_found) — definirlas
+        // AQUÍ (bloque dominante) o el verifier falla: "uses value from non-dominating
+        // inst" (SSA dominance). Bug R7.6: estaban dentro de found_block.
+        let stride_i64 = builder.ins().iconst(types::I64, stride as i64);
+        let val_offset_amt = (8 + self.tamano_tipo(tipo_k)) as i64;
+        let val_offset_val = builder.ins().iconst(types::I64, val_offset_amt);
+
         let found_block = builder.create_block();
         let not_found_block = builder.create_block();
         let merge_block = builder.create_block();
@@ -1932,12 +1990,9 @@ impl Codegen {
 
         // Found: overwrite value at existing_idx
         builder.switch_to_block(found_block);
-        let stride_i64 = builder.ins().iconst(types::I64, stride as i64);
         let idx_i64 = builder.ins().uextend(types::I64, existing_idx);
         let offset_bytes = builder.ins().imul(idx_i64, stride_i64);
         let bucket_addr = builder.ins().iadd(buckets_ptr, offset_bytes);
-        let val_offset_amt = (8 + self.tamano_tipo(tipo_k)) as i64;
-        let val_offset_val = builder.ins().iconst(types::I64, val_offset_amt);
         let val_addr = builder.ins().iadd(bucket_addr, val_offset_val);
         self.diccionario_guardar_valor(builder, val_addr, val_val, tipo_v, flags);
         builder.ins().jump(merge_block, &[dict_ptr]);
@@ -1945,8 +2000,41 @@ impl Codegen {
         // Not found: insert into first empty slot (at len position)
         builder.switch_to_block(not_found_block);
         let len = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_LEN);
+        let cap = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_CAP);
+        // Resize (R7.6): si len >= cap → realloc a 2*cap. realloc preserva el
+        // contenido; la búsqueda escanea todos los buckets (probing completo),
+        // así que las claves existentes siguen siendo encontrables.
+        let necesita_resize = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::UnsignedGreaterThanOrEqual,
+            len,
+            cap,
+        );
+        let resize_block = builder.create_block();
+        let no_resize_block = builder.create_block();
+        let merge_resize = builder.create_block();
+        builder.ins().brif(necesita_resize, resize_block, &[], no_resize_block, &[]);
+        builder.seal_block(resize_block);
+        builder.seal_block(no_resize_block);
+
+        builder.switch_to_block(resize_block);
+        let dos = builder.ins().iconst(types::I64, 2);
+        let new_cap = builder.ins().imul(dos, cap);
+        let new_size = builder.ins().imul_imm(new_cap, stride as i64);
+        let buckets_nuevos = self.llamar_realloc(builder, buckets_ptr, new_size);
+        let flags_resize = cranelift_codegen::ir::MemFlags::new();
+        builder.ins().store(flags_resize, buckets_nuevos, dict_ptr, Self::OFFSET_PTR);
+        builder.ins().store(flags_resize, new_cap, dict_ptr, Self::OFFSET_CAP);
+        builder.ins().jump(merge_resize, &[]);
+
+        builder.switch_to_block(no_resize_block);
+        builder.ins().jump(merge_resize, &[]);
+        builder.seal_block(merge_resize);
+        builder.switch_to_block(merge_resize);
+
+        // Re-cargar tras el posible resize (memoria = fuente de verdad)
+        let buckets_final = self.cargar_campo_descriptor(builder, dict_ptr, Self::OFFSET_PTR);
         let len_offset = builder.ins().imul(len, stride_i64);
-        let empty_addr = builder.ins().iadd(buckets_ptr, len_offset);
+        let empty_addr = builder.ins().iadd(buckets_final, len_offset);
         let hash_val = self.compilar_hash(tipo_k, builder, key_val);
         builder.ins().store(flags, hash_val, empty_addr, 0);
         let uno_i8 = builder.ins().iconst(types::I8, 1);
