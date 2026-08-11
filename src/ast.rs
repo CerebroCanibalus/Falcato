@@ -300,6 +300,9 @@ pub enum Expresion {
     Copiar(Box<Expresion>, Span), // copiar expr — clone explícito
     /// Ruta cualificada: modulo::simbolo (pertenencia, no llamado)
     Ruta(Vec<String>, Span),
+    /// R7.7 F1 — Subjuntivo aritmético: `a + b fuese` → checked (Resultado<T, Entero32>)
+    /// "si la suma se desbordara..." — hipótesis. Desborde → Resultado.Error(1)
+    Checked(Box<Expresion>, Span),
     /// Rango: inicio..fin (exclusivo) o inicio..=fin (inclusivo)
     Rango(Box<Expresion>, Box<Expresion>, bool, Span), // inicio, fin, inclusivo, span
     /// Closure: |params| cuerpo
@@ -339,6 +342,7 @@ impl Expresion {
             Expresion::Mover(_, _, span) => span,
             Expresion::Copiar(_, span) => span,
             Expresion::Ruta(_, span) => span,
+            Expresion::Checked(_, span) => span,
             Expresion::Rango(_, _, _, span) => span,
             Expresion::Closure(_, _, span) => span,
             Expresion::Coincidir(_, _, span) => span,

@@ -2078,6 +2078,83 @@ No puedes modificar algo que no es 'tuyo'.",
 
                 self.tipo_operacion(*op, &tipo_izq, span)
             }
+            // R7.7 F1 — Subjuntivo aritmético: `a + b fuese` → Resultado<T, Entero32>
+            // Solo aritmética entera que pueda desbordar. "si la suma se desbordara..."
+            Expresion::Checked(inner, span) => {
+                match inner.as_ref() {
+                    Expresion::Binaria(izq, op, der, span_bin) => {
+                        // Verificar que es aritmética entera (suma/resta/multiplicación)
+                        let es_aritmetica = matches!(
+                            op,
+                            OperadorBinario::Suma
+                                | OperadorBinario::Resta
+                                | OperadorBinario::Multiplicacion
+                        );
+                        if !es_aritmetica {
+                            self.reportar_error(
+                                CategoriaError::Tipo,
+                                104, // T104: fuese solo en aritmética
+                                span,
+                                format!(
+                                    "'fuese' (checked) solo aplica a suma, resta o multiplicación, no a '{:?}'",
+                                    op
+                                ),
+                                Some("Usa 'fuese' para detectar desbordamiento: el x = a + b fuese".to_string())
+                            );
+                            return Tipo::Entero32;
+                        }
+
+                        let tipo_izq = self.inferir_tipo(izq);
+                        let tipo_der = self.inferir_tipo(der);
+                        let (tipo_izq, tipo_der) = self.adaptar_literales_binaria(izq, &tipo_izq, der, &tipo_der);
+                        if tipo_izq != tipo_der {
+                            self.reportar_error(
+                                CategoriaError::Tipo,
+                                DISCONCORDANCIA_OPERANDOS,
+                                span_bin,
+                                format!("Disconcordancia de tipo en operación '{:?}': izquierda '{:?}', derecha '{:?}'",
+                                    op, tipo_izq, tipo_der),
+                                Some("Ambos operandos deben ser del mismo tipo".to_string())
+                            );
+                        }
+
+                        // Debe ser entero de ≤32 bits (los flotantes no desbordan en el sentido checked;
+                        // Entero64/Natural64 → Resultado de 12 bytes, layout enum grande — pendiente F1.1)
+                        let tipo_operacion = self.tipo_operacion(*op, &tipo_izq, span_bin);
+                        let es_entero_32 = matches!(
+                            tipo_operacion,
+                            Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32
+                                | Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32
+                        );
+                        if !es_entero_32 {
+                            self.reportar_error(
+                                CategoriaError::Tipo,
+                                105, // T105: fuese requiere enteros 32-bit
+                                span,
+                                format!(
+                                    "'fuese' (checked) requiere enteros de 32 bits o menos, pero la operación es '{:?}'",
+                                    tipo_operacion
+                                ),
+                                Some("F1: soporta Entero8/16/32 y Natural8/16/32; Entero64/Natural64 pendiente (F1.1)".to_string())
+                            );
+                            return Tipo::Entero32;
+                        }
+
+                        // Resultado<T, Entero32>: Exito(valor) | Error(1 = desbordamiento)
+                        Tipo::Resultado(Box::new(tipo_operacion), Box::new(Tipo::Entero32))
+                    }
+                    _ => {
+                        self.reportar_error(
+                            CategoriaError::Tipo,
+                            106, // T106: fuese requiere operación binaria
+                            span,
+                            format!("'fuese' (checked) solo aplica a operaciones aritméticas, no a esta expresión"),
+                            Some("Escribe la operación completa: el x = a + b fuese".to_string())
+                        );
+                        Tipo::Entero32
+                    }
+                }
+            }
             Expresion::Unaria(op, expr, span) => {
                 let tipo = self.inferir_tipo(expr);
                 match op {

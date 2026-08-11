@@ -316,6 +316,9 @@ fn recolectar_usos_expr(expr: &Expresion, usos: &mut HashSet<String>) {
         Expresion::Propagacion(expr, _) => {
             recolectar_usos_expr(expr, usos);
         }
+        Expresion::Checked(inner, _) => {
+            recolectar_usos_expr(inner, usos);
+        }
         Expresion::Mover(_, destino, _) => {
             if let Some(d) = destino {
                 recolectar_usos_expr(d, usos);

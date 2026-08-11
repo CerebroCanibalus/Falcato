@@ -538,6 +538,7 @@ impl IndiceSemantico {
             Expresion::AccesoCampo(base, _, _) => Self::colectar_referencias_en_expresion(base, nombre, refs),
             Expresion::EsVariante(base, _, _, _, _) => Self::colectar_referencias_en_expresion(base, nombre, refs),
             Expresion::Propagacion(expr, _) => Self::colectar_referencias_en_expresion(expr, nombre, refs),
+            Expresion::Checked(inner, _) => Self::colectar_referencias_en_expresion(inner, nombre, refs),
             Expresion::Mover(nombre_var, destino, span) => {
                 if nombre_var == nombre { refs.push(span.clone()); }
                 if let Some(dest) = destino {

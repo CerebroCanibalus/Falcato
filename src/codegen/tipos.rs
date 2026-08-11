@@ -315,6 +315,13 @@ impl Codegen {
                 }
             }
             Expresion::DireccionDe(_, _) => Tipo::Entero64,
+            // R7.7 F1: `a + b fuese` → Resultado<T, Entero32> — el slot debe ser de 8 bytes
+            // (packed I64), no de 4 (Entero32). Sin esto, declaración sin tipo explícito
+            // crea slot pequeño y stack_store I64 → heap/slot overflow (0xC0000005).
+            Expresion::Checked(inner, _) => {
+                let tipo_interno = self.inferir_tipo(inner, variables);
+                Tipo::Resultado(Box::new(tipo_interno), Box::new(Tipo::Entero32))
+            }
             _ => Tipo::Entero32,
         }
     }

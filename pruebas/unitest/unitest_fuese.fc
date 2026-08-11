@@ -1,0 +1,102 @@
+// unitest_fuese.fc — R7.7 F1: subjuntivo aritmético `a + b fuese` (checked)
+// Spec: `a + b fuese` → Resultado<T, Entero32> | Exito(valor) | Error(1 = desbordamiento)
+// Desambiguación: `;` `)` `}` `,` EOF → checked · `{` `>` `<` → subjuntivo de condición
+// Entero8/16/32 y Natural8/16/32 (64-bit pendiente F1.1)
+
+prueba "suma sin desbordamiento → Exito" {
+    el a: Entero32 = 40;
+    el b: Entero32 = 2;
+    el r = a + b fuese;
+    el v: Entero32 = r?;
+    afirmar(v == 42);
+}
+
+prueba "suma con desbordamiento → Error(1)" {
+    el max: Entero32 = 2147483647;
+    el uno: Entero32 = 1;
+    el r = max + uno fuese;
+    si r es Resultado.Error {
+        afirmar(verdadero);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "resta con desbordamiento → Error" {
+    el n: Entero32 = -2147483647;
+    el dos: Entero32 = 2;
+    el r = n - dos fuese;
+    si r es Resultado.Error {
+        afirmar(verdadero);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "multiplicacion con desbordamiento → Error" {
+    el p1: Entero32 = 46341;
+    el p2: Entero32 = 46341;
+    el r = p1 * p2 fuese;
+    si r es Resultado.Error {
+        afirmar(verdadero);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "multiplicacion sin desbordamiento → Exito" {
+    el m1: Entero32 = 2;
+    el m2: Entero32 = 3;
+    el r = m1 * m2 fuese;
+    el v: Entero32 = r?;
+    afirmar(v == 6);
+}
+
+prueba "natural unsigned carry → Error" {
+    el ua: Natural32 = 4294967295;
+    el ub: Natural32 = 1;
+    el r = ua + ub fuese;
+    si r es Resultado.Error {
+        afirmar(verdadero);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "wrap normal sin fuese intacto" {
+    el max: Entero32 = 2147483647;
+    el uno: Entero32 = 1;
+    el wrap: Entero32 = max + uno;
+    afirmar(wrap == -2147483648);
+}
+
+prueba "gauss checked acumula sin overflow" {
+    el suma: Entero32 = 0;
+    el fallo: Booleano = falso;
+    para i en 1..101 {
+        el paso = suma + i fuese;
+        si paso es Resultado.Error {
+            fallo = verdadero;
+        } sino {
+            el v: Entero32 = paso?;
+            suma = v;
+        }
+    }
+    afirmar(!fallo);
+    afirmar(suma == 5050);
+}
+
+prueba "factorial 13 desborda con fuese" {
+    el fact: Entero32 = 1;
+    el fallo: Booleano = falso;
+    para i en 1..14 {
+        el paso = fact * i fuese;
+        si paso es Resultado.Error {
+            fallo = verdadero;
+        } sino {
+            el v: Entero32 = paso?;
+            fact = v;
+        }
+    }
+    afirmar(fallo);  // 13! = 6227020800 > Entero32::MAX
+}

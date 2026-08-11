@@ -5,7 +5,30 @@ use super::{ErrorSintaxis, ParserCursor};
 
 /// Parsea una expresión completa con precedencia y span real
 pub fn parse_expresion(cursor: &mut ParserCursor) -> Result<Expresion, ErrorSintaxis> {
-    let izquierda = parse_expresion_precedencia(cursor, 0)?;
+    let mut izquierda = parse_expresion_precedencia(cursor, 0)?;
+
+    // R7.7 F1 — Subjuntivo aritmético: `a + b fuese` → checked (Resultado<T, Entero32>)
+    // Se aplica AQUÍ (entrada pública, NO recursiva): el check en parse_expresion_precedencia
+    // envolvería el lado derecho (`a + Checked(b)`) en vez de la operación completa.
+    // Desambiguación lingüística: el token SIGUIENTE al `fuese` decide el modo:
+    //   ; ) } , EOF → checked aritmético ("la suma se desbordara...")
+    //   { > < etc.  → subjuntivo de condición (lo maneja parse_condicional: si x fuese > 10)
+    if cursor.actual() == Some(&Token::Fuese) {
+        let siguiente = cursor.peek(1);
+        let es_delimitador = matches!(
+            siguiente,
+            Some(Token::PuntoYComa)
+                | Some(Token::ParenCierra)
+                | Some(Token::LlaveCierra)
+                | Some(Token::Coma)
+                | None
+        );
+        if es_delimitador {
+            let span = izquierda.span().clone();
+            cursor.avanzar();
+            izquierda = Expresion::Checked(Box::new(izquierda), span);
+        }
+    }
 
     // Rangos: expr..expr (exclusivo) o expr..=expr (inclusivo)
     // Precedencia más baja que todo lo demás

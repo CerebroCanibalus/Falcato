@@ -236,6 +236,98 @@ impl Codegen {
                 let val_der = self.compilar_lado_binaria(der, &tipo_izq, builder, variables)?;
                 self.compilar_operacion_binaria(*op, val_izq, val_der, builder)
             }
+            // R7.7 F1 — Subjuntivo aritmético: `a + b fuese` → checked (Resultado<T, Entero32>)
+            // Empaqueta tag+data en I64 (layout enum pequeño): tag low 32, data high 32.
+            // Exito(tag 0, data = resultado) | Error(tag 1, data = 1 = desbordamiento)
+            Expresion::Checked(inner, span) => {
+                let (izq, op, der, span_bin) = match inner.as_ref() {
+                    Expresion::Binaria(i, o, d, s) => (i, o, d, s),
+                    _ => {
+                        self.errores.agregar(ErrorCompilador::nuevo(
+                            CategoriaError::Interno,
+                            1,
+                            span.clone(),
+                            "Checked sin operación binaria interna".to_string(),
+                        ));
+                        return Err(());
+                    }
+                };
+                let tipo_izq = self.inferir_tipo(izq, variables);
+                let tipo_der = self.inferir_tipo(der, variables);
+                let val_izq = self.compilar_lado_binaria(izq, &tipo_der, builder, variables)?;
+                let val_der = self.compilar_lado_binaria(der, &tipo_izq, builder, variables)?;
+                // El resultado wrap (módulo 2ⁿ) — igual que sin `fuese`
+                let val_r = self.compilar_operacion_binaria(*op, val_izq, val_der, builder)?;
+                let tipo_val = builder.func.dfg.value_type(val_izq);
+                let bits = tipo_val.bits() as i64;
+                // ¿Signed (Entero*) o unsigned (Natural*)?
+                let es_signed = matches!(
+                    self.resolver_alias(&tipo_izq),
+                    Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32
+                );
+                use cranelift_codegen::ir::condcodes::IntCC;
+                // Detectar desbordamiento:
+                //   Suma signed:   ((a ^ r) & (b ^ r)) < 0   → signos de a y b iguales, r distinto
+                //   Resta signed:  ((a ^ b) & (a ^ r)) < 0   → signos de a y b distintos, r distinto de a
+                //   Mul signed:    smulhi(a,b) != sext(r)    → mitad alta no es extensión de signo
+                //   Suma unsigned: r < a                     → carry
+                //   Resta unsigned: r > a                    → borrow
+                //   Mul unsigned:  umulhi(a,b) != 0          → bits altos no vacíos
+                let overflow = match op {
+                    OperadorBinario::Suma if es_signed => {
+                        let xor_a = builder.ins().bxor(val_izq, val_r);
+                        let xor_b = builder.ins().bxor(val_der, val_r);
+                        let and = builder.ins().band(xor_a, xor_b);
+                        let shift = builder.ins().iconst(tipo_val, bits - 1);
+                        let signo = builder.ins().sshr(and, shift);
+                        let cero = builder.ins().iconst(tipo_val, 0);
+                        builder.ins().icmp(IntCC::NotEqual, signo, cero)
+                    }
+                    OperadorBinario::Resta if es_signed => {
+                        let xor_ab = builder.ins().bxor(val_izq, val_der);
+                        let xor_ar = builder.ins().bxor(val_izq, val_r);
+                        let and = builder.ins().band(xor_ab, xor_ar);
+                        let shift = builder.ins().iconst(tipo_val, bits - 1);
+                        let signo = builder.ins().sshr(and, shift);
+                        let cero = builder.ins().iconst(tipo_val, 0);
+                        builder.ins().icmp(IntCC::NotEqual, signo, cero)
+                    }
+                    OperadorBinario::Multiplicacion if es_signed => {
+                        let hi = builder.ins().smulhi(val_izq, val_der);
+                        let shift = builder.ins().iconst(tipo_val, bits - 1);
+                        let ext = builder.ins().sshr(val_r, shift);
+                        builder.ins().icmp(IntCC::NotEqual, hi, ext)
+                    }
+                    OperadorBinario::Suma => {
+                        builder.ins().icmp(IntCC::UnsignedLessThan, val_r, val_izq)
+                    }
+                    OperadorBinario::Resta => {
+                        builder.ins().icmp(IntCC::UnsignedGreaterThan, val_r, val_izq)
+                    }
+                    OperadorBinario::Multiplicacion => {
+                        let hi = builder.ins().umulhi(val_izq, val_der);
+                        let cero = builder.ins().iconst(tipo_val, 0);
+                        builder.ins().icmp(IntCC::NotEqual, hi, cero)
+                    }
+                    _ => {
+                        self.errores.agregar(ErrorCompilador::nuevo(
+                            CategoriaError::Interno,
+                            1,
+                            span_bin.clone(),
+                            format!("Checked con operación no aritmética: {:?}", op),
+                        ));
+                        return Err(());
+                    }
+                };
+                // Empaquetar: Exito(tag 0) | Error(tag 1, data = 1)
+                let r_i64 = builder.ins().uextend(types::I64, val_r);
+                let shift32 = builder.ins().iconst(types::I64, 32);
+                let exito_packed = builder.ins().ishl(r_i64, shift32); // tag 0 implícito
+                let uno = builder.ins().iconst(types::I64, 1);
+                let error_data = builder.ins().ishl(uno, shift32); // 1 << 32
+                let error_packed = builder.ins().bor(error_data, uno); // | tag 1
+                Ok(builder.ins().select(overflow, error_packed, exito_packed))
+            }
             Expresion::Unaria(op, expr, span) => {
                 // Manejar referencias de forma especial (necesitan puntero al stack slot)
                 match op {

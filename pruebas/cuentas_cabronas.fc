@@ -1,0 +1,164 @@
+// Cuentas cabronas — demo R7.7 F1: aritmética checked + flotantes + wrap
+// Valores esperados verificados con calc-mcp ANTES de escribir el test.
+
+funcion principal() -> Entero32 {
+    imprimir_linea("=== 10 CUENTAS CABRONAS ===");
+
+    // 1. Cuadratica: x^2 + 5x + 6 = 0 → raices -2 y -3 (verificado: exacto -3, -2)
+    el a: Flotante64 = 1.0;
+    el b: Flotante64 = 5.0;
+    el c: Flotante64 = 6.0;
+    el disc: Flotante64 = b * b - 4.0 * a * c;
+    el raiz_disc: Flotante64 = raiz(disc);
+    el raiz1: Flotante64 = (-b + raiz_disc) / (2.0 * a);
+    el raiz2: Flotante64 = (-b - raiz_disc) / (2.0 * a);
+    imprimir_linea("1. cuadratica x^2+5x+6: raices {raiz1} y {raiz2}");
+    si raiz1 es -2.0 {
+        si raiz2 es -3.0 {
+            imprimir_linea("   [PASS] raices correctas");
+        } sino {
+            imprimir_linea("   [FAIL] raiz2 esperada -3");
+        }
+    } sino {
+        imprimir_linea("   [FAIL] raiz1 esperada -2");
+    }
+
+    // 2. Gauss: sum(1..100) con fuese (checked) → 5050
+    // NOTA: no hay break en Falcato → bandera + bucle completo
+    el suma: Entero32 = 0;
+    el fallo_gauss: Booleano = falso;
+    para i en 1..101 {
+        el paso = suma + i fuese;
+        si paso es Resultado.Error {
+            fallo_gauss = verdadero;
+        } sino {
+            el v: Entero32 = paso?;
+            suma = v;
+        }
+    }
+    imprimir_linea("2. gauss 1..100 checked: {suma}");
+    si fallo_gauss {
+        imprimir_linea("   [FAIL] overflow en Gauss");
+    } sino {
+        si suma es 5050 {
+            imprimir_linea("   [PASS] suma correcta");
+        } sino {
+            imprimir_linea("   [FAIL] esperaba 5050");
+        }
+    }
+
+    // 3. Factorial: 12! = 479001600 (Exito), 13! = 6227020800 (Error — overflow Entero32)
+    el fact12: Entero32 = 1;
+    el fallo12: Booleano = falso;
+    para i en 1..13 {
+        el paso = fact12 * i fuese;
+        si paso es Resultado.Error {
+            fallo12 = verdadero;
+        } sino {
+            el v: Entero32 = paso?;
+            fact12 = v;
+        }
+    }
+    imprimir_linea("3. 12! = {fact12} (esperado 479001600)");
+    el fact13: Entero32 = 1;
+    el fallo13: Booleano = falso;
+    para i en 1..14 {
+        el paso = fact13 * i fuese;
+        si paso es Resultado.Error {
+            fallo13 = verdadero;
+        } sino {
+            el v: Entero32 = paso?;
+            fact13 = v;
+        }
+    }
+    si fallo13 {
+        imprimir_linea("   13! desbordo [PASS] (13! = 6227020800 > MAX)");
+    } sino {
+        imprimir_linea("   [FAIL] 13! no desbordo");
+    }
+
+    // 4. 0.1 + 0.2 → 0.30000000000000004 (NO 0.3) — motivo de F5 decimal
+    el u1: Flotante64 = 0.1;
+    el u2: Flotante64 = 0.2;
+    el suma_f: Flotante64 = u1 + u2;
+    imprimir_linea("4. 0.1+0.2 = {suma_f} (esperado 0.30000000000000004)");
+    si suma_f es 0.30000000000000004 {
+        imprimir_linea("   [PASS] precision IEEE 754 confirmada");
+    } sino {
+        imprimir_linea("   [INFO] valor flotante (comparacion exacta es fragil)");
+    }
+
+    // 5. Pi ≈ 355/113 = 3.14159292035 (división cabrona)
+    el num: Flotante64 = 355.0;
+    el den: Flotante64 = 113.0;
+    el pi_aprox: Flotante64 = num / den;
+    imprimir_linea("5. 355/113 = {pi_aprox} (esperado 3.14159292035)");
+
+    // 6. Gravitacion: F = G*m1*m2/r^2 Tierra-Sol → 3.542e22 N
+    // NOTA: lexer no soporta notacion cientifica (6.674e-11) → valores extendidos
+    el G: Flotante64 = 0.00000000006674;
+    el m1: Flotante64 = 5972000000000000000000000.0;
+    el m2: Flotante64 = 1989000000000000000000000000000.0;
+    el r: Flotante64 = 149600000000.0;
+    el F: Flotante64 = G * m1 * m2 / (r * r);
+    imprimir_linea("6. F gravitacion = {F} N (esperado ~3.542e22)");
+    si F > 35000000000000000000000.0 && F < 36000000000000000000000.0 {
+        imprimir_linea("   [PASS] orden de magnitud correcto");
+    } sino {
+        imprimir_linea("   [FAIL] F fuera de rango");
+    }
+
+    // 7. Umbral multiplicacion: 46340^2 = 2147395600 (Exito), 46341^2 = 2147488281 (Error)
+    el m1v: Entero32 = 46340;
+    el m2v: Entero32 = 46341;
+    el r40 = m1v * m1v fuese;
+    el r41 = m2v * m2v fuese;
+    si r40 es Resultado.Exito {
+        el v: Entero32 = r40?;
+        imprimir_linea("7. 46340^2 = {v} (esperado 2147395600) [PASS]");
+    } sino {
+        imprimir_linea("   46340^2 desbordo [FAIL] (cabe en Entero32)");
+    }
+    si r41 es Resultado.Error {
+        imprimir_linea("   46341^2 desbordo [PASS] (2147488281 > MAX)");
+    } sino {
+        imprimir_linea("   46341^2 NO desbordo [FAIL] (debia desbordar)");
+    }
+
+    // 8. Wrap exacto (sin fuese): MAX + 1 → MIN
+    el max: Entero32 = 2147483647;
+    el uno: Entero32 = 1;
+    el wrap: Entero32 = max + uno;
+    imprimir_linea("8. wrap MAX+1 = {wrap} (esperado -2147483648)");
+    si wrap es -2147483648 {
+        imprimir_linea("   [PASS] wrap modulo 2^32");
+    } sino {
+        imprimir_linea("   [FAIL] wrap roto");
+    }
+
+    // 9. Resta al limite: -2147483647 - 2 con fuese → Error (-2147483649 no cabe)
+    el n: Entero32 = -2147483647;
+    el dos: Entero32 = 2;
+    el r9 = n - dos fuese;
+    si r9 es Resultado.Error {
+        imprimir_linea("9. resta -2147483647-2 checked → Error [PASS]");
+    } sino {
+        imprimir_linea("   [FAIL] resta no desbordo");
+    }
+
+    // 10. Division flotante por cero: inf y nan (IEEE 754, no crash)
+    el uno_f: Flotante64 = 1.0;
+    el cero_f: Flotante64 = 0.0;
+    el inf: Flotante64 = uno_f / cero_f;
+    imprimir_linea("10. 1.0/0.0 = {inf} (inf — no crash)");
+    el nan: Flotante64 = cero_f / cero_f;
+    imprimir_linea("    0.0/0.0 = {nan} (nan — no crash)");
+    si inf > 1000000.0 {
+        imprimir_linea("    [PASS] inf > finito (IEEE 754)");
+    } sino {
+        imprimir_linea("    [FAIL] inf no detectado");
+    }
+
+    imprimir_linea("=== FIN ===");
+    retornar 0;
+}
