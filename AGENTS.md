@@ -174,12 +174,41 @@ Piezas **NATIVAS** (Capa A/B/C); todo lo demás (JSON, HTTP, SSE, MCP) son libre
 ### R7.6 — Unitest de codebase (previa al Cid)
 Suite de pruebas de calidad del lenguaje — **requisito antes de empezar Cid** (el primer proyecto grande necesita red de seguridad). Un módulo de pruebas que ejercita el compiler contra casos que los ejemplos no cubren.
 
-- [ ] **Mutabilidad y ownership:** `el`/`la`/`un`/`los`/`las`, mover/copiar/prestar, `&T`/`&mut T`, field-level borrowing, use-after-move (N0 compila, N1/N2 detectan), branch-aware liveness
-- [ ] **Edge cases numéricos:** overflow de Entero32/64, división por cero, literales límite (Entero32::MAX/MIN), conversiones `como_entero32` truncando, aritmética mixta (Entero32/Entero64)
-- [ ] **Edge cases de texto/colecciones:** `texto_nuevo()` vacío, `vector_agregar` con realloc, `vector_obtener` fuera de rango, `Diccionario` con clave inexistente, liberar dos veces (doble free), strings con escapes `\n\t\\`
+**Método (adaptado a Falcato, validado contra Rust ui-tests / Zig build modes / Go spec):**
+1. **Descubrir** qué hace hoy el compiler en cada edge case (pasada rápida)
+2. **DECIDIR la spec** por caso (lo que el lenguaje PROMETE) y clasificar:
+   - 🟢 **Confirmado** — correcto por diseño → se documenta en REFERENCIA.md como spec
+   - 🔴 **Bug** — se arregla el compiler
+   - 🟡 **Por especificar** — requiere investigación y documentación a fondo antes de decidir; cada caso se abre como tarea y termina en una decisión escrita, nunca en "así es la vida"
+3. **Testear la spec** (ver abajo) · 4. **Documentar** la spec en REFERENCIA.md
+
+**Estructura (escalable: añadir test = añadir archivo, sin tocar el orquestador):**
+```
+pruebas/unitest/
+├── unitest_ownership.fc        # + ejecutan (prueba "x" { afirmar })
+├── unitest_numeros.fc          # + ejecutan
+├── unitest_texto.fc            # + ejecutan
+├── unitest_compilan/           # DEBE compilar pero no se ejecuta (verifica exit 0)
+│   └── mover_en_n0.fc          # use-after-move en N0 → compila (spec: N0 permisivo)
+├── unitest_negativos/          # DEBE fallar con código exacto (verifica --json)
+│   ├── mover_en_n2.fc          # // ESPERADO: [O001] — función estricto
+│   └── mutar_inmutable.fc      # // ESPERADO: [O001]
+├── ESPECIFICACIONES.md         # registro de decisiones por caso (🟢/🔴/🟡)
+└── correr_unitest.ps1          # orquestador: scan + prueba + verifica + semáforo
+```
+
+**Los 3 tipos de tests (clave del diseño):**
+- **Ejecutan** → `falcato prueba archivo.fc` (patrón `prueba "nombre" { afirmar }`)
+- **Compilan (N0)** → `falcato verifica` exit 0 — la filosofía N0 es "todo compila, sugiere"; un test negativo en N2 es POSITIVO en N0
+- **Fallan** → `falcato verifica --json` exit 1 + comparar `codigo` con `// ESPERADO: [XNNN]` del header (nuestro trybuild: el contrato JSON ya existe, sin snapshots)
+
+**Cobertura por categorías:**
+- [ ] **Mutabilidad y ownership:** `el`/`la`/`un`/`los`/`las`, mover/copiar/prestar, `&T`/`&mut T`, field-level borrowing, use-after-move (N0 compila, N1/N2 detectan), branch-aware liveness — niveles como dial por función
+- [ ] **Edge cases numéricos:** overflow de Entero32/64 (¿wrap como Go? ¿panic como Rust debug? → 🟡 por especificar), división por cero (¿crash controlado como Zig? ¿UB como C? → 🟡), literales límite (Entero32::MAX/MIN), conversiones `como_entero32` truncando, aritmética mixta (Entero32/Entero64 — el operando mayor manda, verificado en fecha.fc)
+- [ ] **Edge cases de texto/colecciones:** `texto_nuevo()` vacío (fix "(null)"), `vector_agregar` con realloc (fix cap=1), `vector_obtener` fuera de rango (¿bounds? → 🟡), `Diccionario` con clave inexistente, doble free (¿detección? → 🟡), strings con escapes `\n\t\\`
 - [ ] **Calidad de código:** complejidad ciclomática ≤10, módulos ≤1500 LOC, panics/unwrap <2/1000 LOC, spans en todos los errores (Day-0), `#[cfg(target_os)]` solo en platform/
-- [ ] **Formato:** `prueba "nombre" { afirmar(...) }` + `falcato prueba` — correr como parte del CI
-- [ ] **Criterio:** suite completa verde en `falcato prueba`, sin regresiones en 54/54 tests existentes
+- [ ] **Formato:** suite verde en `falcato prueba` + orquestador `correr_unitest.ps1` en CI
+- [ ] **Criterio:** suite completa verde, sin regresiones en 54/54 tests existentes, ESPECIFICACIONES.md sin casos 🟡 abiertos (todos resueltos o con tarea)
 - [ ] *Bloqueante:* Cid Fase 2 (loop agente con JSON trees) necesita confianza en mutabilidad y memoria
 
 ### R8 — Sistema de paquetes distribuido (P2P, sin servidores)
