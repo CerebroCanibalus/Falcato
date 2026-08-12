@@ -177,6 +177,10 @@ pub fn parse_tipo(cursor: &mut ParserCursor) -> Result<Tipo, ErrorSintaxis> {
                 if nombre == "Conjunto" && argumentos.len() == 1 {
                     return Ok(Tipo::Conjunto(Box::new(argumentos.into_iter().next().unwrap())));
                 }
+                if nombre == "Option" && argumentos.len() == 1 {
+                    // R7.7 F2: Option<T> — Algo(valor) | Nada (`un x = a + b`)
+                    return Ok(Tipo::Option(Box::new(argumentos.into_iter().next().unwrap())));
+                }
                 
                 Ok(Tipo::NombreGenerico(nombre, argumentos))
             } else {

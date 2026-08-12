@@ -203,7 +203,7 @@ impl Codegen {
                 // Si es array, struct o enum con datos, devolvemos puntero (direcci├│n base)
                 // Resolver apodos primero (ej: apodo ID = Entero64 → Entero64)
                 let tipo_resuelto = self.resolver_alias(&tipo);
-                let val = if matches!(tipo_resuelto, Tipo::Array(_, _) | Tipo::Nombre(_) | Tipo::Resultado(_, _)) {
+                let val = if matches!(tipo_resuelto, Tipo::Array(_, _) | Tipo::Nombre(_) | Tipo::Resultado(_, _) | Tipo::Option(_)) {
                     builder.ins().stack_addr(types::I64, slot, 0)
                 } else {
                     builder.ins().stack_load(
@@ -1019,7 +1019,7 @@ impl Codegen {
     }
     /// Compila un lado de una operación binaria, adaptando literales numéricos
     /// al tipo del otro operando (ej: x: Entero64 + 1 → el 1 se emite como I64).
-    fn compilar_lado_binaria(
+    pub(crate) fn compilar_lado_binaria(
         &mut self,
         expr: &Expresion,
         tipo_otro: &Tipo,

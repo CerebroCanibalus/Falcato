@@ -1,0 +1,73 @@
+// unitest_un.fc â€” R7.7 F2: artÃ­culo incierto `un x = a + b` â†’ Option<T> (checked con None)
+// Spec: `un` (Pilar I: opcional) + aritmÃ©tica entera â†’ Algo(valor) | Nada
+// Overflow â†’ Nada Â· sin overflow â†’ Algo(valor). Consulta: si x es Option.Algo { el v = x?; }
+
+prueba "un sin desbordamiento â†’ Algo" {
+    un x = 40 + 2;
+    si x es Option.Algo {
+        el v: Entero32 = x?;
+        afirmar(v == 42);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "un con desbordamiento â†’ Nada" {
+    el max: Entero32 = 2147483647;
+    el uno: Entero32 = 1;
+    un x = max + uno;
+    si x es Option.Nada {
+        afirmar(verdadero);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "un resta desbordamiento â†’ Nada" {
+    el n: Entero32 = -2147483647;
+    el dos: Entero32 = 2;
+    un x = n - dos;
+    si x es Option.Nada {
+        afirmar(verdadero);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "un multiplicacion desbordamiento â†’ Nada" {
+    el p: Entero32 = 46341;
+    un x = p * p;
+    si x es Option.Nada {
+        afirmar(verdadero);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "un natural unsigned carry â†’ Nada" {
+    el ua: Natural32 = 4294967295;
+    el ub: Natural32 = 1;
+    un x = ua + ub;
+    si x es Option.Nada {
+        afirmar(verdadero);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "un con tipo explicito Option" {
+    un x: Option<Entero32> = 20 * 2;
+    si x es Option.Algo {
+        el v: Entero32 = x?;
+        afirmar(v == 40);
+    } sino {
+        afirmar(falso);
+    }
+}
+
+prueba "el sin fuese sigue wrap (no se rompio nada)" {
+    el max: Entero32 = 2147483647;
+    el uno: Entero32 = 1;
+    el wrap: Entero32 = max + uno;
+    afirmar(wrap == -2147483648);
+}

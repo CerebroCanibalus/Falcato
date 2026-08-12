@@ -1160,6 +1160,34 @@ impl AnalizadorSemantico {
             ],
             span: span_vacio.clone(),
         });
+
+        // Option<T>: enum genérico para valores opcionales (R7.7 F2 — `un x = a + b`)
+        // Algo(valor) | Nada — el artículo `un` (incierto) codifica checked con None
+        let t_generico_opt = ParametroGenerico {
+            nombre: "T".to_string(),
+            tipo: None,
+            bounds: vec![],
+            span: span_vacio.clone(),
+        };
+        let tipo_t_opt = Tipo::Generico("T".to_string());
+
+        self.enums.insert("Option".to_string(), InfoEnum {
+            nombre: "Option".to_string(),
+            parametros_genericos: vec![t_generico_opt],
+            variantes: vec![
+                Variante {
+                    nombre: "Algo".to_string(),
+                    datos: Some(vec![("valor".to_string(), tipo_t_opt)]),
+                    span: span_vacio.clone(),
+                },
+                Variante {
+                    nombre: "Nada".to_string(),
+                    datos: None,
+                    span: span_vacio.clone(),
+                },
+            ],
+            span: span_vacio.clone(),
+        });
     }
 
     /// Determina si una función es pública según su artículo de visibilidad y contexto.
@@ -1472,9 +1500,45 @@ impl AnalizadorSemantico {
                     _ => self.inferir_tipo(&decl.valor)
                 };
                 
+                // R7.7 F2 — artículo incierto: `un x = a + b` → Option<T> (checked con None)
+                // El artículo `un` (Pilar I: opcional) + aritmética entera → Algo(valor) | Nada
+                // si la operación desborda. Coherente: `un` = incierto = puede no haber valor.
+                let mut tipo_valor = tipo_valor;
+                if decl.articulo == Articulo::Un {
+                    if let Expresion::Binaria(_, op, _, _) = &decl.valor {
+                        let es_aritmetica = matches!(
+                            op,
+                            OperadorBinario::Suma
+                                | OperadorBinario::Resta
+                                | OperadorBinario::Multiplicacion
+                        );
+                        if es_aritmetica {
+                            let es_entero_32 = matches!(
+                                self.resolver_alias(&tipo_valor),
+                                Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32
+                                    | Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32
+                            );
+                            if es_entero_32 {
+                                tipo_valor = Tipo::Option(Box::new(tipo_valor));
+                            } else {
+                                self.reportar_error(
+                                    CategoriaError::Tipo,
+                                    109, // T109: un requiere enteros 32-bit
+                                    &decl.span,
+                                    format!(
+                                        "'un' (opcional checked) requiere enteros de 32 bits o menos, pero la operación es '{:?}'",
+                                        tipo_valor
+                                    ),
+                                    Some("F2: soporta Entero8/16/32 y Natural8/16/32; flotantes no desbordan (inf)".to_string())
+                                );
+                            }
+                        }
+                    }
+                }
+                
                 // Verificar concordancia de tipo explícito
                 if let Some(ref tipo_declarado) = decl.tipo {
-                    // Resolver apodos (ej: apodo ID = Entero64 → Entero64)
+                    // Resolver apodos (ej: apodo ID = Entero64  Entero64)
                     let tipo_declarado_resuelto = self.resolver_alias(tipo_declarado);
                     // Adaptar literal numérico al tipo declarado (ej: el x: Entero64 = 5)
                     // Los literales enteros se infieren como Entero32; si el tipo declarado
@@ -2016,17 +2080,18 @@ No puedes modificar algo que no es 'tuyo'.",
                 }
             }
             Expresion::Propagacion(expr, span) => {
-                // Verificar que expr es Resultado<T, E> y retornar T
+                // Verificar que expr es Resultado<T, E> u Option<T> y retornar T
                 let tipo_expr = self.inferir_tipo(expr);
                 match tipo_expr {
                     Tipo::Resultado(tipo_exito, _) => *tipo_exito,
+                    Tipo::Option(tipo_exito) => *tipo_exito,
                     _ => {
                         self.reportar_error(
                             CategoriaError::Tipo,
                             29,
                             span,
-                            format!("El operador '?' requiere Resultado<T, E>, pero se encontró '{:?}'", tipo_expr),
-                            Some("Usa '?' solo en expresiones de tipo Resultado".to_string())
+                            format!("El operador '?' requiere Resultado<T, E> u Option<T>, pero se encontr� '{:?}'", tipo_expr),
+                            Some("Usa '?' solo en expresiones de tipo Resultado u Option".to_string())
                         );
                         Tipo::Entero32
                     }
@@ -2624,6 +2689,7 @@ No puedes modificar algo que no es 'tuyo'.",
                 let tipo_es_enum = match &tipo_expr {
                     Tipo::Nombre(n) if n == enum_nombre => true,
                     Tipo::Resultado(_, _) if enum_nombre == "Resultado" => true,
+                    Tipo::Option(_) if enum_nombre == "Option" => true,
                     _ => false,
                 };
                 

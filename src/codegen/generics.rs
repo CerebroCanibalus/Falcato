@@ -493,6 +493,7 @@ impl Codegen {
                 Tipo::Diccionario(k, v) => format!("Diccionario_{}_{}", self.nombre_tipo_instancia(k), self.nombre_tipo_instancia(v)),
                 Tipo::Conjunto(t) => format!("Conjunto_{}", self.nombre_tipo_instancia(t)),
                 Tipo::Resultado(t, e) => format!("Resultado_{}_{}", self.nombre_tipo_instancia(t), self.nombre_tipo_instancia(e)),
+                Tipo::Option(t) => format!("Option_{}", self.nombre_tipo_instancia(t)),
                 Tipo::Puntero(t) => format!("Ptr_{}", self.nombre_tipo_instancia(t)),
                 Tipo::Referencia(t) => format!("Ref_{}", self.nombre_tipo_instancia(t)),
                 Tipo::ReferenciaMut(t) => format!("RefMut_{}", self.nombre_tipo_instancia(t)),

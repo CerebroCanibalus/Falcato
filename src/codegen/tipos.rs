@@ -178,6 +178,7 @@ impl Codegen {
             Tipo::Diccionario(_, _) => types::I64, // Puntero
             Tipo::Conjunto(_) => types::I64, // Puntero
             Tipo::Resultado(_, _) => types::I64, // Puntero
+            Tipo::Option(_) => types::I64, // R7.7 F2: packed (tag low 32, data high 32)
             Tipo::Generico(n) => panic!("No se puede compilar tipo genÃƒÂ©rico '{}' sin concretar", n),
             Tipo::Nombre(n) => panic!("No se puede compilar tipo Nombre '{}' sin resolver (Ã‚Â¿olvidaste importarlo?)", n),
             Tipo::NombreGenerico(n, _) => panic!("Tipo NombreGenerico '{}' no se pudo resolver (Ã‚Â¿olvidaste concretar genÃƒÂ©ricos?)", n),
@@ -208,6 +209,7 @@ impl Codegen {
             Tipo::Diccionario(_, _) |
             Tipo::Conjunto(_) |
             Tipo::Resultado(_, _) |
+            Tipo::Option(_) |
             Tipo::Puntero(_) |
             Tipo::Referencia(_) |
             Tipo::ReferenciaMut(_) |

@@ -323,7 +323,7 @@ impl VariableManager {
             Tipo::Entero64 | Tipo::Natural64 | Tipo::Flotante64 |
             Tipo::Palabra | Tipo::Texto | Tipo::Vector(_) |
             Tipo::Diccionario(_, _) | Tipo::Conjunto(_) |
-            Tipo::Resultado(_, _) | Tipo::Puntero(_) |
+        Tipo::Resultado(_, _) | Tipo::Option(_) | Tipo::Puntero(_) |
             Tipo::Referencia(_) | Tipo::ReferenciaMut(_) => 8,
             Tipo::Array(tipo_elem, longitud) => Self::tamano_tipo_static(tipo_elem) * (*longitud as u32),
             _ => 8, // Default para punteros y tipos complejos
@@ -608,6 +608,7 @@ pub fn tipo_a_cranelift(tipo: &Tipo) -> Type {
         Tipo::Diccionario(_, _) => types::I64,
         Tipo::Conjunto(_) => types::I64,
         Tipo::Resultado(_, _) => types::I64,
+        Tipo::Option(_) => types::I64,
         Tipo::Generico(n) => panic!("No se puede compilar tipo genérico '{}' sin concretar", n),
         Tipo::Nombre(n) => panic!("No se puede compilar tipo Nombre '{}' sin resolver", n),
         Tipo::NombreGenerico(n, _) => panic!("Tipo NombreGenerico '{}' no se pudo resolver", n),
@@ -623,7 +624,7 @@ pub fn tamano_tipo(tipo: &Tipo) -> u32 {
         Tipo::Entero64 | Tipo::Natural64 | Tipo::Flotante64 |
         Tipo::Palabra | Tipo::Texto | Tipo::Vector(_) |
         Tipo::Diccionario(_, _) | Tipo::Conjunto(_) |
-        Tipo::Resultado(_, _) | Tipo::Puntero(_) |
+        Tipo::Resultado(_, _) | Tipo::Option(_) | Tipo::Puntero(_) |
         Tipo::Referencia(_) | Tipo::ReferenciaMut(_) |
         Tipo::ReferenciaConLifetime(_, _) |
         Tipo::ReferenciaMutConLifetime(_, _) |

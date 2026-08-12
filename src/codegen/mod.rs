@@ -222,6 +222,24 @@ impl Codegen {
             tipos_datos,
         });
 
+        // Option<T> — R7.7 F2: Algo(valor) | Nada. Layout packed I64 como Resultado:
+        // tag 0 = Algo (data = valor), tag 1 = Nada (sin data)
+        let mut variantes_opt = HashMap::new();
+        variantes_opt.insert("Algo".to_string(), 0u32);
+        variantes_opt.insert("Nada".to_string(), 1u32);
+        let mut tipos_datos_opt = HashMap::new();
+        tipos_datos_opt.insert("Algo".to_string(), vec![Tipo::Entero32]);
+        tipos_datos_opt.insert("Nada".to_string(), vec![]);
+        self.enums.insert("Option".to_string(), LayoutEnum {
+            nombre: "Option".to_string(),
+            tamano: tamano_alineado,
+            alineacion,
+            tag_tamano,
+            datos_offset,
+            variantes: variantes_opt,
+            tipos_datos: tipos_datos_opt,
+        });
+
         self
     }
 

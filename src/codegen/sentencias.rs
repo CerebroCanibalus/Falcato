@@ -19,6 +19,41 @@ impl Codegen {
                 // Resolver apodos de tipo (ej: apodo ID = Entero64 → Entero64)
                 // para que el slot tenga el tamaño correcto y el literal se emita bien.
                 let tipo = self.resolver_alias(&tipo);
+
+                // R7.7 F2 — `un x = a + b` sin tipo explícito: el artículo `un` (incierto)
+                // + aritmética → Option<T>. Sin esto, inferir_tipo del codegen devuelve
+                // Entero32 (Binaria => Entero32 simplificado) y el slot es de 4 bytes.
+                let tipo = if decl.articulo == crate::ast::Articulo::Un {
+                    if decl.tipo.is_none() {
+                        if let Expresion::Binaria(izq, op, _, _) = &decl.valor {
+                            let es_aritmetica = matches!(
+                                op,
+                                OperadorBinario::Suma
+                                    | OperadorBinario::Resta
+                                    | OperadorBinario::Multiplicacion
+                            );
+                            if es_aritmetica {
+                                let t_interno = self.inferir_tipo(izq, variables);
+                                if matches!(self.resolver_alias(&t_interno),
+                                    Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32
+                                        | Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32)
+                                {
+                                    Tipo::Option(Box::new(t_interno))
+                                } else {
+                                    tipo
+                                }
+                            } else {
+                                tipo
+                            }
+                        } else {
+                            tipo
+                        }
+                    } else {
+                        tipo
+                    }
+                } else {
+                    tipo
+                };
                 
                 // Arrays: stack slot grande
                 let (slot, _tamano) = match &tipo {
@@ -231,6 +266,99 @@ impl Codegen {
                         let valor = self.compilar_expresion(&decl.valor, builder, variables)?;
                         builder.ins().stack_store(valor, slot, 0);
                         (slot, tamano)
+                    }
+                    // R7.7 F2 — `un x = a + b`: Option<T> checked con None
+                    // Algo(tag 0, data = valor) | Nada(tag 1). Empaqueta I64 como Resultado.
+                    Tipo::Option(tipo_interno) => {
+                        let tamano = self.tamano_tipo(&tipo);
+                        let slot = builder.create_sized_stack_slot(
+                            cranelift_codegen::ir::StackSlotData::new(
+                                cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+                                tamano,
+                                0,
+                            )
+                        );
+                        // Solo soportamos aritmética binaria checked: `un x = a + b`
+                        match &decl.valor {
+                            Expresion::Binaria(izq, op, der, span_bin) => {
+                                let tipo_izq = self.inferir_tipo(izq, variables);
+                                let tipo_der = self.inferir_tipo(der, variables);
+                                let val_izq = self.compilar_lado_binaria(izq, &tipo_der, builder, variables)?;
+                                let val_der = self.compilar_lado_binaria(der, &tipo_izq, builder, variables)?;
+                                let val_r = self.compilar_operacion_binaria(*op, val_izq, val_der, builder)?;
+                                let tipo_val = builder.func.dfg.value_type(val_izq);
+                                let bits = tipo_val.bits() as i64;
+                                let es_signed = matches!(
+                                    self.resolver_alias(tipo_interno),
+                                    Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32
+                                );
+                                use cranelift_codegen::ir::condcodes::IntCC;
+                                let overflow = match op {
+                                    OperadorBinario::Suma if es_signed => {
+                                        let xor_a = builder.ins().bxor(val_izq, val_r);
+                                        let xor_b = builder.ins().bxor(val_der, val_r);
+                                        let and = builder.ins().band(xor_a, xor_b);
+                                        let shift = builder.ins().iconst(tipo_val, bits - 1);
+                                        let signo = builder.ins().sshr(and, shift);
+                                        let cero = builder.ins().iconst(tipo_val, 0);
+                                        builder.ins().icmp(IntCC::NotEqual, signo, cero)
+                                    }
+                                    OperadorBinario::Resta if es_signed => {
+                                        let xor_ab = builder.ins().bxor(val_izq, val_der);
+                                        let xor_ar = builder.ins().bxor(val_izq, val_r);
+                                        let and = builder.ins().band(xor_ab, xor_ar);
+                                        let shift = builder.ins().iconst(tipo_val, bits - 1);
+                                        let signo = builder.ins().sshr(and, shift);
+                                        let cero = builder.ins().iconst(tipo_val, 0);
+                                        builder.ins().icmp(IntCC::NotEqual, signo, cero)
+                                    }
+                                    OperadorBinario::Multiplicacion if es_signed => {
+                                        let hi = builder.ins().smulhi(val_izq, val_der);
+                                        let shift = builder.ins().iconst(tipo_val, bits - 1);
+                                        let ext = builder.ins().sshr(val_r, shift);
+                                        builder.ins().icmp(IntCC::NotEqual, hi, ext)
+                                    }
+                                    OperadorBinario::Suma => {
+                                        builder.ins().icmp(IntCC::UnsignedLessThan, val_r, val_izq)
+                                    }
+                                    OperadorBinario::Resta => {
+                                        builder.ins().icmp(IntCC::UnsignedGreaterThan, val_r, val_izq)
+                                    }
+                                    OperadorBinario::Multiplicacion => {
+                                        let hi = builder.ins().umulhi(val_izq, val_der);
+                                        let cero = builder.ins().iconst(tipo_val, 0);
+                                        builder.ins().icmp(IntCC::NotEqual, hi, cero)
+                                    }
+                                    _ => {
+                                        self.errores.agregar(ErrorCompilador::nuevo(
+                                            CategoriaError::Tipo,
+                                            110, // T110: un requiere aritmética
+                                            span_bin.clone(),
+                                            format!("'un' (Option checked) solo aplica a suma, resta o multiplicación, no a '{:?}'", op),
+                                        ));
+                                        return Err(());
+                                    }
+                                };
+                                // Empaquetar: Algo(tag 0, data = r) | Nada(tag 1)
+                                let r_i64 = builder.ins().uextend(types::I64, val_r);
+                                let shift32 = builder.ins().iconst(types::I64, 32);
+                                let algo_packed = builder.ins().ishl(r_i64, shift32); // tag 0 implícito
+                                let uno = builder.ins().iconst(types::I64, 1);
+                                let nada_packed = uno; // tag 1, sin data
+                                let valor = builder.ins().select(overflow, nada_packed, algo_packed);
+                                builder.ins().stack_store(valor, slot, 0);
+                                (slot, tamano)
+                            }
+                            _ => {
+                                self.errores.agregar(ErrorCompilador::nuevo(
+                                    CategoriaError::Tipo,
+                                    111, // T111: un Option requiere aritmética binaria
+                                    decl.span.clone(),
+                                    "'un' (Option checked) requiere una operación aritmética binaria: un x = a + b".to_string(),
+                                ));
+                                return Err(());
+                            }
+                        }
                     }
                     _ => {
                         let tamano = self.tamano_tipo(&tipo);
