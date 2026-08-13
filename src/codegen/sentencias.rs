@@ -246,13 +246,23 @@ impl Codegen {
                                 }
                             }
                             _ => {
-                                // R9.0.1 — si el valor es una llamada que retorna struct,
-                                // el ptr devuelto apunta al slot temporal → copiar al slot de n
-                                let es_llamada_struct = matches!(&decl.valor, Expresion::Llamada(llamada) if
-                                    self.declaraciones.get(&llamada.funcion)
-                                        .and_then(|f| f.retorno.as_ref())
-                                        .map(|r| self.tipo_es_struct(r).is_some())
-                                        .unwrap_or(false));
+                                // R9.0.1/R9.0.2 — si el valor es una llamada que produce un
+                                // puntero a struct (retorno de función de usuario con struct,
+                                // o diccionario_obtener con valor struct), copiar el struct
+                                // del ptr al slot de n en vez de stack_store (guardaría el ptr).
+                                let es_llamada_struct = match &decl.valor {
+                                    Expresion::Llamada(llamada) => {
+                                        let ret_struct = self.declaraciones.get(&llamada.funcion)
+                                            .and_then(|f| f.retorno.as_ref())
+                                            .map(|r| self.tipo_es_struct(r).is_some())
+                                            .unwrap_or(false);
+                                        let dict_struct = llamada.funcion == "diccionario_obtener"
+                                            && llamada.tipo_args.len() == 2
+                                            && self.tipo_es_struct(&llamada.tipo_args[1]).is_some();
+                                        ret_struct || dict_struct
+                                    }
+                                    _ => false,
+                                };
                                 if es_llamada_struct {
                                     let base_ptr = builder.ins().stack_addr(types::I64, slot, 0);
                                     let src_ptr = self.compilar_expresion(&decl.valor, builder, variables)?;

@@ -310,6 +310,14 @@ impl Codegen {
                     "tamano_de" => Tipo::Entero32,
                     "raiz" | "potencia" => Tipo::Flotante64,
                     "archivo_existe" | "texto_obtener_byte" => Tipo::Entero8,
+                    // R9.0.2 — diccionario_obtener<K,V> retorna V (puede ser struct)
+                    "diccionario_obtener" => {
+                        if llamada.tipo_args.len() == 2 {
+                            llamada.tipo_args[1].clone()
+                        } else {
+                            Tipo::Entero32
+                        }
+                    }
                     _ => {
                         // R9.0.1 — funciones de usuario: devolver el retorno declarado
                         if let Some(decl) = self.declaraciones.get(&llamada.funcion) {

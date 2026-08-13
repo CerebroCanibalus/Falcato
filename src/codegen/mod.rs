@@ -888,6 +888,15 @@ impl Codegen {
         builder: &mut FunctionBuilder,
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
     ) -> Result<(), ()> {
+        // R6 fix (2026-08-13): un retorno temprano llama liberar_scope(0) que libera
+        // TODO el heap (incluidas variables de scopes exteriores). Los epílogos de
+        // bucles/ramas anidados intentan liberar luego con marcas obsoletas (desde > len)
+        // → panic "range start index X out of range". Si ya no hay nada desde `desde`,
+        // podar las marcas obsoletas y salir sin liberar (nada que liberar / ya liberado).
+        if desde > self.heap_vivas.len() {
+            self.scope_marcas.retain(|&m| m < desde);
+            return Ok(());
+        }
         // Recoger los nombres a liberar (desde el snapshot hasta el final)
         let a_liberar: Vec<(String, Tipo)> = self.heap_vivas[desde..].to_vec();
         for (nombre, tipo) in &a_liberar {
@@ -910,6 +919,8 @@ impl Codegen {
         }
         // Podar el vec hasta el snapshot
         self.heap_vivas.truncate(desde);
+        // Podar marcas de scope obsoletas (las >= desde ya se liberaron)
+        self.scope_marcas.retain(|&m| m < desde);
         Ok(())
     }
 

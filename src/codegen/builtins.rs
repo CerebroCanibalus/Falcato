@@ -1826,6 +1826,17 @@ impl Codegen {
         tipo: &Tipo,
         flags: cranelift_codegen::ir::MemFlags,
     ) {
+        // R9.0.2 — structs (incluso de 8/4/2/1 bytes) se guardan COPIANDO del ptr:
+        // `val` es la dirección del slot del struct. Sin esto, un struct de 8 bytes
+        // (2×Entero32) caía en el caso I64 y guardaba el PUNTERO en vez del struct.
+        if self.tipo_es_struct(tipo).is_some() {
+            let tam = self.tamano_tipo(tipo);
+            for off in (0..tam).step_by(8) {
+                let fv = builder.ins().load(types::I64, flags, val, off as i32);
+                builder.ins().store(flags, fv, addr, off as i32);
+            }
+            return;
+        }
         let tam = self.tamano_tipo(tipo);
         match tam {
             1 => { let v = builder.ins().ireduce(types::I8, val); builder.ins().store(flags, v, addr, 0); }
@@ -1847,6 +1858,12 @@ impl Codegen {
         tipo: &Tipo,
         flags: cranelift_codegen::ir::MemFlags,
     ) -> cranelift_codegen::ir::Value {
+        // R9.0.2 — structs: devolver el PUNTERO al valor en el bucket (el caller
+        // copia al slot o accede por campos). Incluye structs de 8 bytes (2×Entero32),
+        // que antes caían en el caso I64 y devolvían el struct empaquetado como puntero.
+        if self.tipo_es_struct(tipo).is_some() {
+            return addr;
+        }
         let tam = self.tamano_tipo(tipo);
         match tam {
             1 => {
