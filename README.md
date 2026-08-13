@@ -1,5 +1,5 @@
 ﻿
-Falcato. Forjado sobre Cranelift. Compila a binarios nativos x86_64. Archivos .exe y .o 
+Falcato. El primer lenguaje **gramatipado y morfosemántico** del mundo: la gramática española es el sistema de tipos. Forjado sobre Cranelift. Compila a binarios nativos x86_64. Archivos .exe y .o 
 
 ![Falcato Banner](assets/images/falcato_banner.png)
 
@@ -65,9 +65,9 @@ falcato run ejemplos\hola_mundo.fc
 
 ## ¿Qué es Falcato?
 
-Falcato es un **lenguaje de programación de sistemas** creado desde cero donde la gramática española no es azúcar sintáctico — **es el sistema de tipos y el modelo de ejecución**.
+Falcato es un **lenguaje de programación de sistemas** creado desde cero donde la gramática española **es el sistema de tipos y el modelo de ejecución**.
 
-No traduce keywords de Rust al español. No interpreta pseudocódigo. No es un wrapper sobre otro compilador.
+No traduce keywords de Rust al español, no interpreta pseudocódigo, y no es un wrapper sobre otro compilador.
 
 Falcato tiene su propio **analizador léxico** (logos), **parser** (descendente manual con Pratt),
 **análisis semántico** (Concordancia Lingüística), y **codegen** (Cranelift → .o → .exe).
@@ -81,11 +81,13 @@ fn principal() -> Entero32 {
 }
 ```
 
+> 📖 **Aprende Falcato desde cero:** [GUIA.md](GUIA.md) — 17 capítulos, 5-10 minutos cada uno.
+
 ---
 
 ## ¿Por qué Falcato existe?
 
-Hay **~600 millones de hispanohablantes** en el mundo (nativos + L2, Instituto Cervantes 2024). Menos del 5% programa. La barrera no es la lógica — es el lenguaje de la documentación, los errores, y la sintaxis.
+Hay **~600 millones de hispanohablantes** en el mundo (nativos + L2, Instituto Cervantes 2024). Menos del 5% programa. La barrera no es la lógica: es el lenguaje de la documentación, los errores y la sintaxis.
 
 Falcato responde a tres preguntas:
 
@@ -113,11 +115,11 @@ Falcato responde a tres preguntas:
 
 Esta es la pregunta que más nos hacen, y merece una respuesta clara:
 
-**Falcato no usa español porque "hay que traducir keywords para que los latinos aprendan".**
-Falcato usa español porque **el español tiene herramientas gramaticales que el inglés no tiene**,
+**Falcato no usa español para "traducir keywords y que los latinos aprendan".**
+Lo usa porque **el español tiene herramientas gramaticales que el inglés no tiene**,
 y esas herramientas permiten construir **sistemas de verificación de compilación más expresivos**.
 
-No es inclusión. Es **ingeniería**.
+No es una decisión de inclusión: es de ingeniería.
 
 ### 🧠 Las 3 razones de fondo
 
@@ -135,7 +137,7 @@ tiempo, modo y aspecto. En programación, **más dimensiones gramaticales = más
 | **Prefijos** | Limitados (re-, un-, pre-) | Productivos: re-, des-, pre-, entre-, contra- | Semántica de sistema: reintentar, liberar, en compilación |
 | **Artículos** | the/a/an (3) | el/la/un/una/los/las/unos/unas (8) | 5+ niveles de posesión y visibilidad |
 
-#### 2. La brecha semántica LLM → código se reduce drásticamente
+#### 2. La brecha semántica LLM → código se reduce
 
 Un LLM genera texto en lenguaje natural. Cuando el lenguaje de programación **es** lenguaje
 natural (estructurado), la distancia entre lo que el LLM "piensa" y lo que escribe se acorta.
@@ -156,9 +158,9 @@ let mut contents: String = String::from("data");
 if contents.len() == 0 { return Err(-1); }
 ```
 
-Esa **fricción de traducción** no es anecdótica. Es el motivo principal por el que la
+Esa **fricción de traducción** es el motivo principal por el que la
 programación tiene una barrera de entrada artificial para 600M de hispanohablantes.
-Y es también el motivo por el que los LLM generan código con más errores semánticos
+También explica por qué los LLM generan código con más errores semánticos
 en lenguajes inglés-nativos: el modelo tiene que traducir dos veces
 (idea → lenguaje natural → código) en vez de una (idea → código en su idioma).
 
@@ -180,16 +182,16 @@ el x: Entero32 = 10;    // dueño, mutable — se puede modificar
 x = 20;                  // ✅ si es 'el', ❌ si es 'la'
 ```
 
-Eso no es decoración. Es **el sistema de affine types integrado en la gramática**.
+Eso no es decoración: es **el sistema de affine types integrado en la gramática**.
 
 En WN++, `pega` en vez de `fn` es un cambio léxico. El intérprete trata `pega` exactamente
 como cualquier otro lenguaje trata `function` o `def`. En Falcato, `el` vs `la` no es léxico —
 es semántico. El compilador **razona** sobre esa diferencia.
 
-### 🎯 La tesis, clara
+### La tesis
 
 > **Falcato existe porque el español tiene recursos gramaticales que permiten construir
-> un lenguaje de sistemas más expresivo, más verificable y más cercano al pensamiento humano
+> un lenguaje de sistemas más expresivo y verificable, y más cercano al pensamiento humano,
 > que cualquier lenguaje diseñado exclusivamente en inglés.**
 
 No estamos "traduciendo Rust al español". Estamos explorando una pregunta que nadie
@@ -204,7 +206,7 @@ de programación, en vez de ignorarse porque "el inglés es el estándar"?**
 
 ### 🧬 El español ES el sistema de tipos
 
-En Falcato, la concordancia gramatical es verificación de tipos. Un adjetivo que no concuerda con su sustantivo es un error de compilación — igual que en español.
+En Falcato, la concordancia gramatical es verificación de tipos. Un adjetivo que no concuerda con su sustantivo es un error de compilación, igual que en español.
 
 ```
 [T001] test.fc:4:8: Disconcordancia de tipo: 'a' es 'Entero32' pero se declaró como 'Booleano'
@@ -246,7 +248,7 @@ Si hablas español, ya entiendes la diferencia entre *"el libro"* (lo tengo yo, 
 
 ### 📡 Async real con hilos del SO
 
-`lanzar expr` → CreateThread real. `canal_nuevo` → mutex + semaphore + ring buffer. `con_executor(N)` → grupo de hilos con cancelación estructurada. Todo verificado integralmente.
+`lanzar expr` → CreateThread real. `canal_nuevo` → mutex + semaphore + ring buffer. `con_executor(N)` → grupo de hilos con cancelación estructurada. Todo verificado.
 
 ---
 
@@ -255,7 +257,7 @@ Si hablas español, ya entiendes la diferencia entre *"el libro"* (lo tengo yo, 
 | ❌ No es... | ✅ Sí es... |
 |-------------|------------|
 | Pseudocódigo | Compilador real → binarios nativos |
-| Traducción de Rust al español | Lenguaje nuevo donde la gramática española IS el sistema de tipos |
+| Traducción de Rust al español | Lenguaje nuevo donde la gramática española ES el sistema de tipos |
 | Wrapper sobre LLVM | motor propio sobre Cranelift (contribución activa al ecosistema) |
 | Lenguaje interpretado | AOT compilation → .exe sin ejecución |
 | Proyecto de traducción de keywords | Ingeniería de lenguajes con dimensiones semánticas únicas |
@@ -342,7 +344,7 @@ imprimir("Hola")
 vía `npm install -g aguila-lang` y su núcleo es privado (no hay compilador real que auditar).
 Es un lenguaje de **scripting dinámico** sobre Node.js con keywords y métodos nativos en español.
 Tiene 54 estrellas en GitHub, un gestor de paquetes, y funcionalidades de ciencia de datos.
-Su mérito no está en el motor — es esencialmente Node.js con sintaxis en español.
+Su mérito no está en el motor: es esencialmente Node.js con sintaxis en español.
 
 ```aguila
 # Águila — scripting dinámico sobre Node.js
@@ -383,7 +385,7 @@ función principal() -> Entero32 {
 }
 ```
 
-**La diferencia no es de grado — es de categoría:**
+**La diferencia es de categoría, no de grado:**
 
 | Dimensión | Latino / PSeInt / EsJS / Sí / Águila / WN++ | Falcato |
 |-----------|----------------------------------------------|---------|
@@ -401,8 +403,8 @@ función principal() -> Entero32 {
 | **Bitfields para hardware** | ❌ | ✅ |
 | **Estructuras auto-referenciales** | ❌ | ✅ |
 
-> **Falcato no compite con Latino, PSeInt, EsJS, Águila, WN++ o Sí.** Compite con **Rust, C, Go y Zig**.
-> Los proyectos en español existentes son herramientas educativas o transpiladores ligeros —
+> **Falcato no compite con Latino, PSeInt, EsJS, Águila, WN++ o Sí: compite con Rust, C, Go y Zig.**
+> Los proyectos en español existentes son herramientas educativas o transpiladores ligeros,
 > válidos en su nicho, pero conceptualmente ortogonales a Falcato.
 >
 > Sería como comparar **Python** con **C**: ambos son lenguajes de programación, pero están
@@ -431,7 +433,7 @@ Falcato + Cranelift + WASM = cadena de herramientas nativa para código generado
 
 ## ¿Para qué sirve Falcato? (Lo que importa)
 
-Falcato existe para una sola razón: **hacer cosas que otros lenguajes de sistemas no pueden, no quieren, o hacen mal**. No es "otro lenguaje de sistemas" — es lo que los demás no se atreven a ser.
+Falcato existe para una sola razón: **hacer cosas que otros lenguajes de sistemas no pueden, no quieren o hacen mal**. No es "otro lenguaje de sistemas": es lo que los demás no se atreven a ser.
 
 ### 🔥 Cosas que solo Falcato puede hacer
 
@@ -445,9 +447,9 @@ Falcato existe para una sola razón: **hacer cosas que otros lenguajes de sistem
 | **Artículos = affine types** — `el` = owned, `la` = prestado, `los` = compartido | ❌ Ninguno | La gramática española **es** el sistema de tipos. No aprendes tipos affine — ya sabes español. |
 | **Regiones de arena** — `región { ... }` todo se libera al salir | ❌ Rust requiere crate externo | Asignación determinística, cero overhead. Ideal para kernels, buffers de red, frames de video. |
 
-### 🎯 Proyectos que IMPRESIONAN (y por qué Falcato es la herramienta correcta)
+### 🎯 Proyectos reales con Falcato
 
-No son ideas. Son proyectos reales que puedes construir hoy con Falcato y que cualquier programador de sistemas respetaría.
+Son proyectos reales que puedes construir hoy con Falcato y que cualquier programador de sistemas respetaría.
 
 ---
 
@@ -455,7 +457,7 @@ No son ideas. Son proyectos reales que puedes construir hoy con Falcato y que cu
 
 El proyecto por excelencia del programador de sistemas. Falcato está diseñado para esto.
 
-**Por qué Falcato arrasa aquí:**
+**Por qué Falcato encaja aquí:**
 - `bits { }` para registros, flags, y estructuras de CPU en tipo puro, sin macros ni crates
 - `[Entero8; 4096]` para memoria del sistema — stack allocation, sin heap, latencia cero
 - `coincidir opcode { 0x00E0 => ... }` para decoding de instrucciones — pattern matching nativo
@@ -469,7 +471,7 @@ El proyecto por excelencia del programador de sistemas. Falcato está diseñado 
 
 El administrador de tareas de Windows corre sobre una API C. Falcato habla C de forma nativa.
 
-**Por qué Falcato arrasa aquí:**
+**Por qué Falcato encaja aquí:**
 - `inseguro fn CreateToolhelp32Snapshot(...)` — la API de Windows se llama como si fuera Falcato nativo
 - `con_executor(2) { lanzar actualizar_lista() }` — un hilo actualiza procesos, otro refresca la UI
 - `Diccionario<Entero32, InfoProceso>` para asociar PID a proceso sin tener que escribir un hash map
@@ -482,7 +484,7 @@ El administrador de tareas de Windows corre sobre una API C. Falcato habla C de 
 
 No es un event loop con corutinas que fingen paralelismo. Es `CreateThread` real.
 
-**Por qué Falcato arrasa aquí:**
+**Por qué Falcato encaja aquí:**
 - `con_executor(N) { lanzar atender(peticion) }` — cada petición en su propio hilo del SO, paralelismo real en todos los núcleos
 - `canal_nuevo<Socket>(100)` + `seleccionar { }` — aceptar conexiones en un hilo, distribuirlas a workers por canal, todo con cancelación
 - `inseguro fn send(s: Socket, buf: &[Entero8], ...)` — Winsock2 directo, sin wrappers, sin overhead
@@ -495,7 +497,7 @@ No es un event loop con corutinas que fingen paralelismo. Es `CreateThread` real
 
 Manipulación de bytes a nivel de bit con tipos de Falcato.
 
-**Por qué Falcato arrasa aquí:**
+**Por qué Falcato encaja aquí:**
 - `bits { }` para interpretar estructuras binarias en tiempo real — FAT, BMP, PNG, ELF, PE
 - `archivo_leer(ruta) -> Texto` — archivo completo a memoria en una línea
 - `[Entero8; N]` para buffer de trabajo — stack allocation, cero GC
@@ -508,7 +510,7 @@ Manipulación de bytes a nivel de bit con tipos de Falcato.
 
 Esto es lo que Falcato hace mejor: **concurrencia real + networking + cero GC**.
 
-**Por qué Falcato arrasa aquí:**
+**Por qué Falcato encaja aquí:**
 - `con_executor(8) { lanzar gestionar_jugador(socket) }` — cada jugador en su propio hilo, paralelismo real
 - `región partida { ... }` — toda la memoria de una partida se asigna al entrar y se libera al salir. Sin GC, sin leaks, sin pausas.
 - `canal_nuevo<Comando>(256)` — cola de comandos del jugador, procesada por el hilo de simulación
@@ -544,11 +546,11 @@ La mayoría de los CNL existentes se usan para especificación de requisitos y r
 
 #### Por qué el español es un superpoder para LLMs
 
-**Tesis:** Un lenguaje de programación basado en español tiene ventajas fundamentales sobre uno basado en inglés cuando el programador es una IA entrenada en lenguaje natural.
+Un lenguaje de programación basado en español tiene ventajas sobre uno basado en inglés cuando el programador es una IA entrenada en lenguaje natural.
 
 **1. Los LLMs ya saben español.**
 
-Un LLM no necesita aprender qué significa `función` — ya lo sabe de su entrenamiento en lenguaje natural. Cuando ve `el x: Entero32`, entiende la posesión implícita de "el" sin haber visto nunca una línea de Falcato en entrenamiento. Esto es **transferencia lingüística cero-esfuerzo**: el conocimiento del español se transfiere directamente a la comprensión del código.
+Un LLM no necesita aprender qué significa `función` — ya lo sabe de su entrenamiento en lenguaje natural. Cuando ve `el x: Entero32`, entiende la posesión implícita de "el" sin haber visto nunca una línea de Falcato en entrenamiento. El conocimiento del español se transfiere directamente a la comprensión del código.
 
 Con Rust o C, el LLM tuvo que aprender sintaxis artificial (`fn`, `let mut`, `unsafe`) desde cero en su entrenamiento con código fuente. Con Falcato, la sintaxis **es** español. El LLM ya la conoce.
 
@@ -566,15 +568,15 @@ Los tokenizadores de LLMs (BPE) fueron entrenados mayoritariamente en inglés. E
 
 **5. Lenguaje autocontenido para el agente.**
 
-Con Lenguajes Naturales Controlados, la investigación reciente (CNL-P, 2025) demuestra que los LLMs pueden hacer análisis semántico a CNL con **más precisión** que a lenguajes formales tradicionales, precisamente porque el CNL reduce la distancia entre el prompt natural y el código generado. Falcato es esta idea llevada a su conclusión lógica: cero distancia entre el prompt en español y el código Falcato.
+Con Lenguajes Naturales Controlados, la investigación reciente ([CNL-P, 2025](https://arxiv.org/abs/2508.06942)) demuestra que los LLMs pueden hacer análisis semántico a CNL con **más precisión** que a lenguajes formales tradicionales, precisamente porque el CNL reduce la distancia entre el prompt natural y el código generado. Falcato lleva esta idea a su conclusión lógica: cero distancia entre el prompt en español y el código Falcato.
 
-#### La prueba más fehaciente
+#### La prueba
 
 **Cualquier LLM hoy puede escribir Falcato sin haberlo visto nunca en entrenamiento.**
 
-No es una afirmación teórica. Hemos probado con GPT-4, Claude, Gemini, DeepSeek, y otros modelos — todos generan código Falcato funcional en el primer intento si se les explica la gramática básica. No necesitan ajuste fino. No necesitan ejemplos en el prompt. El conocimiento del español + la gramática restringida del CNL es suficiente.
+Lo hemos probado con GPT-4, Claude, Gemini, DeepSeek y otros modelos: todos generan código Falcato funcional en el primer intento si se les explica la gramática básica. No necesitan ajuste fino ni ejemplos en el prompt. El conocimiento del español + la gramática restringida del CNL es suficiente.
 
-¿Por qué funciona? Porque para un LLM, Falcato no es "un lenguaje de programación que hay que aprender" — es **instrucciones en español con formato estructurado**. El LLM no traduce tu prompt a código Falcato. El prompt YA está en Falcato.
+Para un LLM, Falcato no es "un lenguaje de programación que hay que aprender": es **instrucciones en español con formato estructurado**. El LLM no traduce tu prompt a código Falcato — el prompt ya está en Falcato.
 
 | Problema | Cómo lo resuelve Falcato |
 |----------|-------------------------|
@@ -595,16 +597,16 @@ No es una afirmación teórica. Hemos probado con GPT-4, Claude, Gemini, DeepSee
 6. falcato build — binario nativo listo en <100ms total
 ```
 
-Esto no es teoría. El LSP de Falcato tiene **7 funcionalidades para agentes**: autocompletado completo (60+ keywords), ayuda de firmas, acciones de código, símbolos del documento, información contextual mejorada, ir a definición, buscar referencias. Integrado con OpenCode, VS Code, Claude Code, Cursor.
+El LSP de Falcato tiene **7 funcionalidades para agentes**: autocompletado completo (60+ keywords), ayuda de firmas, acciones de código, símbolos del documento, información contextual mejorada, ir a definición, buscar referencias. Integrado con OpenCode, VS Code, Claude Code, Cursor.
 
 ### 🧠 Lo que Falcato te da que otros no
 
-No es una lista de features — es una lista de **batallas que dejas de pelear**:
+No es una lista de features: es una lista de **batallas que dejas de pelear**:
 
-- **Rust ownership sin Rust complexity**: gradual, educativo, con opciones de fix
-- **C speed sin C peligro**: nativo, ABI C, pero con verificación de tipos y memoria
-- **Python velocidad de prototipado sin Python lentitud**: compila rápido, corre rápido
-- **Go simplicidad sin Go GC**: sin pausas, sin recolector, sin runtime
+- **El ownership de Rust sin su complejidad**: gradual, educativo, con opciones de fix
+- **La velocidad de C sin su peligro**: nativo, ABI C, pero con verificación de tipos y memoria
+- **La velocidad de prototipado de Python sin su lentitud**: compila rápido, corre rápido
+- **La simplicidad de Go sin su GC**: sin pausas, sin recolector, sin runtime
 - **Español real**: no necesitas inglés para programar sistemas. Los errores los entiendes, no los traduces
 
 ---
@@ -727,7 +729,7 @@ Resaltado de sintaxis, LSP integrado y tema **"Falcato Dorado"**:
 
 | Aspecto | Estado |
 |---------|--------|
-| Pipeline integralmente | ✅ Operativo |
+| Pipeline completo | ✅ Operativo |
 | motor Cranelift | ✅ Generando binarios nativos |
 | Tests unitarios | ✅ 40/40 pasando |
 | Ejemplos funcionando | ✅ 50+ |
@@ -735,7 +737,7 @@ Resaltado de sintaxis, LSP integrado y tema **"Falcato Dorado"**:
 | Async (hilos + TCP + canales + grupo de hilos) | ✅ Fase 18A-18D |
 | Stackless futures | ✅ MVP |
 | Diccionario + Conjunto | ✅ Fase R4 |
-| Documentación completa | ✅ GUIA.md + 15 capítulos + REFERENCIA.md + ERRORES.md |
+| Documentación completa | ✅ GUIA.md + 17 capítulos + REFERENCIA.md + ERRORES.md |
 | VS Code Extension | ✅ Syntax + LSP + tema Falcato Dorado |
 | CI GitHub Actions | ✅ Build + test |
 | Distribución | ⚠️ Pre-lanzamiento v0.1.0 |
@@ -747,7 +749,7 @@ Resaltado de sintaxis, LSP integrado y tema **"Falcato Dorado"**:
 | Recurso | Ubicación |
 |---------|-----------|
 | Repositorio | [github.com/CerebroCanibalus/falcato](https://github.com/CerebroCanibalus/falcato) |
-| Documentación | `GUIA.md` + carpeta `GUIA/` (15 capítulos) |
+| Documentación | [📖 GUIA.md](GUIA.md) + carpeta [GUIA/](GUIA/) (17 capítulos) |
 | Referencia de funciones integradas | `REFERENCIA.md` |
 | Códigos de error | `ERRORES.md` |
 | Instalación | `INSTALL.md` |

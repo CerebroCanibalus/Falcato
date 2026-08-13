@@ -2,8 +2,8 @@
 
 ![Falcato Title](assets/images/falcato_title.png)
 
-> Un lenguaje de sistemas en español, construido sobre Cranelift.
-> Rápido de compilar, fácil de entender, difícil de romper.
+> Un lenguaje de sistemas **gramatipado y morfosemántico**, construido sobre Cranelift.
+> La gramática española ES el sistema de tipos. Rápido de compilar, fácil de entender, difícil de romper.
 
 ---
 
