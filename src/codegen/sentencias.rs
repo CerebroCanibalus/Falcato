@@ -246,8 +246,21 @@ impl Codegen {
                                 }
                             }
                             _ => {
-                                let valor = self.compilar_expresion(&decl.valor, builder, variables)?;
-                                builder.ins().stack_store(valor, slot, 0);
+                                // R9.0.1 — si el valor es una llamada que retorna struct,
+                                // el ptr devuelto apunta al slot temporal → copiar al slot de n
+                                let es_llamada_struct = matches!(&decl.valor, Expresion::Llamada(llamada) if
+                                    self.declaraciones.get(&llamada.funcion)
+                                        .and_then(|f| f.retorno.as_ref())
+                                        .map(|r| self.tipo_es_struct(r).is_some())
+                                        .unwrap_or(false));
+                                if es_llamada_struct {
+                                    let base_ptr = builder.ins().stack_addr(types::I64, slot, 0);
+                                    let src_ptr = self.compilar_expresion(&decl.valor, builder, variables)?;
+                                    self.copiar_mem(base_ptr, src_ptr, tamano, builder);
+                                } else {
+                                    let valor = self.compilar_expresion(&decl.valor, builder, variables)?;
+                                    builder.ins().stack_store(valor, slot, 0);
+                                }
                             }
                         }
                         
@@ -524,6 +537,15 @@ impl Codegen {
                 self.liberar_scope(0, builder, variables)?;
                 if let Some(expr) = expr {
                     let val = self.compilar_expresion(expr, builder, variables)?;
+                    // R9.0.1 — retorno de struct: copiar el struct (apuntado por val)
+                    // al sret ptr y retornar void
+                    if let Some(dest) = self.sret_destino {
+                        let tipo_expr = self.inferir_tipo(expr, variables);
+                        let tamano = self.tamano_tipo(&tipo_expr);
+                        self.copiar_mem(dest, val, tamano, builder);
+                        builder.ins().return_(&[]);
+                        return Ok(());
+                    }
                     // Si la expresi├│n accede a una variable de tipo Resultado o enum peque├▒o,
                     // el valor es un puntero al struct en stack ÔåÆ dereferenciar para retornar
                     if matches!(expr, Expresion::Identificador(_, _)) {

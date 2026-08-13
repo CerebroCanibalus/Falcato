@@ -22,11 +22,25 @@ impl Codegen {
 
         // Crear firma para la funciÃ³n
         let mut sig = Signature::new(self.call_conv_default());
+        // R9.0.1 — Retorno de struct → sret (puntero oculto como primer parámetro).
+        let ret_es_struct = match &func.retorno {
+            Some(ret) => self.tipo_es_struct(ret).is_some(),
+            None => false,
+        };
         if let Some(ref ret) = func.retorno {
-            sig.returns.push(AbiParam::new(self.tipo_a_cranelift(ret)));
+            if !ret_es_struct {
+                sig.returns.push(AbiParam::new(self.tipo_a_cranelift(ret)));
+            }
+        }
+        if ret_es_struct {
+            sig.params.push(AbiParam::new(types::I64));
         }
         for param in &func.parametros {
-            sig.params.push(AbiParam::new(self.tipo_a_cranelift(&param.tipo)));
+            if self.tipo_es_struct(&param.tipo).is_some() {
+                sig.params.push(AbiParam::new(types::I64)); // por referencia
+            } else {
+                sig.params.push(AbiParam::new(self.tipo_a_cranelift(&param.tipo)));
+            }
         }
 
         // Asignar firma al contexto
@@ -40,10 +54,20 @@ impl Codegen {
 
         let entry_block = builder.create_block();
 
-        // AÃ±adir parÃ¡metros al bloque de entrada ANTES de cualquier instrucciÃ³n
+        // Añadir parámetros al bloque de entrada ANTES de cualquier instrucción
+        // R9.0.1: el sret ptr (si hay) es el primero; los params struct son I64 (ptr)
+        let mut num_params_ir = 0usize;
+        if ret_es_struct {
+            builder.append_block_param(entry_block, types::I64);
+            num_params_ir += 1;
+        }
         for param in &func.parametros {
-            let tipo = self.tipo_a_cranelift(&param.tipo);
-            builder.append_block_param(entry_block, tipo);
+            if self.tipo_es_struct(&param.tipo).is_some() {
+                builder.append_block_param(entry_block, types::I64);
+            } else {
+                builder.append_block_param(entry_block, self.tipo_a_cranelift(&param.tipo));
+            }
+            num_params_ir += 1;
         }
 
         builder.switch_to_block(entry_block);
@@ -56,9 +80,18 @@ impl Codegen {
         self.heap_vivas.clear();
         self.scope_marcas.clear();
 
+        // R9.0.1 — guardar el sret ptr para `retornar struct`
+        self.sret_destino = if ret_es_struct {
+            Some(builder.block_params(entry_block)[0])
+        } else {
+            None
+        };
+
         // ParÃ¡metros como variables
         for (i, param) in func.parametros.iter().enumerate() {
-            let val = builder.block_params(entry_block)[i];
+            // +1 si hay sret (el primer block_param es el ptr oculto)
+            let idx_ir = i + if ret_es_struct { 1 } else { 0 };
+            let val = builder.block_params(entry_block)[idx_ir];
             let tamano = self.tamano_tipo(&param.tipo);
             let slot = builder.create_sized_stack_slot(
                 cranelift_codegen::ir::StackSlotData::new(
@@ -67,7 +100,13 @@ impl Codegen {
                     0,
                 )
             );
-            builder.ins().stack_store(val, slot, 0);
+            if self.tipo_es_struct(&param.tipo).is_some() {
+                // R9.0.1 — param struct llega como puntero → copiar al slot local
+                let slot_ptr = builder.ins().stack_addr(types::I64, slot, 0);
+                self.copiar_mem(slot_ptr, val, tamano, &mut builder);
+            } else {
+                builder.ins().stack_store(val, slot, 0);
+            }
             variables.insert(param.nombre.clone(), (slot, param.tipo.clone(), param.articulo));
             // R6: parÃ¡metro owned (el/los) de tipo heap → el callee es dueÃ±o → liberar al final
             if matches!(param.articulo, crate::ast::Articulo::El | crate::ast::Articulo::Los) {

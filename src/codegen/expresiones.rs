@@ -1204,7 +1204,30 @@ impl Codegen {
         
         let func_ref = self.module.declare_func_in_func(func_id, builder.func);
 
+        // R9.0.1 — si la función retorna un struct, el caller aloca un slot temporal
+        // y lo pasa como primer argumento oculto (sret). Devuelve el ptr del slot.
+        let ret_es_struct = self.declaraciones.get(&llamada.funcion)
+            .and_then(|f| f.retorno.as_ref())
+            .map(|r| self.tipo_es_struct(r).is_some())
+            .unwrap_or(false);
+
         let mut args = Vec::new();
+        let mut slot_sret: Option<cranelift_codegen::ir::StackSlot> = None;
+        if ret_es_struct {
+            let layout = self.declaraciones.get(&llamada.funcion)
+                .and_then(|f| f.retorno.as_ref())
+                .and_then(|r| self.tipo_es_struct(r))
+                .expect("retorno struct debe tener layout");
+            let slot = builder.create_sized_stack_slot(
+                cranelift_codegen::ir::StackSlotData::new(
+                    cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+                    layout.tamano,
+                    0,
+                )
+            );
+            slot_sret = Some(slot);
+            args.push(builder.ins().stack_addr(types::I64, slot, 0));
+        }
         for arg in &llamada.argumentos {
             let val = self.compilar_expresion(arg, builder, variables)?;
             args.push(val);
@@ -1212,8 +1235,10 @@ impl Codegen {
 
         let call = builder.ins().call(func_ref, &args);
         let results = builder.inst_results(call);
-        
-        if results.is_empty() {
+
+        if ret_es_struct {
+            Ok(builder.ins().stack_addr(types::I64, slot_sret.unwrap(), 0))
+        } else if results.is_empty() {
             Ok(builder.ins().iconst(types::I32, 0))
         } else {
             Ok(results[0])

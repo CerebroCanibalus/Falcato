@@ -271,6 +271,10 @@ pub struct AnalizadorSemantico {
     modulo_actual: Vec<String>,
     /// Símbolos públicos de otros módulos (nombre cualificado → firma)
     simbolos_publicos_importados: HashMap<String, FirmaFuncion>,
+    /// Structs públicos de otros módulos (nombre cualificado → info) — para `usar modulo::*`
+    structs_importados: HashMap<String, InfoStruct>,
+    /// Enums públicos de otros módulos (nombre cualificado → info) — para `usar modulo::*`
+    enums_importados: HashMap<String, InfoEnum>,
     /// Variables movidas en la función actual (para use-after-move detection)
     variables_movidas: std::collections::HashSet<String>,
     /// Nivel de verificación de ownership de la función actual
@@ -302,6 +306,8 @@ impl AnalizadorSemantico {
             glob_imports: Vec::new(),
             modulo_actual: Vec::new(),
             simbolos_publicos_importados: HashMap::new(),
+            structs_importados: HashMap::new(),
+            enums_importados: HashMap::new(),
             variables_movidas: std::collections::HashSet::new(),
             nivel_verificacion_actual: crate::ast::NivelVerificacion::Permisivo,
             borrows: HashMap::new(),
@@ -315,9 +321,20 @@ impl AnalizadorSemantico {
         analizador
     }
 
-    /// Crea analizador con símbolos públicos de otros módulos pre-cargados.
+    /// Crea analizador con símbolos públicos de otros módulos pre-cargados (solo funciones).
     /// Usado por el resolver multi-archivo para compartir APIs entre módulos.
     pub fn con_simbolos_publicos(simbolos: HashMap<String, FirmaFuncion>) -> Self {
+        Self::con_simbolos_publicos_completo(simbolos, HashMap::new(), HashMap::new())
+    }
+
+    /// Crea analizador con símbolos públicos completos de otros módulos:
+    /// funciones, structs y enums (nombres cualificados).
+    /// Usado por el resolver multi-archivo para type-checking cross-file real.
+    pub fn con_simbolos_publicos_completo(
+        simbolos: HashMap<String, FirmaFuncion>,
+        structs: HashMap<String, InfoStruct>,
+        enums: HashMap<String, InfoEnum>,
+    ) -> Self {
         let mut analizador = Self {
             errores: Errores::nuevo(),
             entorno: Entorno::nuevo(),
@@ -329,6 +346,8 @@ impl AnalizadorSemantico {
             glob_imports: Vec::new(),
             modulo_actual: Vec::new(),
             simbolos_publicos_importados: simbolos,
+            structs_importados: structs,
+            enums_importados: enums,
             variables_movidas: std::collections::HashSet::new(),
             nivel_verificacion_actual: crate::ast::NivelVerificacion::Permisivo,
             borrows: HashMap::new(),
@@ -1259,6 +1278,56 @@ impl AnalizadorSemantico {
         None
     }
 
+    /// Busca un struct: local, import específico (`usar modulo::Struct`), o glob (`usar modulo::*`).
+    fn buscar_struct(&self, nombre: &str) -> Option<InfoStruct> {
+        // 1. Local
+        if let Some(info) = self.structs.get(nombre) {
+            return Some(info.clone());
+        }
+        // 2. Import específico: atajo "Struct" → "modulo::Struct"
+        if let Some(cualificado) = self.imports.get(nombre) {
+            if let Some(info) = self.structs_importados.get(cualificado) {
+                return Some(info.clone());
+            }
+        }
+        // 3. Glob import: prefijo::Struct
+        for prefijo in &self.glob_imports {
+            let cualificado = format!("{}::{}", prefijo, nombre);
+            if let Some(info) = self.structs_importados.get(&cualificado) {
+                return Some(info.clone());
+            }
+            if let Some(info) = self.structs.get(&cualificado) {
+                return Some(info.clone());
+            }
+        }
+        None
+    }
+
+    /// Busca un enum: local, import específico (`usar modulo::Enum`), o glob (`usar modulo::*`).
+    fn buscar_enum(&self, nombre: &str) -> Option<InfoEnum> {
+        // 1. Local
+        if let Some(info) = self.enums.get(nombre) {
+            return Some(info.clone());
+        }
+        // 2. Import específico: atajo "Enum" → "modulo::Enum"
+        if let Some(cualificado) = self.imports.get(nombre) {
+            if let Some(info) = self.enums_importados.get(cualificado) {
+                return Some(info.clone());
+            }
+        }
+        // 3. Glob import: prefijo::Enum
+        for prefijo in &self.glob_imports {
+            let cualificado = format!("{}::{}", prefijo, nombre);
+            if let Some(info) = self.enums_importados.get(&cualificado) {
+                return Some(info.clone());
+            }
+            if let Some(info) = self.enums.get(&cualificado) {
+                return Some(info.clone());
+            }
+        }
+        None
+    }
+
     pub fn analizar(&mut self, programa: &Programa) -> Result<(), Errores> {
         for decl in &programa.declaraciones {
             self.analizar_declaracion(decl);
@@ -2059,9 +2128,9 @@ No puedes modificar algo que no es 'tuyo'.",
                 let nombre_cualificado = path.join("::");
                 if let Some(firma) = self.buscar_funcion(&nombre_cualificado, true, span) {
                     firma.retorno.clone().unwrap_or(Tipo::Entero32)
-                } else if let Some(_ts) = self.structs.get(&nombre_cualificado) {
+                } else if let Some(_ts) = self.structs.get(&nombre_cualificado).or_else(|| self.structs_importados.get(&nombre_cualificado)) {
                     Tipo::Nombre(nombre_cualificado)
-                } else if let Some(_te) = self.enums.get(&nombre_cualificado) {
+                } else if let Some(_te) = self.enums.get(&nombre_cualificado).or_else(|| self.enums_importados.get(&nombre_cualificado)) {
                     Tipo::Nombre(nombre_cualificado)
                 } else {
                     let sugerencia = sugerir_nombre(&path[0], &self.entorno.todos_nombres());
@@ -2510,7 +2579,7 @@ No puedes modificar algo que no es 'tuyo'.",
                 }
             }
             Expresion::InicializacionStruct(nombre, campos, span) => {
-                let info_opt = self.structs.get(nombre).cloned();
+                let info_opt = self.buscar_struct(nombre);
                 match info_opt {
                     Some(info) => {
                         // Fase 15B: struct de bitfields
@@ -2585,7 +2654,7 @@ No puedes modificar algo que no es 'tuyo'.",
                 }
             }
             Expresion::ConstructorEnum(enum_nombre, variante_nombre, argumentos, span) => {
-                let info_opt = self.enums.get(enum_nombre).cloned();
+                let info_opt = self.buscar_enum(enum_nombre);
                 match info_opt {
                     Some(info) => {
                         match info.variantes.iter().find(|v| v.nombre == *variante_nombre) {
@@ -2703,7 +2772,7 @@ No puedes modificar algo que no es 'tuyo'.",
                     );
                 }
                 // Verificar que la variante existe
-                if let Some(info) = self.enums.get(enum_nombre) {
+                if let Some(info) = self.buscar_enum(enum_nombre) {
                     if !info.variantes.iter().any(|v| v.nombre == *variante_nombre) {
                         self.reportar_error(
                             CategoriaError::Tipo,
@@ -2720,7 +2789,7 @@ No puedes modificar algo que no es 'tuyo'.",
                 let tipo_expr = self.inferir_tipo(expr);
                 match &tipo_expr {
                     Tipo::Nombre(nombre_struct) => {
-                        let info_opt = self.structs.get(nombre_struct).cloned();
+                        let info_opt = self.buscar_struct(nombre_struct);
                         match info_opt {
                             Some(info) => {
                                 // Fase 15B: verificar campos de bits primero
@@ -2860,7 +2929,7 @@ No puedes modificar algo que no es 'tuyo'.",
                         }
                         crate::ast::PatronMatch::VarianteEnum(enum_nombre, variante, binding, span_pat) => {
                             // Verificar que el enum existe y la variante es válida
-                            if let Some(info_enum) = self.enums.get(enum_nombre) {
+                            if let Some(info_enum) = self.buscar_enum(enum_nombre) {
                                 if !info_enum.variantes.iter().any(|v| &v.nombre == variante) {
                                     self.reportar_error(
                                         CategoriaError::Tipo,

@@ -305,11 +305,11 @@ impl Codegen {
                     "raiz" | "potencia" => Tipo::Flotante64,
                     "archivo_existe" | "texto_obtener_byte" => Tipo::Entero8,
                     _ => {
-                        // Para built-ins no listados o funciones de usuario, verificar
-                        // si es inseguro FFI (no tenemos firma en codegen, asumir Entero64
-                        // por ser el tipo de puntero mÃƒÂ¡s comÃƒÂºn en FFI)
-                        if llamada.funcion.starts_with("fc_") {
-                            Tipo::Entero64  // funciones del trampolÃƒÂ­n C retornan punteros
+                        // R9.0.1 — funciones de usuario: devolver el retorno declarado
+                        if let Some(decl) = self.declaraciones.get(&llamada.funcion) {
+                            decl.retorno.clone().unwrap_or(Tipo::Entero32)
+                        } else if llamada.funcion.starts_with("fc_") {
+                            Tipo::Entero64  // funciones del trampolÃ­n C retornan punteros
                         } else {
                             Tipo::Entero32  // default: Entero32 por compatibilidad
                         }
@@ -339,5 +339,47 @@ impl Codegen {
             Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64 |
             Tipo::Flotante32 | Tipo::Flotante64
         )
+    }
+
+    /// R9.0.1 — Si el tipo es un struct conocido (Tipo::Nombre resuelto en self.structs),
+    /// devuelve su layout. Usado para firmas sret (retorno por puntero oculto)
+    /// y parámetros por referencia.
+    pub(crate) fn tipo_es_struct(&self, tipo: &Tipo) -> Option<LayoutStruct> {
+        let tipo = self.resolver_alias(tipo);
+        match &tipo {
+            Tipo::Nombre(nombre) => self.structs.get(nombre).cloned(),
+            _ => None,
+        }
+    }
+
+    /// R9.0.1 — Copia `tamano` bytes de `src_ptr` a `dest_ptr`.
+    /// Emite loads/stores de 8/4/2/1 bytes (sin depender de memcpy).
+    pub(crate) fn copiar_mem(
+        &self,
+        dest_ptr: cranelift_codegen::ir::Value,
+        src_ptr: cranelift_codegen::ir::Value,
+        tamano: u32,
+        builder: &mut FunctionBuilder,
+    ) {
+        let mut restante = tamano as i64;
+        let mut offset = 0i64;
+        let flags = cranelift_codegen::ir::MemFlags::new();
+        while restante > 0 {
+            let (ancho, tipo_ir) = if restante >= 8 {
+                (8, types::I64)
+            } else if restante >= 4 {
+                (4, types::I32)
+            } else if restante >= 2 {
+                (2, types::I16)
+            } else {
+                (1, types::I8)
+            };
+            let src = builder.ins().iadd_imm(src_ptr, offset);
+            let dest = builder.ins().iadd_imm(dest_ptr, offset);
+            let val = builder.ins().load(tipo_ir, flags, src, 0);
+            builder.ins().store(flags, val, dest, 0);
+            offset += ancho;
+            restante -= ancho;
+        }
     }
 }

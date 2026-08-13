@@ -1,0 +1,10 @@
+// mod_nota.fc — struct en módulo separado (bug conocido: retorno entre archivos)
+estructural Nota {
+    tono: Entero32,
+    duracion: Flotante64,
+}
+
+función crear_nota(el tono: Entero32, el dur: Flotante64) -> Nota {
+    el n: Nota = Nota { tono: tono, duracion: dur };
+    retornar n;
+}

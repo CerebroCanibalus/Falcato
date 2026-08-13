@@ -96,6 +96,9 @@ pub struct Codegen {
     /// R7.7 — romper/continuar: pila de bucles activos (header, exit).
     /// El mas interno es el destino de `romper` (exit) y `continuar` (header).
     pub(crate) pila_bucles: Vec<(cranelift_codegen::ir::Block, cranelift_codegen::ir::Block)>,
+    /// R9.0.1 — sret: puntero destino del struct retornado por la función actual.
+    /// Se setea en el prólogo (primer parámetro oculto) y se usa en `retornar struct`.
+    pub(crate) sret_destino: Option<cranelift_codegen::ir::Value>,
 }
 
 /// Info para compilar un closure diferidamente
@@ -165,6 +168,7 @@ impl Codegen {
             heap_vivas: Vec::new(),
             scope_marcas: Vec::new(),
             pila_bucles: Vec::new(),
+            sret_destino: None,
         }.registrar_builtins_codegen())
     }
 
@@ -730,16 +734,32 @@ impl Codegen {
     ) {
         let mut sig = Signature::new(self.call_conv_default());
 
-        // Tipo de retorno
+        // R9.0.1 — Retorno de struct → sret (puntero oculto como primer parámetro).
+        // La función escribe el struct en esa memoria y retorna void.
+        let ret_es_struct = match &func.retorno {
+            Some(ret) => self.tipo_es_struct(ret).is_some(),
+            None => false,
+        };
         if let Some(ref ret) = func.retorno {
-            let tipo = self.tipo_a_cranelift(ret);
-            sig.returns.push(AbiParam::new(tipo));
+            if !ret_es_struct {
+                let tipo = self.tipo_a_cranelift(ret);
+                sig.returns.push(AbiParam::new(tipo));
+            }
         }
 
-        // ParÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡metros
+        // Parámetro oculto sret (solo si retorna struct)
+        if ret_es_struct {
+            sig.params.push(AbiParam::new(types::I64));
+        }
+
+        // Parámetros: los structs se pasan por referencia (I64 puntero)
         for param in &func.parametros {
-            let tipo = self.tipo_a_cranelift(&param.tipo);
-            sig.params.push(AbiParam::new(tipo));
+            if self.tipo_es_struct(&param.tipo).is_some() {
+                sig.params.push(AbiParam::new(types::I64));
+            } else {
+                let tipo = self.tipo_a_cranelift(&param.tipo);
+                sig.params.push(AbiParam::new(tipo));
+            }
         }
 
         let linkage = if func.es_insegura && func.cuerpo.sentencias.is_empty() {

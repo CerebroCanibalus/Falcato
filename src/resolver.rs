@@ -5,7 +5,7 @@ use std::fs;
 use crate::ast::Programa;
 use crate::lexer::LexerFalcato;
 use crate::parser::ParserFalcato;
-use crate::semantic::{AnalizadorSemantico, FirmaFuncion};
+use crate::semantic::{AnalizadorSemantico, FirmaFuncion, InfoEnum, InfoStruct};
 
 /// Representa una unidad de compilación: archivo fuente → AST → código objeto.
 #[derive(Debug, Clone)]
@@ -220,15 +220,24 @@ impl Resolver {
 
         // 2. Colectar símbolos públicos de todos los módulos en un mapa global
         let mut simbolos_publicos: HashMap<String, FirmaFuncion> = HashMap::new();
+        let mut structs_publicos: HashMap<String, InfoStruct> = HashMap::new();
+        let mut enums_publicos: HashMap<String, InfoEnum> = HashMap::new();
         for (nombre_modulo, programa) in &programas {
             for decl in &programa.declaraciones {
-                Self::colectar_simbolos_publicos_decl(decl, nombre_modulo, "", &mut simbolos_publicos);
+                Self::colectar_simbolos_publicos_decl(
+                    decl, nombre_modulo, "",
+                    &mut simbolos_publicos, &mut structs_publicos, &mut enums_publicos,
+                );
             }
         }
 
         // 3. Analizar semánticamente cada módulo con acceso a los símbolos públicos globales
         for (nombre_modulo, programa) in &programas {
-            let mut semantica = AnalizadorSemantico::con_simbolos_publicos(simbolos_publicos.clone());
+            let mut semantica = AnalizadorSemantico::con_simbolos_publicos_completo(
+                simbolos_publicos.clone(),
+                structs_publicos.clone(),
+                enums_publicos.clone(),
+            );
             semantica.analizar(programa)
                 .map_err(|e| format!("Errores semánticos en '{}':\n{}", nombre_modulo, e))?;
         }
@@ -248,26 +257,31 @@ impl Resolver {
         Ok(objetos)
     }
 
-    /// Recorre declaraciones y registra funciones públicas con nombre cualificado.
-    /// - Top-level de archivo: `nombre_modulo::funcion`
-    /// - Dentro de módulo inline: `nombre_modulo::submodulo::funcion` o `submodulo::funcion`
+    /// Recorre declaraciones y registra símbolos públicos con nombre cualificado:
+    /// funciones, structs y enums.
+    /// - Top-level de archivo: `nombre_modulo::funcion` / `nombre_modulo::Struct`
+    /// - Dentro de módulo inline: `prefijo::simbolo`
     fn colectar_simbolos_publicos_decl(
         decl: &crate::ast::Declaracion,
         nombre_modulo_archivo: &str,
         prefijo: &str,
         simbolos: &mut HashMap<String, FirmaFuncion>,
+        structs: &mut HashMap<String, InfoStruct>,
+        enums: &mut HashMap<String, InfoEnum>,
     ) {
         use crate::ast::Declaracion;
+        let cualificar = |nombre: &str| -> String {
+            if prefijo.is_empty() {
+                format!("{}::{}", nombre_modulo_archivo, nombre)
+            } else {
+                format!("{}::{}", prefijo, nombre)
+            }
+        };
         match decl {
             Declaracion::Funcion(func) => {
                 let es_top_level = prefijo.is_empty();
                 if AnalizadorSemantico::es_funcion_publica(func, es_top_level) {
-                    let nombre_cualificado = if prefijo.is_empty() {
-                        // Top-level del archivo → prefijo explícito del nombre del módulo-archivo
-                        format!("{}::{}", nombre_modulo_archivo, func.nombre)
-                    } else {
-                        format!("{}::{}", prefijo, func.nombre)
-                    };
+                    let nombre_cualificado = cualificar(&func.nombre);
                     let firma = FirmaFuncion {
                         nombre: nombre_cualificado.clone(),
                         parametros_genericos: func.parametros_genericos.clone(),
@@ -281,6 +295,24 @@ impl Resolver {
                     simbolos.insert(nombre_cualificado, firma);
                 }
             }
+            Declaracion::Estructural(s) => {
+                let nombre_cualificado = cualificar(&s.nombre);
+                structs.insert(nombre_cualificado, InfoStruct {
+                    nombre: s.nombre.clone(),
+                    campos: s.campos.clone(),
+                    campos_bits: s.campos_bits.clone(),
+                    span: s.span.clone(),
+                });
+            }
+            Declaracion::Enumeracion(e) => {
+                let nombre_cualificado = cualificar(&e.nombre);
+                enums.insert(nombre_cualificado, InfoEnum {
+                    nombre: e.nombre.clone(),
+                    parametros_genericos: e.parametros_genericos.clone(),
+                    variantes: e.variantes.clone(),
+                    span: e.span.clone(),
+                });
+            }
             Declaracion::Modulo(modulo) => {
                 let nuevo_prefijo = if prefijo.is_empty() {
                     modulo.nombre.clone()
@@ -288,7 +320,10 @@ impl Resolver {
                     format!("{}::{}", prefijo, modulo.nombre)
                 };
                 for decl in &modulo.contenido {
-                    Self::colectar_simbolos_publicos_decl(decl, nombre_modulo_archivo, &nuevo_prefijo, simbolos);
+                    Self::colectar_simbolos_publicos_decl(
+                        decl, nombre_modulo_archivo, &nuevo_prefijo,
+                        simbolos, structs, enums,
+                    );
                 }
             }
             _ => {}
