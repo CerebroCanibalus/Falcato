@@ -291,6 +291,12 @@ impl Codegen {
                     "como_entero64" | "texto_a_puntero" | "direccion_de" | "dir_de" => {
                         Tipo::Entero64
                     }
+                    // R9.0.3 — conversión numérica: retorno según el builtin
+                    "como_entero8" => Tipo::Entero8,
+                    "como_entero16" => Tipo::Entero16,
+                    "como_entero32" => Tipo::Entero32,
+                    "como_flotante32" => Tipo::Flotante32,
+                    "como_flotante64" => Tipo::Flotante64,
                     "texto_nuevo" | "texto_desde" | "texto_concatenar" | "texto_subtexto" => {
                         Tipo::Texto
                     }

@@ -1268,7 +1268,9 @@ impl Codegen {
             "dht_nuevo" | "dht_publicar" | "dht_consultar" | "dht_bootstrap" | "dht_cerrar" |
             "cancelar" |
             "texto_a_puntero" |
-            "como_entero64" | "como_entero32"
+            "como_entero64" | "como_entero32" |
+            "como_entero8" | "como_entero16" |
+            "como_flotante32" | "como_flotante64"
         )
     }
     pub(crate) fn compilar_llamada_builtin(
@@ -1298,6 +1300,10 @@ impl Codegen {
             "texto_a_puntero" => self.builtin_texto_a_puntero(builder, variables, &llamada.argumentos),
             "como_entero64" => self.builtin_como_entero64(builder, variables, &llamada.argumentos),
             "como_entero32" => self.builtin_como_entero32(builder, variables, &llamada.argumentos),
+            "como_entero8" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Entero8, builder, variables),
+            "como_entero16" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Entero16, builder, variables),
+            "como_flotante32" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Flotante32, builder, variables),
+            "como_flotante64" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Flotante64, builder, variables),
             "archivo_leer" => self.builtin_archivo_leer(builder, variables, &llamada.argumentos),
             "archivo_escribir" => self.builtin_archivo_escribir(builder, variables, &llamada.argumentos),
             "archivo_existe" => self.builtin_archivo_existe(builder, variables, &llamada.argumentos),

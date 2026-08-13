@@ -1181,14 +1181,14 @@ impl Codegen {
 
     /// Fase GUI-1: como_entero64(valor: Entero32) -> Entero64
     /// Extiende Entero32 a Entero64 con signo. Para pasar NULL (0) como puntero en FFI.
+    /// R9.0.3: también acepta Flotante64 (trunca con fcvt_to_sint).
     pub(crate) fn builtin_como_entero64(
         &mut self,
         builder: &mut FunctionBuilder,
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
         argumentos: &Vec<Expresion>,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
-        Ok(builder.ins().sextend(types::I64, val))
+        self.builtin_conversion_numerica(argumentos, Tipo::Entero64, builder, variables)
     }
 
     /// R7.5 Fase 2: como_entero32(valor: Entero64) -> Entero32
@@ -1199,8 +1199,59 @@ impl Codegen {
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
         argumentos: &Vec<Expresion>,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
-        Ok(builder.ins().ireduce(types::I32, val))
+        self.builtin_conversion_numerica(argumentos, Tipo::Entero32, builder, variables)
+    }
+
+    /// R9.0.3 — Conversión numérica completa.
+    /// `builtin_conversion_numerica(argumentos, destino, ...)` convierte el primer argumento
+    /// al tipo destino, manejando todas las combinaciones:
+    /// - entero → entero: sextend/ireduce según ancho
+    /// - flotante → entero: fcvt_to_sint (trunca hacia cero, como cast en C)
+    /// - entero → flotante: fcvt_from_sint
+    /// - flotante → flotante: fpromote/fdemote
+    /// VITAL para WAV 16/24-bit (muestras Flotante64 → Entero16/32) y DSP.
+    pub(crate) fn builtin_conversion_numerica(
+        &mut self,
+        argumentos: &Vec<Expresion>,
+        destino: Tipo,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {        let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let tipo_fuente = self.resolver_alias(&self.inferir_tipo(&argumentos[0], variables));
+        let ir_destino = self.tipo_a_cranelift(&destino);
+
+        let es_fuente_flotante = matches!(tipo_fuente, Tipo::Flotante32 | Tipo::Flotante64);
+        let es_destino_flotante = matches!(destino, Tipo::Flotante32 | Tipo::Flotante64);
+
+        match (es_fuente_flotante, es_destino_flotante) {
+            // flotante → entero: truncar hacia cero (fcvt_to_sint)
+            (true, false) => Ok(builder.ins().fcvt_to_sint(ir_destino, val)),
+            // entero → flotante
+            (false, true) => Ok(builder.ins().fcvt_from_sint(ir_destino, val)),
+            // flotante → flotante: promover o degradar
+            (true, true) => {
+                if ir_destino == types::F64 && self.tipo_a_cranelift(&tipo_fuente) == types::F32 {
+                    Ok(builder.ins().fpromote(types::F64, val))
+                } else if ir_destino == types::F32 && self.tipo_a_cranelift(&tipo_fuente) == types::F64 {
+                    Ok(builder.ins().fdemote(types::F32, val))
+                } else {
+                    Ok(val)
+                }
+            }
+            // entero → entero: extender o truncar
+            (false, false) => {
+                let ir_fuente = self.tipo_a_cranelift(&tipo_fuente);
+                let ancho_fuente = ir_fuente.bits();
+                let ancho_destino = ir_destino.bits();
+                if ancho_destino > ancho_fuente {
+                    Ok(builder.ins().sextend(ir_destino, val))
+                } else if ancho_destino < ancho_fuente {
+                    Ok(builder.ins().ireduce(ir_destino, val))
+                } else {
+                    Ok(val)
+                }
+            }
+        }
     }
 
     /// R7.5 Fase 2: conversión de Texto a número (texto_a_entero/natural/flotante/booleano).

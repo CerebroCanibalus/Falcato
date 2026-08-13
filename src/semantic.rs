@@ -820,11 +820,32 @@ impl AnalizadorSemantico {
         self.funciones.insert("como_entero32".to_string(), FirmaFuncion {
             nombre: "como_entero32".to_string(),
             parametros_genericos: vec![],
-            parametros: vec![("valor".to_string(), Tipo::Entero64)],
+            parametros: vec![("valor".to_string(), Tipo::Entero32)],
             retorno: Some(Tipo::Entero32),
             span: span_vacio.clone(),
             es_publica: true,
         });
+        // R9.0.3 — Conversión numérica completa (para WAV 16/24-bit y DSP).
+        // como_entero8/16/32/64(x: número) — entero→entero (extend/trunc) o flotante→entero (trunca).
+        // como_flotante32/64(x: número) — entero→flotante o flotante→flotante (promueve/degrada).
+        // La verificación de argumentos usa es_conversion_numerica (acepta cualquier tipo numérico).
+        for (nombre, ret) in [
+            ("como_entero8", Tipo::Entero8),
+            ("como_entero16", Tipo::Entero16),
+            ("como_entero32", Tipo::Entero32),
+            ("como_entero64", Tipo::Entero64),
+            ("como_flotante32", Tipo::Flotante32),
+            ("como_flotante64", Tipo::Flotante64),
+        ] {
+            self.funciones.insert(nombre.to_string(), FirmaFuncion {
+                nombre: nombre.to_string(),
+                parametros_genericos: vec![],
+                parametros: vec![("valor".to_string(), Tipo::Entero32)],
+                retorno: Some(ret),
+                span: span_vacio.clone(),
+                es_publica: true,
+            });
+        }
         // Fase GUI-1: texto_a_puntero — obtiene la dirección de un literal de cadena
         self.funciones.insert("texto_a_puntero".to_string(), FirmaFuncion {
             nombre: "texto_a_puntero".to_string(),
@@ -2465,11 +2486,24 @@ No puedes modificar algo que no es 'tuyo'.",
                             // imprimir/imprimir_linea/decir son polimórficos (aceptan cualquier tipo)
                             // pero aún así debemos inferir tipos para detectar variables no declaradas
                             let es_polimorfica = llamada.funcion == "imprimir" || llamada.funcion == "imprimir_linea" || llamada.funcion == "decir";
+                            // R9.0.3 — conversiones numéricas aceptan cualquier número (entero o flotante)
+                            let es_conversion_numerica = matches!(llamada.funcion.as_str(),
+                                "como_entero8" | "como_entero16" | "como_entero32" | "como_entero64" |
+                                "como_flotante32" | "como_flotante64");
                             if !es_polimorfica {
                                 for (i, (arg, (nombre_param, tipo_param))) in 
                                     llamada.argumentos.iter().zip(firma_efectiva.parametros.iter()).enumerate() {
                                     let tipo_arg = self.inferir_tipo(arg);
-                                    if !self.tipos_compatibles(tipo_param, &tipo_arg) {
+                                    // Conversión numérica: aceptar cualquier tipo numérico
+                                    let compatible = if es_conversion_numerica {
+                                        matches!(self.resolver_alias(&tipo_arg),
+                                            Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64 |
+                                            Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64 |
+                                            Tipo::Flotante32 | Tipo::Flotante64)
+                                    } else {
+                                        self.tipos_compatibles(tipo_param, &tipo_arg)
+                                    };
+                                    if !compatible {
                                         self.reportar_error(
                                             CategoriaError::Tipo,
                                             DISCONCORDANCIA_TIPO,
