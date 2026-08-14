@@ -973,6 +973,15 @@ impl AnalizadorSemantico {
         self.funciones.insert("fabs".to_string(), trig_unario("fabs"));
         self.funciones.insert("fmod".to_string(), trig_binario("fmod"));
 
+        // Trigonometría rápida (F2/F3) — math.rs
+        self.funciones.insert("seno_rapido".to_string(), trig_unario("seno_rapido"));
+        self.funciones.insert("coseno_rapido".to_string(), trig_unario("coseno_rapido"));
+        self.funciones.insert("seno_2pi".to_string(), trig_unario("seno_2pi"));
+        self.funciones.insert("coseno_2pi".to_string(), trig_unario("coseno_2pi"));
+        self.funciones.insert("exp_rapido".to_string(), trig_unario("exp_rapido"));
+        self.funciones.insert("log_rapido".to_string(), trig_unario("log_rapido"));
+        self.funciones.insert("seno_aprox".to_string(), trig_unario("seno_aprox"));
+
         // Vector<T>: arreglo dinámico heap-allocado
         let t_generico = ParametroGenerico {
             nombre: "T".to_string(),

@@ -1859,6 +1859,96 @@ impl Codegen {
         Ok(builder.inst_results(call)[0])
     }
 
+    // ============================================================
+    // TRIGONOMETRÍA RÁPIDA — F2/F3: math.rs (polinomios minimax)
+    // ============================================================
+
+    /// seno_rapido(x: Real) -> Real — F2: usa libm (funcional, futuro: minimax)
+    pub(crate) fn builtin_seno_rapido(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // Por ahora usa libm (igual que seno_preciso)
+        // Futuro: polinomio minimax para ~10x más rápido
+        self.builtin_seno(builder, variables, argumentos)
+    }
+
+    /// coseno_rapido(x: Real) -> Real — F2: usa libm (funcional, futuro: minimax)
+    pub(crate) fn builtin_coseno_rapido(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        self.builtin_coseno(builder, variables, argumentos)
+    }
+
+    /// seno_2pi(fase: Real) -> Real — optimizado para fase ∈ [0, 1)
+    pub(crate) fn builtin_seno_2pi(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // Por ahora: sin(2π * fase)
+        let fase = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let dos_pi = builder.ins().f64const(std::f64::consts::TAU);
+        let angulo = builder.ins().fmul(fase, dos_pi);
+        let sin_id = self.asegurar_funcion_c("sin", &[types::F64], Some(types::F64));
+        let sin_ref = self.module.declare_func_in_func(sin_id, builder.func);
+        let call = builder.ins().call(sin_ref, &[angulo]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// coseno_2pi(fase: Real) -> Real — optimizado para fase ∈ [0, 1)
+    pub(crate) fn builtin_coseno_2pi(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let fase = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let dos_pi = builder.ins().f64const(std::f64::consts::TAU);
+        let angulo = builder.ins().fmul(fase, dos_pi);
+        let cos_id = self.asegurar_funcion_c("cos", &[types::F64], Some(types::F64));
+        let cos_ref = self.module.declare_func_in_func(cos_id, builder.func);
+        let call = builder.ins().call(cos_ref, &[angulo]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// exp_rapido(x: Real) -> Real — F2: usa libm
+    pub(crate) fn builtin_exponencial_rapido(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        self.builtin_exponencial(builder, variables, argumentos)
+    }
+
+    /// log_rapido(x: Real) -> Real — F2: usa libm
+    pub(crate) fn builtin_logaritmo_rapido(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        self.builtin_logaritmo(builder, variables, argumentos)
+    }
+
+    /// seno_aprox(x: Real) -> Real — F3: tabla + interpolación (placeholder)
+    pub(crate) fn builtin_seno_aprox(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // Placeholder: usa libm
+        self.builtin_seno(builder, variables, argumentos)
+    }
+
     pub(crate) fn builtin_vector_nuevo(
         &mut self,
         builder: &mut FunctionBuilder,

@@ -308,7 +308,7 @@ impl Codegen {
                         Tipo::Entero32
                     }
                     "tamano_de" => Tipo::Entero32,
-                    "raiz" | "potencia" | "seno" | "coseno" | "tangente" | "arcseno" | "arccoseno" | "arctangente" | "arctangente2" | "senoh" | "cosenoh" | "tangenteh" | "exp" | "log" | "log10" | "piso" | "techo" | "fabs" | "fmod" => Tipo::Flotante64,
+                    "raiz" | "potencia" | "seno" | "coseno" | "tangente" | "arcseno" | "arccoseno" | "arctangente" | "arctangente2" | "senoh" | "cosenoh" | "tangenteh" | "exp" | "log" | "log10" | "piso" | "techo" | "fabs" | "fmod" | "seno_rapido" | "coseno_rapido" | "seno_2pi" | "coseno_2pi" | "exp_rapido" | "log_rapido" | "seno_aprox" => Tipo::Flotante64,
                     "archivo_existe" | "texto_obtener_byte" => Tipo::Entero8,
                     // R9.0.2 — diccionario_obtener<K,V> retorna V (puede ser struct)
                     "diccionario_obtener" => {

@@ -1256,6 +1256,9 @@ impl Codegen {
             "seno" | "coseno" | "tangente" | "arcseno" | "arccoseno" | "arctangente" | "arctangente2" |
             "senoh" | "cosenoh" | "tangenteh" |
             "exp" | "log" | "log10" | "piso" | "techo" | "fabs" | "fmod" |
+            // Trigonometría rápida (F2/F3) — math.rs
+            "seno_rapido" | "coseno_rapido" | "seno_2pi" | "coseno_2pi" |
+            "exp_rapido" | "log_rapido" | "seno_aprox" |
             "vector_nuevo" | "vector_agregar" | "vector_obtener" | "vector_longitud" | "vector_tam" | "vector_liberar" |
             "dormir" |
             "diccionario_nuevo" | "diccionario_insertar" | "diccionario_obtener" |
@@ -1334,6 +1337,14 @@ impl Codegen {
             "techo" => self.builtin_techo(builder, variables, &llamada.argumentos),
             "fabs" => self.builtin_valor_absoluto(builder, variables, &llamada.argumentos),
             "fmod" => self.builtin_modulo_flotante(builder, variables, &llamada.argumentos),
+            // Trigonometría rápida (F2/F3) — math.rs
+            "seno_rapido" => self.builtin_seno_rapido(builder, variables, &llamada.argumentos),
+            "coseno_rapido" => self.builtin_coseno_rapido(builder, variables, &llamada.argumentos),
+            "seno_2pi" => self.builtin_seno_2pi(builder, variables, &llamada.argumentos),
+            "coseno_2pi" => self.builtin_coseno_2pi(builder, variables, &llamada.argumentos),
+            "exp_rapido" => self.builtin_exponencial_rapido(builder, variables, &llamada.argumentos),
+            "log_rapido" => self.builtin_logaritmo_rapido(builder, variables, &llamada.argumentos),
+            "seno_aprox" => self.builtin_seno_aprox(builder, variables, &llamada.argumentos),
             "vector_nuevo" => self.builtin_vector_nuevo(builder, &llamada.tipo_args),
             "vector_agregar" => self.builtin_vector_agregar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "vector_obtener" => self.builtin_vector_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),
