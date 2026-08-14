@@ -934,6 +934,45 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // Trigonometría — F1: libm (preciso)
+        let trig_unario = |nombre: &str| FirmaFuncion {
+            nombre: nombre.to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("x".to_string(), Tipo::Flotante64)],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        };
+        let trig_binario = |nombre: &str| FirmaFuncion {
+            nombre: nombre.to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("y".to_string(), Tipo::Flotante64),
+                ("x".to_string(), Tipo::Flotante64),
+            ],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        };
+
+        self.funciones.insert("seno".to_string(), trig_unario("seno"));
+        self.funciones.insert("coseno".to_string(), trig_unario("coseno"));
+        self.funciones.insert("tangente".to_string(), trig_unario("tangente"));
+        self.funciones.insert("arcseno".to_string(), trig_unario("arcseno"));
+        self.funciones.insert("arccoseno".to_string(), trig_unario("arccoseno"));
+        self.funciones.insert("arctangente".to_string(), trig_unario("arctangente"));
+        self.funciones.insert("arctangente2".to_string(), trig_binario("arctangente2"));
+        self.funciones.insert("senoh".to_string(), trig_unario("senoh"));
+        self.funciones.insert("cosenoh".to_string(), trig_unario("cosenoh"));
+        self.funciones.insert("tangenteh".to_string(), trig_unario("tangenteh"));
+        self.funciones.insert("exp".to_string(), trig_unario("exp"));
+        self.funciones.insert("log".to_string(), trig_unario("log"));
+        self.funciones.insert("log10".to_string(), trig_unario("log10"));
+        self.funciones.insert("piso".to_string(), trig_unario("piso"));
+        self.funciones.insert("techo".to_string(), trig_unario("techo"));
+        self.funciones.insert("fabs".to_string(), trig_unario("fabs"));
+        self.funciones.insert("fmod".to_string(), trig_binario("fmod"));
+
         // Vector<T>: arreglo dinámico heap-allocado
         let t_generico = ParametroGenerico {
             nombre: "T".to_string(),

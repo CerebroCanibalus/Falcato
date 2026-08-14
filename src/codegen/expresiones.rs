@@ -1252,6 +1252,10 @@ impl Codegen {
             "texto_a_entero" | "texto_a_natural" | "texto_a_flotante" | "texto_a_booleano" |
             "archivo_leer" | "archivo_escribir" | "archivo_existe" |
             "abs" | "max" | "min" | "raiz" | "potencia" |
+            // Trigonometría — F1: libm (preciso)
+            "seno" | "coseno" | "tangente" | "arcseno" | "arccoseno" | "arctangente" | "arctangente2" |
+            "senoh" | "cosenoh" | "tangenteh" |
+            "exp" | "log" | "log10" | "piso" | "techo" | "fabs" | "fmod" |
             "vector_nuevo" | "vector_agregar" | "vector_obtener" | "vector_longitud" | "vector_tam" | "vector_liberar" |
             "dormir" |
             "diccionario_nuevo" | "diccionario_insertar" | "diccionario_obtener" |
@@ -1312,6 +1316,24 @@ impl Codegen {
             "min" => self.builtin_min(builder, variables, &llamada.argumentos),
             "raiz" => self.builtin_raiz(builder, variables, &llamada.argumentos),
             "potencia" => self.builtin_potencia(builder, variables, &llamada.argumentos),
+            // Trigonometría — F1: libm (preciso)
+            "seno" => self.builtin_seno(builder, variables, &llamada.argumentos),
+            "coseno" => self.builtin_coseno(builder, variables, &llamada.argumentos),
+            "tangente" => self.builtin_tangente(builder, variables, &llamada.argumentos),
+            "arcseno" => self.builtin_arcseno(builder, variables, &llamada.argumentos),
+            "arccoseno" => self.builtin_arccoseno(builder, variables, &llamada.argumentos),
+            "arctangente" => self.builtin_arctangente(builder, variables, &llamada.argumentos),
+            "arctangente2" => self.builtin_arctangente2(builder, variables, &llamada.argumentos),
+            "senoh" => self.builtin_seno_hiperbolico(builder, variables, &llamada.argumentos),
+            "cosenoh" => self.builtin_coseno_hiperbolico(builder, variables, &llamada.argumentos),
+            "tangenteh" => self.builtin_tangente_hiperbolica(builder, variables, &llamada.argumentos),
+            "exp" => self.builtin_exponencial(builder, variables, &llamada.argumentos),
+            "log" => self.builtin_logaritmo(builder, variables, &llamada.argumentos),
+            "log10" => self.builtin_logaritmo10(builder, variables, &llamada.argumentos),
+            "piso" => self.builtin_piso(builder, variables, &llamada.argumentos),
+            "techo" => self.builtin_techo(builder, variables, &llamada.argumentos),
+            "fabs" => self.builtin_valor_absoluto(builder, variables, &llamada.argumentos),
+            "fmod" => self.builtin_modulo_flotante(builder, variables, &llamada.argumentos),
             "vector_nuevo" => self.builtin_vector_nuevo(builder, &llamada.tipo_args),
             "vector_agregar" => self.builtin_vector_agregar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "vector_obtener" => self.builtin_vector_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),

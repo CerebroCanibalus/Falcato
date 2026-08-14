@@ -313,6 +313,44 @@ impl BuiltinRegistry {
             &[types::F64], Some(types::F64));
         self.insert("pow", "pow",
             &[types::F64, types::F64], Some(types::F64));
+        // Trigonometría (libm - C math library)
+        self.insert("sin", "sin",
+            &[types::F64], Some(types::F64));
+        self.insert("cos", "cos",
+            &[types::F64], Some(types::F64));
+        self.insert("tan", "tan",
+            &[types::F64], Some(types::F64));
+        self.insert("asin", "asin",
+            &[types::F64], Some(types::F64));
+        self.insert("acos", "acos",
+            &[types::F64], Some(types::F64));
+        self.insert("atan", "atan",
+            &[types::F64], Some(types::F64));
+        self.insert("atan2", "atan2",
+            &[types::F64, types::F64], Some(types::F64));
+        // Hiperbólicas
+        self.insert("sinh", "sinh",
+            &[types::F64], Some(types::F64));
+        self.insert("cosh", "cosh",
+            &[types::F64], Some(types::F64));
+        self.insert("tanh", "tanh",
+            &[types::F64], Some(types::F64));
+        // Exponencial y logaritmo
+        self.insert("exp", "exp",
+            &[types::F64], Some(types::F64));
+        self.insert("log", "log",
+            &[types::F64], Some(types::F64));
+        self.insert("log10", "log10",
+            &[types::F64], Some(types::F64));
+        // Otras útiles
+        self.insert("floor", "floor",
+            &[types::F64], Some(types::F64));
+        self.insert("ceil", "ceil",
+            &[types::F64], Some(types::F64));
+        self.insert("fabs", "fabs",
+            &[types::F64], Some(types::F64));
+        self.insert("fmod", "fmod",
+            &[types::F64, types::F64], Some(types::F64));
     }
 
     fn insert(&mut self, abstract_name: &str, name: &str, params: &[Type], ret: Option<Type>) {
