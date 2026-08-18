@@ -1,0 +1,49 @@
+// Ejemplo que demuestra las funciones TLS/HTTPS (R7.8 FASE 5)
+// Nota: Esta es una implementación básica. En producción se requiere handshake completo.
+
+función principal() -> Entero32 {
+    imprimir_linea("=== Demo: TLS/HTTPS (R7.8 FASE 5) ===");
+    imprimir_linea("");
+
+    // Test 1: tls_conectar
+    imprimir_linea("Test 1: tls_conectar");
+    el host: Texto = texto_desde("example.com");
+    el conn: Entero64 = tls_conectar(host, 443);
+    si conn es 0 {
+        imprimir_linea("  Error: no se pudo conectar");
+    } sino {
+        imprimir_linea("  Conectado a example.com:443 (handle: {conn})");
+
+        // Test 2: tls_escribir (HTTP GET request)
+        imprimir_linea("Test 2: tls_escribir");
+        el request: Texto = texto_desde("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n");
+        el request_ptr: Entero64 = texto_puntero(request);
+        el request_len: Entero32 = texto_longitud(request);
+        el escritos: Entero32 = tls_escribir(conn, request_ptr, request_len);
+        imprimir_linea("  Bytes escritos: {escritos}");
+
+        // Test 3: tls_leer
+        imprimir_linea("Test 3: tls_leer");
+        el buf: [Entero32; 1024] = todos 0;
+        el buf_ptr: Entero64 = &buf;
+        el leidos: Entero32 = tls_leer(conn, buf_ptr, 1024);
+        imprimir_linea("  Bytes leídos: {leidos}");
+
+        // Test 4: tls_cerrar
+        imprimir_linea("Test 4: tls_cerrar");
+        tls_cerrar(conn);
+        imprimir_linea("  Conexión cerrada");
+
+        request.liberar();
+    }
+    host.liberar();
+    imprimir_linea("");
+
+    imprimir_linea("=== TLS/HTTPS funciones disponibles ===");
+    imprimir_linea("tls_conectar, tls_escribir, tls_leer, tls_datos_disponibles, tls_cerrar");
+    imprimir_linea("");
+    imprimir_linea("Nota: Esta es una implementación básica (TCP plano).");
+    imprimir_linea("Handshake TLS completo requiere Schannel/OpenSSL fully integrated.");
+
+    retornar 0;
+}

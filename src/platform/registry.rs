@@ -122,6 +122,7 @@ impl BuiltinRegistry {
         // Terminal (R7.2): modo raw + lectura de teclas
         r.insert("terminal_modo_raw", "falcato_terminal_modo_raw", &[types::I32], Some(types::I32));
         r.insert("terminal_leer_tecla", "falcato_terminal_leer_tecla", &[], Some(types::I32));
+        r.insert("terminal_dimensiones", "falcato_terminal_dimensiones", &[], Some(types::I64));
 
         // Entrada estándar (R7.3)
         r.insert("entrada_leer", "falcato_entrada_leer", &[], Some(types::I64));
@@ -191,6 +192,13 @@ impl BuiltinRegistry {
         r.insert("aleatorio", "falcato_aleatorio", &[], Some(types::I64));
         r.insert("archivo_listar", "falcato_archivo_listar", &[types::I64, types::I64], None);
 
+        // TLS/HTTPS (R7.8 FASE 5)
+        r.insert("tls_conectar", "falcato_tls_conectar", &[types::I64, types::I32], Some(types::I64));
+        r.insert("tls_escribir", "falcato_tls_escribir", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("tls_leer", "falcato_tls_leer", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("tls_datos_disponibles", "falcato_tls_datos_disponibles", &[types::I64], Some(types::I32));
+        r.insert("tls_cerrar", "falcato_tls_cerrar", &[types::I64], None);
+
         r
     }
 
@@ -256,6 +264,7 @@ impl BuiltinRegistry {
         // Terminal (R7.2): modo raw + lectura de teclas
         r.insert("terminal_modo_raw", "falcato_terminal_modo_raw", &[types::I32], Some(types::I32));
         r.insert("terminal_leer_tecla", "falcato_terminal_leer_tecla", &[], Some(types::I32));
+        r.insert("terminal_dimensiones", "falcato_terminal_dimensiones", &[], Some(types::I64));
 
         // Entrada estándar (R7.3)
         r.insert("entrada_leer", "falcato_entrada_leer", &[], Some(types::I64));
@@ -322,6 +331,13 @@ impl BuiltinRegistry {
         r.insert("directorio_actual", "falcato_directorio_actual", &[types::I64], None);
         r.insert("aleatorio", "falcato_aleatorio", &[], Some(types::I64));
         r.insert("archivo_listar", "falcato_archivo_listar", &[types::I64, types::I64], None);
+
+        // TLS/HTTPS (R7.8 FASE 5)
+        r.insert("tls_conectar", "falcato_tls_conectar", &[types::I64, types::I32], Some(types::I64));
+        r.insert("tls_escribir", "falcato_tls_escribir", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("tls_leer", "falcato_tls_leer", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("tls_datos_disponibles", "falcato_tls_datos_disponibles", &[types::I64], Some(types::I32));
+        r.insert("tls_cerrar", "falcato_tls_cerrar", &[types::I64], None);
 
         r
     }

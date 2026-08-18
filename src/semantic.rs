@@ -770,6 +770,59 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // TLS/HTTPS (R7.8 FASE 5)
+        self.funciones.insert("tls_conectar".to_string(), FirmaFuncion {
+            nombre: "tls_conectar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("host".to_string(), Tipo::Texto),
+                ("puerto".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Entero64), // handle de conexión (0 = error)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("tls_escribir".to_string(), FirmaFuncion {
+            nombre: "tls_escribir".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("conn".to_string(), Tipo::Entero64),
+                ("datos".to_string(), Tipo::Entero64), // ptr a datos
+                ("n".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Entero32), // bytes escritos (-1 = error)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("tls_leer".to_string(), FirmaFuncion {
+            nombre: "tls_leer".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("conn".to_string(), Tipo::Entero64),
+                ("buf".to_string(), Tipo::Entero64), // ptr a buffer
+                ("n".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Entero32), // bytes leídos (0 = EOF, -1 = error)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("tls_datos_disponibles".to_string(), FirmaFuncion {
+            nombre: "tls_datos_disponibles".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("conn".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Entero32), // 1 = hay datos, 0 = no
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("tls_cerrar".to_string(), FirmaFuncion {
+            nombre: "tls_cerrar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("conn".to_string(), Tipo::Entero64)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
         // Terminal (R7.2): modo raw + lectura de teclas
         self.funciones.insert("terminal_modo_raw".to_string(), FirmaFuncion {
             nombre: "terminal_modo_raw".to_string(),
@@ -784,6 +837,14 @@ impl AnalizadorSemantico {
             parametros_genericos: vec![],
             parametros: vec![],
             retorno: Some(Tipo::Entero32), // código de tecla (ver terminal.rs)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("terminal_dimensiones".to_string(), FirmaFuncion {
+            nombre: "terminal_dimensiones".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero64), // empaquetado: ancho en low 32, alto en high 32
             span: span_vacio.clone(),
             es_publica: true,
         });

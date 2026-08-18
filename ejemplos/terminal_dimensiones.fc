@@ -1,0 +1,25 @@
+// Ejemplo que demuestra terminal_dimensiones (R7.8 FASE 5)
+
+función principal() -> Entero32 {
+    imprimir_linea("=== Demo: Terminal Dimensiones (R7.8 FASE 5) ===");
+    imprimir_linea("");
+
+    el dims: Entero64 = terminal_dimensiones();
+    // Desempaquetar: ancho en low 32, alto en high 32
+    el ancho: Entero32 = como_entero32(dims);
+    el alto: Entero32 = como_entero32(dims >> 32);
+
+    imprimir_linea("Dimensiones de terminal:");
+    imprimir_linea("  Ancho: {ancho} columnas");
+    imprimir_linea("  Alto: {alto} filas");
+    imprimir_linea("");
+
+    si ancho es 0 {
+        imprimir_linea("  (Nota: 0x0 significa que no hay consola interactiva)");
+    }
+
+    imprimir_linea("");
+    imprimir_linea("=== terminal_dimensiones funciona ===");
+
+    retornar 0;
+}

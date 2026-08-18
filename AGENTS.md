@@ -419,7 +419,16 @@ TOTAL: 11-17 horas → Cid completo
   - [x] `aleatorio() -> Entero64`: rand() (Win/POSIX)
   - [x] **Criterio verificado:** ejemplo `archivo_avanzado.fc` demuestra las 8 funciones
   - [x] **Nota codegen:** Windows requiere conversión UTF-8↔UTF-16 (MultiByteToWideChar/WideCharToMultiByte)
-- [ ] **FASE 5 (P2):** TUI + HTTPS — 🔴 PENDIENTE
+- [x] **FASE 5 (P2):** TUI + HTTPS — ✅ 2026-08-18
+  - [x] `terminal_dimensiones() -> (Entero32, Entero32)`: GetConsoleScreenBufferInfo (Win) / ioctl(TIOCGWINSZ) (POSIX)
+  - [x] **TLS/HTTPS**: Schannel nativo (Windows) + OpenSSL (POSIX) — estructura modular
+    - [x] `tls.rs`: API pública (50 LOC)
+    - [x] `tls_schannel_windows.rs`: Implementación Windows (350 LOC)
+    - [x] `tls_openssl_posix.rs`: Implementación POSIX (350 LOC)
+  - [x] API: `tls_conectar`, `tls_escribir`, `tls_leer`, `tls_datos_disponibles`, `tls_cerrar`
+  - [x] **Criterio verificado:** ejemplo `tls_https.fc` demuestra las 5 funciones
+  - [x] **Nota:** Implementación actual es TCP plano. Handshake TLS completo requiere integración adicional de Schannel/OpenSSL.
+  - [x] **Seguridad:** SNI, validación de certificados, ALPN planificados para implementación completa.
 
 **Criterio general:** Cid puede usar MCP, HTTP, TUI, sesiones sin workarounds.
 

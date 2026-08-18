@@ -25,6 +25,7 @@ mod tcp_cliente;
 mod texto_dinamico;
 mod conversion_numerica;
 mod archivo_avanzado;
+mod tls;
 
 use std::ffi::c_void;
 

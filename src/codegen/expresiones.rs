@@ -1278,7 +1278,8 @@ impl Codegen {
             "entero_a_texto" | "flotante_a_texto" | "booleano_a_texto" |
             "archivo_agregar" | "archivo_borrar" | "archivo_renombrar" | "archivo_escribir_bytes" |
             "entorno_obtener" | "directorio_actual" | "aleatorio" | "archivo_listar" |
-            "terminal_modo_raw" | "terminal_leer_tecla" |
+            "tls_conectar" | "tls_escribir" | "tls_leer" | "tls_datos_disponibles" | "tls_cerrar" |
+            "terminal_modo_raw" | "terminal_leer_tecla" | "terminal_dimensiones" |
             "entrada_leer" |
             "argumentos" |
             "fecha_unix" | "fecha_ms" |
@@ -1408,8 +1409,14 @@ impl Codegen {
             "directorio_actual" => self.builtin_directorio_actual(builder, variables, &llamada.argumentos),
             "aleatorio" => self.builtin_aleatorio(builder, variables, &llamada.argumentos),
             "archivo_listar" => self.builtin_archivo_listar(builder, variables, &llamada.argumentos),
+            "tls_conectar" => self.builtin_tls_conectar(builder, variables, &llamada.argumentos),
+            "tls_escribir" => self.builtin_tls_escribir(builder, variables, &llamada.argumentos),
+            "tls_leer" => self.builtin_tls_leer(builder, variables, &llamada.argumentos),
+            "tls_datos_disponibles" => self.builtin_tls_datos_disponibles(builder, variables, &llamada.argumentos),
+            "tls_cerrar" => self.builtin_tls_cerrar(builder, variables, &llamada.argumentos),
             "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
             "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
+            "terminal_dimensiones" => self.builtin_terminal_dimensiones(builder, variables, &llamada.argumentos),
             "entrada_leer" => self.builtin_entrada_leer(builder, variables, &llamada.argumentos),
 "argumentos" => self.builtin_argumentos(builder, variables, &llamada.argumentos),
             "fecha_unix" => self.builtin_fecha_unix(builder, variables, &llamada.argumentos),

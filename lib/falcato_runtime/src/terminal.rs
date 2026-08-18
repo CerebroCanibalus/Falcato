@@ -65,6 +65,29 @@ mod imp {
         control_key_state: u32,
     }
 
+    #[repr(C)]
+    struct Coord {
+        x: i16,
+        y: i16,
+    }
+
+    #[repr(C)]
+    struct SmallRect {
+        left: i16,
+        top: i16,
+        right: i16,
+        bottom: i16,
+    }
+
+    #[repr(C)]
+    struct CONSOLE_SCREEN_BUFFER_INFO {
+        dw_size: Coord,
+        dw_cursor_position: Coord,
+        w_attributes: u16,
+        sr_window: SmallRect,
+        dw_maximum_window_size: Coord,
+    }
+
     extern "system" {
         fn GetStdHandle(n_std_handle: i32) -> *mut c_void;
         fn GetConsoleMode(h_console_handle: *mut c_void, lp_mode: *mut u32) -> i32;
@@ -74,6 +97,10 @@ mod imp {
             lp_buffer: *mut InputRecord,
             n_length: u32,
             lp_number_of_events_read: *mut u32,
+        ) -> i32;
+        fn GetConsoleScreenBufferInfo(
+            h_console_output: *mut c_void,
+            lp_console_screen_buffer_info: *mut CONSOLE_SCREEN_BUFFER_INFO,
         ) -> i32;
     }
 
@@ -210,6 +237,20 @@ mod imp {
             }
         }
     }
+
+    /// Obtiene dimensiones de la terminal (ancho, alto).
+    /// Retorna Entero64 empaquetado: ancho en low 32, alto en high 32.
+    #[no_mangle]
+    pub unsafe extern "C" fn falcato_terminal_dimensiones() -> i64 {
+        let h = GetStdHandle(STD_OUTPUT_HANDLE);
+        let mut info: CONSOLE_SCREEN_BUFFER_INFO = std::mem::zeroed();
+        if GetConsoleScreenBufferInfo(h, &mut info) == 0 {
+            return 0;
+        }
+        let ancho = info.dw_size.x as i64;
+        let alto = info.dw_size.y as i64;
+        (alto << 32) | ancho
+    }
 }
 
 // ============================================================
@@ -331,6 +372,33 @@ mod imp {
             b'\x03' => 3,               // Ctrl+C
             _ => c as i32,
         }
+    }
+
+    /// Obtiene dimensiones de la terminal (ancho, alto).
+    /// Retorna Entero64 empaquetado: ancho en low 32, alto en high 32.
+    #[no_mangle]
+    pub unsafe extern "C" fn falcato_terminal_dimensiones() -> i64 {
+        #[repr(C)]
+        struct Winsize {
+            ws_row: u16,
+            ws_col: u16,
+            ws_xpixel: u16,
+            ws_ypixel: u16,
+        }
+        
+        const TIOCGWINSZ: u64 = 0x5413;
+        
+        extern "C" {
+            fn ioctl(fd: i32, request: u64, argp: *mut Winsize) -> i32;
+        }
+        
+        let mut ws: Winsize = std::mem::zeroed();
+        if ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut ws) < 0 {
+            return 0;
+        }
+        let ancho = ws.ws_col as i64;
+        let alto = ws.ws_row as i64;
+        (alto << 32) | ancho
     }
 }
 
