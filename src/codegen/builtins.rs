@@ -115,17 +115,31 @@ impl Codegen {
                 builder.seal_block(bloque_fin);
             }
             Tipo::Flotante32 | Tipo::Flotante64 => {
-                // Floats: printf %.17g (round-trip exacto — antes %f truncaba a 6 decimales:
-                // 0.1+0.2 imprimía 0.300000 aunque el valor real es 0.30000000000000004)
-                // Windows x64 variadic ABI: doubles se pasan como bit pattern en reg entero
+                // Floats: printf %.17g (round-trip exacto)
+                // CR-7 fix: en Windows, doubles van por GPR en variádicas (bitcast I64).
+                // En POSIX (macOS/Linux), doubles van por FP regs (pasar F64 directo).
                 let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
                 let fmt = if con_newline { "%.17g\n" } else { "%.17g" };
                 let fmt_ptr = self.crear_string_literal(builder, fmt);
-                // Bitcast F64 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ I64 para passing variÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡dico correcto
-                let val_bits = builder.ins().bitcast(types::I64, cranelift_codegen::ir::MemFlags::new(), val);
-                let func_id = self.asegurar_funcion_c("printf", &[types::I64, types::I64], Some(types::I32));
-                let func_ref = self.module.declare_func_in_func(func_id, builder.func);
-                builder.ins().call(func_ref, &[fmt_ptr, val_bits]);
+                let func_id;
+                let func_ref;
+                let args;
+                #[cfg(target_os = "windows")]
+                {
+                    // Windows x64 variadic: doubles se pasan como bit pattern en reg entero
+                    let val_bits = builder.ins().bitcast(types::I64, cranelift_codegen::ir::MemFlags::new(), val);
+                    func_id = self.asegurar_funcion_c("printf", &[types::I64, types::I64], Some(types::I32));
+                    func_ref = self.module.declare_func_in_func(func_id, builder.func);
+                    args = vec![fmt_ptr, val_bits];
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    // POSIX: doubles van por FP regs — pasar F64 directo
+                    func_id = self.asegurar_funcion_c("printf", &[types::I64, types::F64], Some(types::I32));
+                    func_ref = self.module.declare_func_in_func(func_id, builder.func);
+                    args = vec![fmt_ptr, val];
+                }
+                builder.ins().call(func_ref, &args);
             }
             _ => {
                 // Palabra u otro puntero: camino original
@@ -795,7 +809,7 @@ impl Codegen {
         self.contador_strings += 1;
         let data_id = self.module.declare_data(
             &format!("str_lit_{}", self.contador_strings),
-            Linkage::Local,
+            Linkage::Preemptible, // Preemptible: visible para el linker en Mach-O (fix CR-3 macOS)
             false,
             false,
         ).unwrap();
@@ -814,7 +828,7 @@ impl Codegen {
         self.contador_strings += 1;
         let data_id = self.module.declare_data(
             &format!("str_bytes_{}", self.contador_strings),
-            Linkage::Local,
+            Linkage::Preemptible, // Preemptible: visible para el linker en Mach-O (fix CR-3 macOS)
             false,
             false,
         ).unwrap();
@@ -3096,7 +3110,7 @@ impl Codegen {
     // Conversión numérica (R7.8 FASE 3): número → texto
     // ============================================================
 
-    /// entero_a_texto(n: Entero64) -> Texto — convierte entero a texto decimal
+    /// entero_a_texto(n: Entero32|Entero64) -> Texto — convierte entero a texto decimal
     pub(crate) fn builtin_entero_a_texto(
         &mut self,
         builder: &mut FunctionBuilder,
@@ -3104,6 +3118,12 @@ impl Codegen {
         argumentos: &[Expresion],
     ) -> Result<cranelift_codegen::ir::Value, ()> {
         let n = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // F-004: aceptar Entero32 (extender a I64) además de Entero64
+        let n_i64 = if builder.func.dfg.value_type(n) == types::I32 {
+            builder.ins().sextend(types::I64, n)
+        } else {
+            n
+        };
         
         // Crear descriptor de salida
         let desc_out = self.descriptor_nuevo(builder);
@@ -3111,7 +3131,7 @@ impl Codegen {
         // falcato_entero_a_texto(n: i64, desc_out: i64) -> void
         let fn_id = self.asegurar_funcion_c("falcato_entero_a_texto", &[types::I64, types::I64], None);
         let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
-        builder.ins().call(fn_ref, &[n, desc_out]);
+        builder.ins().call(fn_ref, &[n_i64, desc_out]);
         
         Ok(desc_out)
     }

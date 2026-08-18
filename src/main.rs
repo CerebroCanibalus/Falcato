@@ -1121,10 +1121,31 @@ fn link_objetos(
             return Err(format!("Error de link:\nSTDERR:\n{}\nSTDOUT:\n{}", stderr, stdout));
         }
     } else {
-        // Linux/macOS: usar gcc o clang
-        let mut cmd = Command::new("gcc");
+        // Linux/macOS: usar PlatformLinker (clang/gcc + runtime + libs)
+        use crate::platform::linker::PlatformLinker;
+        let linker = PlatformLinker::for_target(target);
+
+        let mut cmd = Command::new(&linker.cmd);
         for obj in objetos {
             cmd.arg(obj);
+        }
+        // Trampolín POSIX si existe (wrapper _main → principal)
+        for extra in &linker.extra_objs {
+            let p = std::path::Path::new(extra);
+            if p.exists() {
+                cmd.arg(extra);
+            }
+        }
+        // Runtime library (libfalcato_runtime.a)
+        if let Some(ref rt) = linker.runtime_lib {
+            let p = std::path::Path::new(rt);
+            if p.exists() {
+                cmd.arg(rt);
+            }
+        }
+        // Librerías del sistema
+        for lib in &linker.libs {
+            cmd.arg(lib);
         }
         cmd.arg("-o")
             .arg(binario);
@@ -1134,7 +1155,8 @@ fn link_objetos(
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Error de link:\n{}", stderr));
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            return Err(format!("Error de link:\nSTDERR:\n{}\nSTDOUT:\n{}", stderr, stdout));
         }
     }
 

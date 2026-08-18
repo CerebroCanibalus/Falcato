@@ -175,6 +175,13 @@ pub unsafe fn falcato_channel_close(ch: *mut c_void) {
         return;
     }
     let ch = &*(ch as *const FalcatoChannel);
+    // CR-9: despertar waiters antes de destruir semáforos.
+    // Postear a sem_signal para que cualquier thread bloqueado en
+    // sem_wait(sem_signal) despierte y pueda salir del loop.
+    // Usamos 64 como máximo razonable de waiters simultáneos.
+    for _ in 0..64 {
+        platform::sem_post(ch.sem_signal);
+    }
     platform::mutex_destroy(ch.mutex);
     platform::sem_destroy(ch.sem_signal);
     platform::sem_destroy(ch.sem_space);

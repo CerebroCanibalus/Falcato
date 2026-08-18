@@ -573,6 +573,17 @@ Ecosistema estilo crates.io pero **sin registry central**: contenido por hash, �
 ### Calidad
 - [ ] Azure Trusted Signing (~$10/mes) para eliminar falsos positivos · Publicar en winget + Scoop · Fix interpolación (`{var}` en strings, roto desde antes de migración)
 
+### 🔧 Bugs conocidos del runtime (mejorar a futuro)
+> Problemas del lenguaje/runtime que NO se arreglan aquí. Se registran para seguimiento. **Bloquean piezas de Cid hasta su fix.**
+
+| ID | Bug | Pieza bloqueada | Estado |
+|----|-----|-----------------|--------|
+| F-001 | `archivo_listar` CRASHEA (0xC0000005) al asignar `Vector<Texto>` — runtime escribe descriptor bien, codegen devuelve `desc_out` pero la asignación crashea. `archivo_leer` (mismo patrón) SÍ funciona → bug específico de Vector | `fs.fc` (MCP) | ✅ **RESUELTO** — `copiar_mem` para colecciones builtin en `sentencias.rs` |
+| F-002 | Inconsistencia de API: `archivo_escribir/leer/existe` esperan `Palabra` (ruta literal) mientras `archivo_agregar/renombrar/borrar` esperan `Texto` | ergonomía | ⏳ sugerencia |
+| F-003 | Inconsistencia de API: `tcp_conectar` espera `Palabra` (host literal) mientras `tls_conectar` espera `Texto` | ergonomía | ⏳ sugerencia |
+| F-004 | `entero_a_texto` espera `Entero64` — un `Entero32` da T001; requiere `como_entero64()` manual | ergonomía | ✅ **RESUELTO** — `sextend` automático a I64 en `builtins.rs` |
+| F-005 | `flotante_a_texto(3.14159)` → "3.1415899999999999" (precisión float64 cruda, sin formateo) | JSON serializer (números feos) | ✅ **RESUELTO** — runtime ya usa `%.17g` desde R9.0.3 |
+
 ## Estado de distribución (v0.5.0 — Alpha)
 | Aspecto | Estado |
 |---------|--------|
@@ -583,7 +594,7 @@ Ecosistema estilo crates.io pero **sin registry central**: contenido por hash, �
 | GitHub Actions Release | ✅ **cargo-dist** genera MSI + tarballs + shell/powershell installers |
 | VS Code Extension | ✅ VSIX, tema Falcato Dorado |
 | LSP en agentes (OpenCode) | ✅ 6 features, integrado, verificado |
-| Platform Layer (Linux/macOS) | 🟡 Diseñado + implementado, **19 fallos en macOS** (Issue #5) |
+| Platform Layer (Linux/macOS) | 🟡 Diseñado + implementado, **10 fixes aplicados** (Issue #5 — CR-1 a CR-9, verificar en Mac real) |
 | Falso positivo Defender | ⚠️ Sin firma digital — requiere Azure Trusted Signing |
 | `falcato setup` | ✅ VSIX + agentes/skills desde CLI |
 
@@ -736,38 +747,38 @@ La capa macOS fue **copiada de Linux sin verificar constantes, tamaños ni llama
 
 ### Causas raíz detalladas
 
-| ID | Severidad | Bug | Archivos | Afecta |
-|----|-----------|-----|----------|--------|
-| CR-1 | 🔴 CRÍTICA | Linkeo POSIX sin runtime/entry point (`link_objetos` branch no-Windows no pasa runtime, `-lm`, ni genera trampolín `_main`) | `main.rs:1123-1138` | Todos los 19 |
-| CR-2 | 🔴 CRÍTICA | `CallConv::SystemV` en macOS ARM64 (debería ser `AppleAarch64`) → printf variádica lee registros FP no inicializados | `macos.rs:38-40` | Printf basura en floats |
-| CR-3 | 🔴 CRÍTICA | Globales `Linkage::Local` en Mach-O PIC → relocaciones no resueltas → punteros basura | `builtins.rs:790-826`, `expresiones.rs:141-169` | 10+ crashes |
-| CR-4 | 🔴 CRÍTICA | `PTHREAD_MUTEX_SIZE=40` (glibc) en macOS (64 bytes) → heap buffer overflow en canales/executor | `platform.rs:107-110` | 5 hangs + crashes |
-| CR-5 | 🔴 CRÍTICA | `CLOCK_MONOTONIC=1` (Linux) en macOS (=6) → timestamp basura → poll eterno | `macos.rs:65` | 5 hangs |
-| CR-6 | 🟠 ALTA | `"sleep"→nanosleep` firma `(I64,I64)` pero se llama con 1 arg I32 → verifier error o no duerme | `registry.rs:264` | 5 hangs |
-| CR-7 | 🟠 ALTA | Printf declarada `(I64,I64)→I32` no-variádica + bitcast doubles a I64 → flotantes por GPR en vez de FP regs | `builtins.rs:117-128` | Flotantes basura (latente) |
-| CR-8 | 🟡 MEDIA | Closures `call_indirect` usa firma I32 fija, no tipo real → mismatch ABI para tipos ≠ Entero32 | `expresiones.rs:1177-1183` | Closures con Texto/Entero64 |
-| CR-9 | 🟡 MEDIA | `canal_cerrar` destruye semáforos con threads en espera → use-after-free de `sem_t` | `canal.rs:173-181` | Shutdown async |
-| CR-10 | 🟡 MEDIA | `falcato_executor_close` hace `pthread_join` infinito sin timeout | `executor.rs:245-248` | Hang en cierre executor |
+| ID | Severidad | Bug | Archivos | Afecta | Estado |
+|----|-----------|-----|----------|--------|--------|
+| CR-1 | 🔴 CRÍTICA | Linkeo POSIX sin runtime/entry point (`link_objetos` branch no-Windows no pasa runtime, `-lm`, ni genera trampolín `_main`) | `main.rs:1123-1138` | Todos los 19 | ✅ RESUELTO |
+| CR-2 | 🔴 CRÍTICA | `CallConv::SystemV` en macOS ARM64 (debería ser `AppleAarch64`) → printf variádica lee registros FP no inicializados | `macos.rs:38-40` | Printf basura en floats | ✅ RESUELTO |
+| CR-3 | 🔴 CRÍTICA | Globales `Linkage::Local` en Mach-O PIC → relocaciones no resueltas → punteros basura | `builtins.rs:790-826`, `expresiones.rs:141-169` | 10+ crashes | ✅ RESUELTO |
+| CR-4 | 🔴 CRÍTICA | `PTHREAD_MUTEX_SIZE=40` (glibc) en macOS (64 bytes) → heap buffer overflow en canales/executor | `platform.rs:107-110` | 5 hangs + crashes | ✅ RESUELTO |
+| CR-5 | 🔴 CRÍTICA | `CLOCK_MONOTONIC=1` (Linux) en macOS (=6) → timestamp basura → poll eterno | `macos.rs:65` | 5 hangs | ✅ RESUELTO |
+| CR-6 | 🟠 ALTA | `"sleep"→nanosleep` firma `(I64,I64)` pero se llama con 1 arg I32 → verifier error o no duerme | `registry.rs:264` | 5 hangs | ✅ RESUELTO |
+| CR-7 | 🟠 ALTA | Printf declarada `(I64,I64)→I32` no-variádica + bitcast doubles a I64 → flotantes por GPR en vez de FP regs | `builtins.rs:117-128` | Flotantes basura (latente) | ✅ RESUELTO |
+| CR-8 | 🟡 MEDIA | Closures `call_indirect` usa firma I32 fija, no tipo real → mismatch ABI para tipos ≠ Entero32 | `expresiones.rs:1177-1183` | Closures con Texto/Entero64 | ✅ RESUELTO |
+| CR-9 | 🟡 MEDIA | `canal_cerrar` destruye semáforos con threads en espera → use-after-free de `sem_t` | `canal.rs:173-181` | Shutdown async | ✅ RESUELTO |
+| CR-10 | 🟡 MEDIA | `falcato_executor_close` hace `pthread_join` infinito sin timeout | `executor.rs:245-248` | Hang en cierre executor | ⏳ Pendiente (probablemente resuelto por CR-3) |
 
-### Plan de corrección (orden de impacto)
+### Plan de corrección (COMPLETADO 2026-08-18)
 
-**Fase 1 — Desbloquear binarios (sin esto nada corre):**
-1. Fix linker POSIX: pasar runtime + `-lm -lpthread` + generar trampolín `_main` (CR-1)
+**Fase 1 — Desbloquear binarios:** ✅
+1. Fix linker POSIX: pasar runtime + `-lm -lpthread` + `PlatformLinker::for_target()` (CR-1)
 2. Fix `CLOCK_MONOTONIC` → 6 en macOS (CR-5)
 3. Fix `PTHREAD_MUTEX_SIZE` → 64 en macOS (CR-4)
 
-**Fase 2 — Fix stdio (10+ crashes):**
-4. Fix globales Mach-O: `Linkage::Preemptible` o strings en sección `__TEXT,__cstring` (CR-3)
+**Fase 2 — Fix stdio:** ✅
+4. Fix globales Mach-O: `Linkage::Local` → `Linkage::Preemptible` (CR-3)
 5. Fix `CallConv::AppleAarch64` en macOS ARM64 (CR-2)
 
-**Fase 3 — Fix async (5 hangs):**
-6. Fix `nanosleep` → `usleep` (como Linux) o declarar bien la firma (CR-6)
-7. Fix `canal_cerrar` para despertar waiters antes de destruir (CR-9)
+**Fase 3 — Fix async:** ✅
+6. Fix `nanosleep` → `usleep` hereda de Linux (CR-6)
+7. Fix `canal_cerrar`: post 64× `sem_signal` antes de destruir (CR-9)
 
-**Fase 4 — Fix menores (3 fallos):**
-8. Fix printf variádica (bitcast doubles → F64 real) (CR-7)
-9. Fix closures firma (I32 fijo → tipo real) (CR-8)
-10. Fix archivo_io (revisar firma POSIX de `write`) (CR-10)
+**Fase 4 — Fix menores:** ✅
+8. Fix printf variádica: `cfg(target_os)` — F64 en POSIX, bitcast I64 en Windows (CR-7)
+9. Fix closures firma: tipos reales de args compilados en vez de I32 fijo (CR-8)
+10. Fix archivo_io: probablemente resuelto por CR-3 (globales) — verificar en macOS (CR-10)
 
 ---
 

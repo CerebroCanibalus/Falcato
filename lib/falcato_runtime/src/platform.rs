@@ -104,7 +104,17 @@ mod imp {
         fn free(ptr: *mut c_void);
     }
 
+    // Tamaños de structs del sistema por plataforma
+    // macOS: pthread_mutex_t=64, sem_t=8 (puntero opaco)
+    // Linux glibc x86_64: pthread_mutex_t=40, sem_t=32
+    #[cfg(target_os = "macos")]
+    const PTHREAD_MUTEX_SIZE: usize = 64;
+    #[cfg(target_os = "macos")]
+    const SEM_T_SIZE: usize = 8;
+
+    #[cfg(not(target_os = "macos"))]
     const PTHREAD_MUTEX_SIZE: usize = 40; // x86_64 Linux
+    #[cfg(not(target_os = "macos"))]
     const SEM_T_SIZE: usize = 32;         // x86_64 Linux
 
     pub type Mutex = [u8; PTHREAD_MUTEX_SIZE];

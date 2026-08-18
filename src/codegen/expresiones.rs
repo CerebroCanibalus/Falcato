@@ -149,7 +149,7 @@ impl Codegen {
                         self.contador_strings += 1;
                         let data_id = self.module.declare_data(
                             &format!("str_{}_{}", self.contador_strings, s.len()),
-                            Linkage::Local,
+                            Linkage::Preemptible, // Preemptible: visible para el linker en Mach-O (fix CR-3 macOS)
                             false,
                             false,
                         ).map_err(|_| ())?;
@@ -1175,12 +1175,15 @@ impl Codegen {
                     }
 
                     // Crear firma para la llamada indirecta
+                    // CR-8 fix: usar tipos reales de los argumentos compilados en vez de I32 fijo
                     let mut sig = Signature::new(self.call_conv_default());
                     sig.params.push(AbiParam::new(types::I64)); // env_ptr
-                    for _ in &llamada.argumentos {
-                        sig.params.push(AbiParam::new(types::I32)); // default I32
+                    for arg_val in &args[1..] { // saltar env_ptr
+                        let arg_type = builder.func.dfg.value_type(*arg_val);
+                        sig.params.push(AbiParam::new(arg_type));
                     }
-                    sig.returns.push(AbiParam::new(types::I32)); // default retorno I32
+                    // Retorno: usar I32 como default (closures típicos retornan Entero32)
+                    sig.returns.push(AbiParam::new(types::I32));
 
                     let sig_ref = builder.import_signature(sig);
                     let call = builder.ins().call_indirect(sig_ref, fn_ptr, &args);

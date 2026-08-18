@@ -348,9 +348,12 @@ impl BuiltinRegistry {
     pub fn macos() -> Self {
         let mut r = Self::linux(); // macOS es casi igual a Linux
 
-        // En macOS, usleep es obsoleto pero funciona. nanosleep es preferible.
-        r.insert("sleep", "nanosleep",
-            &[types::I64, types::I64], Some(types::I32));
+        // CR-6 fix: usar usleep como Linux (nanosleep requiere struct timespec
+        // y 2 args, pero el codegen llama con 1 arg I32 — usleep funciona en
+        // macOS aunque deprecado, y tiene la misma firma que Linux).
+        // r.insert("sleep", "nanosleep",
+        //     &[types::I64, types::I64], Some(types::I32));
+        // usleep ya viene de Self::linux() con firma (I32) → I32 — OK.
 
         // En macOS, pthread y semáforos POSIX están disponibles
         // (aunque sem_init está deprecado, usar dispatch_semaphore sería más nativo)

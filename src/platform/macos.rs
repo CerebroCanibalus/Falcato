@@ -36,7 +36,11 @@ impl PlatformRuntime for MacOsRuntime {
     // TODO: ajustar cuando tengamos un Mac para testing.
 
     fn call_conv_default(&self) -> CallConv {
-        CallConv::SystemV
+        // AppleAarch64 en ARM64 (Apple Silicon), SystemV en x86_64
+        #[cfg(target_arch = "aarch64")]
+        { CallConv::AppleAarch64 }
+        #[cfg(not(target_arch = "aarch64"))]
+        { CallConv::SystemV }
     }
 
     fn sleep(&self, ctx: &mut CodegenCtx, builder: &mut FunctionBuilder, ms_val: Value) {
@@ -62,7 +66,7 @@ impl PlatformRuntime for MacOsRuntime {
             Some(types::I32),
         );
         let func_ref = ctx.module.declare_func_in_func(clock_id, builder.func);
-        let clock_mono = builder.ins().iconst(types::I32, 1);
+        let clock_mono = builder.ins().iconst(types::I32, 6); // CLOCK_MONOTONIC=6 en macOS (1 en Linux)
         builder.ins().call(func_ref, &[clock_mono, ts_ptr]);
 
         let tv_sec = builder.ins().load(types::I64, ir::MemFlags::new(), ts_ptr, 0);
@@ -147,9 +151,12 @@ impl PlatformRuntime for MacOsRuntime {
     }
 
     fn thread_wrapper_signature(&self) -> ir::Signature {
-        // En macOS x64: SystemV. En ARM: AppleAarch64.
-        // Como no podemos saber en compilación, usamos SystemV (funciona en ambos).
-        let mut sig = ir::Signature::new(CallConv::SystemV);
+        // AppleAarch64 en ARM64 (Apple Silicon), SystemV en x86_64
+        #[cfg(target_arch = "aarch64")]
+        let conv = CallConv::AppleAarch64;
+        #[cfg(not(target_arch = "aarch64"))]
+        let conv = CallConv::SystemV;
+        let mut sig = ir::Signature::new(conv);
         sig.params.push(ir::AbiParam::new(types::I64));
         sig.returns.push(ir::AbiParam::new(types::I64));
         sig

@@ -46,7 +46,7 @@
 //! **No tocar codegen.rs ni los otros archivos de plataforma.**
 
 mod registry;
-mod linker;
+pub mod linker;
 mod traits;
 
 #[cfg(target_os = "windows")]
