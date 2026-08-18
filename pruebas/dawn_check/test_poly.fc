@@ -1,0 +1,34 @@
+// Test F7: Polinomios minimax en acción
+función principal() -> Entero32 {
+    // seno_2pi(0.25) = sin(π/2) = 1.0
+    el r1: Real = seno_2pi(0.25);
+    imprimir_linea("seno_2pi(0.25) = {r1}");
+    
+    // coseno_2pi(0.0) = cos(0) = 1.0
+    el r2: Real = coseno_2pi(0.0);
+    imprimir_linea("coseno_2pi(0.0) = {r2}");
+    
+    // seno_2pi(0.5) = sin(π) ≈ 0
+    el r3: Real = seno_2pi(0.5);
+    imprimir_linea("seno_2pi(0.5) = {r3}");
+    
+    // coseno_2pi(0.25) = cos(π/2) ≈ 0
+    el r4: Real = coseno_2pi(0.25);
+    imprimir_linea("coseno_2pi(0.25) = {r4}");
+    
+    // Comparar con libm
+    el r5: Real = seno(1.5707963267948966);  // seno(π/2) = 1
+    el r6: Real = seno_2pi(0.25);
+    imprimir_linea("seno(π/2) = {r5}, seno_2pi(0.25) = {r6}");
+    
+    // Precisión: múltiples puntos
+    el r7: Real = seno_2pi(0.0);
+    el r8: Real = seno_2pi(0.125);
+    el r9: Real = seno_2pi(0.25);
+    el r10: Real = seno_2pi(0.375);
+    el r11: Real = seno_2pi(0.5);
+    imprimir_linea("seno_2pi en 0, 1/8, 1/4, 3/8, 1/2:");
+    imprimir_linea("  {r7}, {r8}, {r9}, {r10}, {r11}");
+    
+    retornar 0;
+}
