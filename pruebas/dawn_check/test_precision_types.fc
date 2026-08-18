@@ -1,0 +1,26 @@
+// Test R9.0.4-F4: Tipos de precisión via apodo + builtins _preciso
+apodo Real_preciso = Real;
+apodo Real_rapido = Real;
+apodo Real_aprox = Real;
+
+función principal() -> Entero32 {
+    el x: Real = 1.0;
+    
+    el r1: Real = seno_preciso(x);
+    el r2: Real = seno_rapido(x);
+    el r3: Real = seno_aprox(x);
+    el r4: Real = coseno_preciso(x);
+    el r5: Real = exp_preciso(x);
+    el r6: Real = log_preciso(x);
+    el r7: Real = seno_2pi(0.25);
+    
+    imprimir_linea("seno_preciso(1) = {r1}");
+    imprimir_linea("seno_rapido(1) = {r2}");
+    imprimir_linea("seno_aprox(1) = {r3}");
+    imprimir_linea("coseno_preciso(1) = {r4}");
+    imprimir_linea("exp_preciso(1) = {r5}");
+    imprimir_linea("log_preciso(1) = {r6}");
+    imprimir_linea("seno_2pi(0.25) = {r7}");
+    
+    retornar 0;
+}

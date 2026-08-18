@@ -1256,6 +1256,8 @@ impl Codegen {
             "seno" | "coseno" | "tangente" | "arcseno" | "arccoseno" | "arctangente" | "arctangente2" |
             "senoh" | "cosenoh" | "tangenteh" |
             "exp" | "log" | "log10" | "piso" | "techo" | "fabs" | "fmod" |
+            // Trigonometría precisa (F1) — libm
+            "seno_preciso" | "coseno_preciso" | "tangente_preciso" | "exp_preciso" | "log_preciso" |
             // Trigonometría rápida (F2/F3) — math.rs
             "seno_rapido" | "coseno_rapido" | "seno_2pi" | "coseno_2pi" |
             "exp_rapido" | "log_rapido" | "seno_aprox" |
@@ -1337,6 +1339,12 @@ impl Codegen {
             "techo" => self.builtin_techo(builder, variables, &llamada.argumentos),
             "fabs" => self.builtin_valor_absoluto(builder, variables, &llamada.argumentos),
             "fmod" => self.builtin_modulo_flotante(builder, variables, &llamada.argumentos),
+            // Trigonometría precisa (F1) — libm
+            "seno_preciso" => self.builtin_seno(builder, variables, &llamada.argumentos),
+            "coseno_preciso" => self.builtin_coseno(builder, variables, &llamada.argumentos),
+            "tangente_preciso" => self.builtin_tangente(builder, variables, &llamada.argumentos),
+            "exp_preciso" => self.builtin_exponencial(builder, variables, &llamada.argumentos),
+            "log_preciso" => self.builtin_logaritmo(builder, variables, &llamada.argumentos),
             // Trigonometría rápida (F2/F3) — math.rs
             "seno_rapido" => self.builtin_seno_rapido(builder, variables, &llamada.argumentos),
             "coseno_rapido" => self.builtin_coseno_rapido(builder, variables, &llamada.argumentos),

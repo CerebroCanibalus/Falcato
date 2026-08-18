@@ -973,6 +973,13 @@ impl AnalizadorSemantico {
         self.funciones.insert("fabs".to_string(), trig_unario("fabs"));
         self.funciones.insert("fmod".to_string(), trig_binario("fmod"));
 
+        // Trigonometría precisa (F1) — libm
+        self.funciones.insert("seno_preciso".to_string(), trig_unario("seno_preciso"));
+        self.funciones.insert("coseno_preciso".to_string(), trig_unario("coseno_preciso"));
+        self.funciones.insert("tangente_preciso".to_string(), trig_unario("tangente_preciso"));
+        self.funciones.insert("exp_preciso".to_string(), trig_unario("exp_preciso"));
+        self.funciones.insert("log_preciso".to_string(), trig_unario("log_preciso"));
+
         // Trigonometría rápida (F2/F3) — math.rs
         self.funciones.insert("seno_rapido".to_string(), trig_unario("seno_rapido"));
         self.funciones.insert("coseno_rapido".to_string(), trig_unario("coseno_rapido"));
