@@ -694,6 +694,82 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // Archivos avanzados + entorno (R7.8 FASE 4)
+        self.funciones.insert("archivo_agregar".to_string(), FirmaFuncion {
+            nombre: "archivo_agregar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("ruta".to_string(), Tipo::Texto),
+                ("texto".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("archivo_borrar".to_string(), FirmaFuncion {
+            nombre: "archivo_borrar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("ruta".to_string(), Tipo::Texto)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("archivo_renombrar".to_string(), FirmaFuncion {
+            nombre: "archivo_renombrar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("vieja".to_string(), Tipo::Texto),
+                ("nueva".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("archivo_escribir_bytes".to_string(), FirmaFuncion {
+            nombre: "archivo_escribir_bytes".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("ruta".to_string(), Tipo::Texto),
+                ("datos".to_string(), Tipo::Entero64),
+                ("n".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("entorno_obtener".to_string(), FirmaFuncion {
+            nombre: "entorno_obtener".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("nombre".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("directorio_actual".to_string(), FirmaFuncion {
+            nombre: "directorio_actual".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("aleatorio".to_string(), FirmaFuncion {
+            nombre: "aleatorio".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("archivo_listar".to_string(), FirmaFuncion {
+            nombre: "archivo_listar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("dir".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Vector(Box::new(Tipo::Texto))),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
         // Terminal (R7.2): modo raw + lectura de teclas
         self.funciones.insert("terminal_modo_raw".to_string(), FirmaFuncion {
             nombre: "terminal_modo_raw".to_string(),

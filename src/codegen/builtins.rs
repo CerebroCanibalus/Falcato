@@ -3169,6 +3169,132 @@ impl Codegen {
     }
 
     // ============================================================
+    // Archivos avanzados + entorno (R7.8 FASE 4)
+    // ============================================================
+
+    /// archivo_agregar(ruta: Texto, texto: Texto) — append a archivo
+    pub(crate) fn builtin_archivo_agregar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let ruta = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let texto = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let fn_id = self.asegurar_funcion_c("falcato_archivo_agregar", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[ruta, texto]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// archivo_borrar(ruta: Texto) — eliminar archivo
+    pub(crate) fn builtin_archivo_borrar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let ruta = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let fn_id = self.asegurar_funcion_c("falcato_archivo_borrar", &[types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[ruta]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// archivo_renombrar(vieja: Texto, nueva: Texto) — mover/renombrar
+    pub(crate) fn builtin_archivo_renombrar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let vieja = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let nueva = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let fn_id = self.asegurar_funcion_c("falcato_archivo_renombrar", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[vieja, nueva]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// archivo_escribir_bytes(ruta: Texto, datos: Entero64, n: Entero32) — escribir bytes crudos
+    pub(crate) fn builtin_archivo_escribir_bytes(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let ruta = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let datos = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let n = self.compilar_expresion(&argumentos[2], builder, variables)?;
+        let n_i32 = if builder.func.dfg.value_type(n) == types::I64 {
+            builder.ins().ireduce(types::I32, n)
+        } else {
+            n
+        };
+        let fn_id = self.asegurar_funcion_c("falcato_archivo_escribir_bytes", &[types::I64, types::I64, types::I32], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[ruta, datos, n_i32]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// entorno_obtener(nombre: Texto) -> Texto — variable de entorno
+    pub(crate) fn builtin_entorno_obtener(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let nombre = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+        let fn_id = self.asegurar_funcion_c("falcato_entorno_obtener", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[nombre, desc_out]);
+        Ok(desc_out)
+    }
+
+    /// directorio_actual() -> Texto — cwd
+    pub(crate) fn builtin_directorio_actual(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_out = self.descriptor_nuevo(builder);
+        let fn_id = self.asegurar_funcion_c("falcato_directorio_actual", &[types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_out]);
+        Ok(desc_out)
+    }
+
+    /// aleatorio() -> Entero64 — número aleatorio
+    pub(crate) fn builtin_aleatorio(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let fn_id = self.asegurar_funcion_c("falcato_aleatorio", &[], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// archivo_listar(dir: Texto) -> Vector<Texto> — listar directorio
+    pub(crate) fn builtin_archivo_listar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let dir = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+        let fn_id = self.asegurar_funcion_c("falcato_archivo_listar", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[dir, desc_out]);
+        Ok(desc_out)
+    }
+
+    // ============================================================
     // Terminal (R7.2): modo raw + lectura de teclas
     // ============================================================
 

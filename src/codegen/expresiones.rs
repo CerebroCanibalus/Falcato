@@ -1276,6 +1276,8 @@ impl Codegen {
             "tcp_conectar" | "dns_resolver" | "tcp_establecer_timeout" | "tcp_datos_disponibles" |
             "texto_agregar_texto" | "texto_poner_byte" | "texto_puntero" | "texto_desde_bytes" |
             "entero_a_texto" | "flotante_a_texto" | "booleano_a_texto" |
+            "archivo_agregar" | "archivo_borrar" | "archivo_renombrar" | "archivo_escribir_bytes" |
+            "entorno_obtener" | "directorio_actual" | "aleatorio" | "archivo_listar" |
             "terminal_modo_raw" | "terminal_leer_tecla" |
             "entrada_leer" |
             "argumentos" |
@@ -1398,6 +1400,14 @@ impl Codegen {
             "entero_a_texto" => self.builtin_entero_a_texto(builder, variables, &llamada.argumentos),
             "flotante_a_texto" => self.builtin_flotante_a_texto(builder, variables, &llamada.argumentos),
             "booleano_a_texto" => self.builtin_booleano_a_texto(builder, variables, &llamada.argumentos),
+            "archivo_agregar" => self.builtin_archivo_agregar(builder, variables, &llamada.argumentos),
+            "archivo_borrar" => self.builtin_archivo_borrar(builder, variables, &llamada.argumentos),
+            "archivo_renombrar" => self.builtin_archivo_renombrar(builder, variables, &llamada.argumentos),
+            "archivo_escribir_bytes" => self.builtin_archivo_escribir_bytes(builder, variables, &llamada.argumentos),
+            "entorno_obtener" => self.builtin_entorno_obtener(builder, variables, &llamada.argumentos),
+            "directorio_actual" => self.builtin_directorio_actual(builder, variables, &llamada.argumentos),
+            "aleatorio" => self.builtin_aleatorio(builder, variables, &llamada.argumentos),
+            "archivo_listar" => self.builtin_archivo_listar(builder, variables, &llamada.argumentos),
             "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
             "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
             "entrada_leer" => self.builtin_entrada_leer(builder, variables, &llamada.argumentos),

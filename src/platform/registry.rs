@@ -181,6 +181,16 @@ impl BuiltinRegistry {
         r.insert("flotante_a_texto", "falcato_flotante_a_texto", &[types::I64, types::I64], None);
         r.insert("booleano_a_texto", "falcato_booleano_a_texto", &[types::I32, types::I64], None);
 
+        // Archivos avanzados + entorno (R7.8 FASE 4)
+        r.insert("archivo_agregar", "falcato_archivo_agregar", &[types::I64, types::I64], None);
+        r.insert("archivo_borrar", "falcato_archivo_borrar", &[types::I64], None);
+        r.insert("archivo_renombrar", "falcato_archivo_renombrar", &[types::I64, types::I64], None);
+        r.insert("archivo_escribir_bytes", "falcato_archivo_escribir_bytes", &[types::I64, types::I64, types::I32], None);
+        r.insert("entorno_obtener", "falcato_entorno_obtener", &[types::I64, types::I64], None);
+        r.insert("directorio_actual", "falcato_directorio_actual", &[types::I64], None);
+        r.insert("aleatorio", "falcato_aleatorio", &[], Some(types::I64));
+        r.insert("archivo_listar", "falcato_archivo_listar", &[types::I64, types::I64], None);
+
         r
     }
 
@@ -302,6 +312,16 @@ impl BuiltinRegistry {
         r.insert("entero_a_texto", "falcato_entero_a_texto", &[types::I64, types::I64], None);
         r.insert("flotante_a_texto", "falcato_flotante_a_texto", &[types::I64, types::I64], None);
         r.insert("booleano_a_texto", "falcato_booleano_a_texto", &[types::I32, types::I64], None);
+
+        // Archivos avanzados + entorno (R7.8 FASE 4)
+        r.insert("archivo_agregar", "falcato_archivo_agregar", &[types::I64, types::I64], None);
+        r.insert("archivo_borrar", "falcato_archivo_borrar", &[types::I64], None);
+        r.insert("archivo_renombrar", "falcato_archivo_renombrar", &[types::I64, types::I64], None);
+        r.insert("archivo_escribir_bytes", "falcato_archivo_escribir_bytes", &[types::I64, types::I64, types::I32], None);
+        r.insert("entorno_obtener", "falcato_entorno_obtener", &[types::I64, types::I64], None);
+        r.insert("directorio_actual", "falcato_directorio_actual", &[types::I64], None);
+        r.insert("aleatorio", "falcato_aleatorio", &[], Some(types::I64));
+        r.insert("archivo_listar", "falcato_archivo_listar", &[types::I64, types::I64], None);
 
         r
     }

@@ -24,6 +24,7 @@ mod convertir;
 mod tcp_cliente;
 mod texto_dinamico;
 mod conversion_numerica;
+mod archivo_avanzado;
 
 use std::ffi::c_void;
 

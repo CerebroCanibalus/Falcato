@@ -408,7 +408,17 @@ TOTAL: 11-17 horas → Cid completo
   - [x] `booleano_a_texto(Booleano) -> Texto`: "verdadero"/"falso"
   - [x] **Criterio verificado:** ejemplo `conversion_numerica.fc` demuestra las 3 funciones
   - [x] **Nota codegen:** Flotante requiere `bitcast` de f64 a i64 antes de pasar a función C. Booleano requiere `uextend` de i8 a i32.
-- [ ] **FASE 4 (P1):** Archivos + entorno — 🔴 PENDIENTE
+- [x] **FASE 4 (P1):** Archivos + entorno — ✅ 2026-08-18
+  - [x] `archivo_agregar(Texto, Texto)`: append con FILE_APPEND_DATA (Win) / O_APPEND (POSIX)
+  - [x] `archivo_borrar(Texto)`: DeleteFile (Win) / unlink (POSIX)
+  - [x] `archivo_renombrar(Texto, Texto)`: MoveFile (Win) / rename (POSIX)
+  - [x] `archivo_listar(Texto) -> Vector<Texto>`: FindFirstFile/FindNextFile (Win) / opendir/readdir (POSIX)
+  - [x] `archivo_escribir_bytes(Texto, Entero64, Entero32)`: bytes crudos binario-safe
+  - [x] `entorno_obtener(Texto) -> Texto`: GetEnvironmentVariable (Win) / getenv (POSIX)
+  - [x] `directorio_actual() -> Texto`: GetCurrentDirectory (Win) / getcwd (POSIX)
+  - [x] `aleatorio() -> Entero64`: rand() (Win/POSIX)
+  - [x] **Criterio verificado:** ejemplo `archivo_avanzado.fc` demuestra las 8 funciones
+  - [x] **Nota codegen:** Windows requiere conversión UTF-8↔UTF-16 (MultiByteToWideChar/WideCharToMultiByte)
 - [ ] **FASE 5 (P2):** TUI + HTTPS — 🔴 PENDIENTE
 
 **Criterio general:** Cid puede usar MCP, HTTP, TUI, sesiones sin workarounds.

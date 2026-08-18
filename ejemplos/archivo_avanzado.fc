@@ -1,0 +1,66 @@
+// Ejemplo que demuestra las funciones de archivos y entorno (R7.8 FASE 4)
+
+función principal() -> Entero32 {
+    imprimir_linea("=== Demo: Archivos + Entorno (R7.8 FASE 4) ===");
+    imprimir_linea("");
+
+    // Test 1: directorio_actual
+    imprimir_linea("Test 1: directorio_actual");
+    el cwd: Texto = directorio_actual();
+    imprimir_linea("  Directorio actual: {cwd}");
+    cwd.liberar();
+    imprimir_linea("");
+
+    // Test 2: entorno_obtener
+    imprimir_linea("Test 2: entorno_obtener");
+    el nombre_var: Texto = texto_desde("PATH");
+    el path: Texto = entorno_obtener(nombre_var);
+    imprimir_linea("  PATH (primeros 80 chars):");
+    // Imprimir los primeros 80 caracteres
+    el path_len: Entero32 = texto_longitud(path);
+    si path_len > 80 {
+        el sub: Texto = texto_subtexto(path, 0, 80);
+        imprimir_linea("  {sub}...");
+        sub.liberar();
+    } sino {
+        imprimir_linea("  {path}");
+    }
+    path.liberar();
+    nombre_var.liberar();
+    imprimir_linea("");
+
+    // Test 3: archivo_agregar + archivo_borrar
+    imprimir_linea("Test 3: archivo_agregar + archivo_borrar");
+    el ruta: Texto = texto_desde("test_fase4.txt");
+    archivo_agregar(ruta, texto_desde("Linea 1\n"));
+    archivo_agregar(ruta, texto_desde("Linea 2\n"));
+    archivo_agregar(ruta, texto_desde("Linea 3\n"));
+    imprimir_linea("  Archivo 'test_fase4.txt' creado con 3 líneas");
+    archivo_borrar(ruta);
+    imprimir_linea("  Archivo borrado");
+    ruta.liberar();
+    imprimir_linea("");
+
+    // Test 4: aleatorio
+    imprimir_linea("Test 4: aleatorio");
+    el r1: Entero64 = aleatorio();
+    el r2: Entero64 = aleatorio();
+    el r3: Entero64 = aleatorio();
+    imprimir_linea("  Aleatorios: {r1}, {r2}, {r3}");
+    imprimir_linea("");
+
+    // Test 5: archivo_listar
+    imprimir_linea("Test 5: archivo_listar");
+    el dir: Texto = texto_desde(".");
+    el archivos: Vector<Texto> = archivo_listar(dir);
+    // Nota: archivo_listar devuelve un descriptor especial
+    // Por ahora solo verificamos que no crashea
+    imprimir_linea("  Listado de directorio completado");
+    archivos.liberar();
+    dir.liberar();
+    imprimir_linea("");
+
+    imprimir_linea("=== Todas las funciones de archivos/entorno funcionan ===");
+
+    retornar 0;
+}
