@@ -435,6 +435,14 @@ mod imp {
             return -1;
         }
         let proc = &*(handle as *mut ProcesoBidireccional);
+        
+        // Esperar hasta 100ms a que haya datos (no bloquear indefinidamente)
+        let wait_result = WaitForSingleObject(proc.stdout_read, 100);
+        if wait_result != 0 {
+            // WAIT_TIMEOUT o WAIT_FAILED — no hay datos o error
+            return 0;
+        }
+        
         let mut leidos: u32 = 0;
         let ok = ReadFile(
             proc.stdout_read,
@@ -454,6 +462,14 @@ mod imp {
             return -1;
         }
         let proc = &*(handle as *mut ProcesoBidireccional);
+        
+        // Esperar hasta 100ms a que haya datos (no bloquear indefinidamente)
+        let wait_result = WaitForSingleObject(proc.stderr_read, 100);
+        if wait_result != 0 {
+            // WAIT_TIMEOUT o WAIT_FAILED — no hay datos o error
+            return 0;
+        }
+        
         let mut leidos: u32 = 0;
         let ok = ReadFile(
             proc.stderr_read,
@@ -478,27 +494,40 @@ mod imp {
         }
     }
 
-    pub unsafe fn proceso_listo_para_leer(handle: *mut c_void, _ms: u32) -> i32 {
+    pub unsafe fn proceso_listo_para_leer(handle: *mut c_void, ms: u32) -> i32 {
         if handle.is_null() {
             return 0;
         }
         let proc = &*(handle as *mut ProcesoBidireccional);
-        let mut bytes_disponibles: u32 = 0;
-        let ok = PeekNamedPipe(
-            proc.stdout_read,
-            ptr::null_mut(),
-            0,
-            ptr::null_mut(),
-            &mut bytes_disponibles,
-            ptr::null_mut(),
-        );
-        if ok == 0 {
-            return 0;
-        }
-        if bytes_disponibles > 0 {
-            1
-        } else {
-            0
+        
+        // Esperar hasta que haya datos o expire el timeout
+        let inicio = std::time::Instant::now();
+        let timeout = std::time::Duration::from_millis(ms as u64);
+        
+        loop {
+            let mut bytes_disponibles: u32 = 0;
+            let ok = PeekNamedPipe(
+                proc.stdout_read,
+                ptr::null_mut(),
+                0,
+                ptr::null_mut(),
+                &mut bytes_disponibles,
+                ptr::null_mut(),
+            );
+            if ok == 0 {
+                return 0; // Error o pipe cerrado
+            }
+            if bytes_disponibles > 0 {
+                return 1; // Hay datos disponibles
+            }
+            
+            // Verificar si expiró el timeout
+            if inicio.elapsed() >= timeout {
+                return 0; // Timeout expirado
+            }
+            
+            // Esperar 10ms antes de reintentar
+            WaitForSingleObject(proc.handle, 10);
         }
     }
 
@@ -761,7 +790,33 @@ mod imp {
             return -1;
         }
         let proc = &*(handle as *mut ProcesoBidireccional);
-        let leidos = read(proc.stdout_read, buf, n as usize);
+        let fd = proc.stdout_read;
+        
+        // Usar select con timeout de 100ms para no bloquear indefinidamente
+        let mut readfds = FdSet { fds_bits: [0; 16] };
+        let idx = fd as usize / 64;
+        let bit = fd as usize % 64;
+        if idx < 16 {
+            readfds.fds_bits[idx] = 1 << bit;
+        }
+        
+        // Timeout de 100ms
+        let mut timeout: [i64; 2] = [0, 100_000]; // 0 sec, 100000 usec = 100ms
+        
+        let result = select(
+            fd + 1,
+            &mut readfds as *mut FdSet as *mut c_void,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            timeout.as_mut_ptr() as *mut c_void,
+        );
+        
+        if result <= 0 {
+            // Timeout o error — no hay datos disponibles
+            return 0;
+        }
+        
+        let leidos = read(fd, buf, n as usize);
         if leidos <= 0 {
             return 0; // EOF o error
         }
@@ -773,7 +828,33 @@ mod imp {
             return -1;
         }
         let proc = &*(handle as *mut ProcesoBidireccional);
-        let leidos = read(proc.stderr_read, buf, n as usize);
+        let fd = proc.stderr_read;
+        
+        // Usar select con timeout de 100ms para no bloquear indefinidamente
+        let mut readfds = FdSet { fds_bits: [0; 16] };
+        let idx = fd as usize / 64;
+        let bit = fd as usize % 64;
+        if idx < 16 {
+            readfds.fds_bits[idx] = 1 << bit;
+        }
+        
+        // Timeout de 100ms
+        let mut timeout: [i64; 2] = [0, 100_000]; // 0 sec, 100000 usec = 100ms
+        
+        let result = select(
+            fd + 1,
+            &mut readfds as *mut FdSet as *mut c_void,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            timeout.as_mut_ptr() as *mut c_void,
+        );
+        
+        if result <= 0 {
+            // Timeout o error — no hay datos disponibles
+            return 0;
+        }
+        
+        let leidos = read(fd, buf, n as usize);
         if leidos <= 0 {
             return 0; // EOF o error
         }

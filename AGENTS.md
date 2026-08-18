@@ -270,6 +270,138 @@ pruebas/unitest/
 - [ ] **Criterio:** suite completa verde, sin regresiones en 54/54 tests existentes ✅, ESPECIFICACIONES.md sin casos 🟡 abiertos (todos resueltos o con tarea) — ✅ 4/4 cerrados con decisión escrita
 - [ ] *Bloqueante:* Cid Fase 2 (loop agente con JSON trees) necesita confianza en mutabilidad y memoria
 
+### R7.8 — Primitivas nativas para Cid (2026-08-18)
+> **Objetivo:** 20 primitivas nativas que desbloquean Cid completo (MCP, HTTP, TUI, sesiones).
+> **Decisión de diseño:** modularización por dominio para evitar archivos >500 LOC.
+
+#### Estrategia de modularización
+```
+lib/falcato_runtime/src/
+├── texto_dinamico.rs      # Strings dinámicos (P0-A: 4 funciones)
+├── conversion_numerica.rs # Número↔texto (P0-B: 3 funciones)
+├── archivo_avanzado.rs    # Archivos + entorno (P1: 8 funciones)
+├── tls.rs                 # TLS/HTTPS schannel (P2: ~500 LOC)
+├── proceso.rs             # Ya existe — añadir fixes (P0-C: 3 fixes)
+└── tcp_cliente.rs         # Ya existe — añadir timeout (P0-C: 1 fix)
+```
+**Regla:** cada módulo ≤500 LOC. Si crece, dividir por subdominio.
+
+#### FASE 1: P0-C — Fixes críticos (bloquea MCP)
+> **Prioridad MÁXIMA** — sin estos fixes, MCP servers cuelgan.
+
+| # | Función | Bug actual | Fix | Complejidad |
+|---|---------|-----------|-----|-------------|
+| 1 | `proceso_listo_para_leer` | Ignora timeout (`_ms`), PeekNamedPipe una vez | Loop con `WaitForSingleObject` + `PeekNamedPipe` cada 10ms | 🟢 Baja |
+| 2 | `proceso_leer_salida_chunk` | ReadFile bloqueante sin timeout | `WaitForSingleObject(pipe, timeout)` antes de `ReadFile` | 🟢 Baja |
+| 3 | `tcp_datos_disponibles` | ioctlsocket una vez, no espera | `select()` con timeout (POSIX) / `WSAPoll` (Windows) | 🟡 Media |
+
+**Criterio:** MCP server responde sin colgar en diálogo JSON-RPC.
+
+#### FASE 2: P0-A — Strings dinámicos (bloquea JSON/HTTP)
+> **Crítico** — sin esto, JSON/HTTP/diff son imposibles.
+
+| # | Función | Firma | Implementación | Complejidad |
+|---|---------|-------|----------------|-------------|
+| 4 | `texto_agregar_texto` | `(Texto, Texto) -> Vacío` | Realloc si `len + frag.len >= cap`, memcpy | 🟢 Baja |
+| 5 | `texto_poner_byte` | `(Texto, Entero32, Entero32) -> Vacío` | Bounds check + `ptr[i] = b` | 🟢 Baja |
+| 6 | `texto_puntero` | `(Texto) -> Entero64` | Retornar `descriptor.ptr` | 🟢 Trivial |
+| 7 | `texto_desde_bytes` | `(Entero64, Entero32) -> Texto` | malloc(n+1), memcpy, construir descriptor | 🟢 Baja |
+
+**Criterio:** `texto_agregar_texto` construye JSON dinámicamente sin leaks.
+
+#### FASE 3: P0-B — Conversión número↔texto
+> Necesita strings dinámicos (Fase 2).
+
+| # | Función | Firma | Implementación | Complejidad |
+|---|---------|-------|----------------|-------------|
+| 8 | `entero_a_texto` | `(Entero64) -> Texto` | `snprintf("%lld")` + `texto_desde_bytes` | 🟢 Baja |
+| 9 | `flotante_a_texto` | `(Flotante64) -> Texto` | `snprintf("%.17g")` + `texto_desde_bytes` | 🟢 Baja |
+| 10 | `booleano_a_texto` | `(Booleano) -> Texto` | `b ? "verdadero" : "falso"` + `texto_desde_bytes` | 🟢 Trivial |
+
+**Criterio:** `entero_a_texto(123)` → `"123"`, `flotante_a_texto(3.14)` → `"3.14"`.
+
+#### FASE 4: P1 — Archivos + entorno (bloquea MCP fs)
+> Desbloquea MCP fs, sesiones, API keys.
+
+| # | Función | Firma | Windows API | POSIX | Complejidad |
+|---|---------|-------|-------------|-------|-------------|
+| 11 | `archivo_agregar` | `(Palabra, Texto) -> Vacío` | `CreateFile(FILE_APPEND_DATA)` | `open(O_APPEND)` + `write` | 🟢 Baja |
+| 12 | `archivo_borrar` | `(Palabra) -> Vacío` | `DeleteFile` | `unlink` | 🟢 Trivial |
+| 13 | `archivo_renombrar` | `(Palabra, Palabra) -> Vacío` | `MoveFile` | `rename` | 🟢 Trivial |
+| 14 | `archivo_listar` | `(Palabra) -> Vector<Texto>` | `FindFirstFile/FindNextFile` | `opendir/readdir` | 🟡 Media |
+| 15 | `archivo_escribir_bytes` | `(Palabra, Entero64, Entero32) -> Vacío` | `CreateFile` + `WriteFile` | `open` + `write` | 🟢 Baja |
+| 16 | `entorno_obtener` | `(Palabra) -> Texto` | `GetEnvironmentVariable` | `getenv` | 🟢 Trivial |
+| 17 | `directorio_actual` | `() -> Texto` | `GetCurrentDirectory` | `getcwd` | 🟢 Trivial |
+| 18 | `aleatorio` | `() -> Entero64` | `rand()` (ya en runtime) | `rand()` | 🟢 Trivial |
+
+**Criterio:** `archivo_listar(".")` lista archivos, `entorno_obtener("PATH")` devuelve PATH.
+
+#### FASE 5: P2 — TUI + HTTPS
+> **Decisión TLS: Opción A — Schannel nativo en runtime**
+
+| # | Función | Firma | Implementación | Complejidad |
+|---|---------|-------|----------------|-------------|
+| 19 | `terminal_dimensiones` | `() -> (Entero32, Entero32)` | `GetConsoleScreenBufferInfo` (Win) / `ioctl(TIOCGWINSZ)` (POSIX) | 🟢 Baja |
+| 20 | **TLS/HTTPS** | — | **Schannel nativo** (ver abajo) | 🔴 Alta |
+
+##### Decisión TLS/HTTPS — Schannel nativo (Opción A)
+**Justificación:**
+- ✅ Más seguro (certs del sistema, sin dependencias externas)
+- ✅ Control total (handshake, ALPN, encrypt/decrypt)
+- ✅ Consistente con filosofía Falcato (todo nativo, sin FFI complejo)
+- ❌ ~500-800 LOC en `tls.rs` (pero modularizable)
+
+**Estructura modular propuesta:**
+```
+lib/falcato_runtime/src/tls.rs          # API pública (50 LOC)
+lib/falcato_runtime/src/tls/
+├── mod.rs                              # Re-exports
+├── schannel_windows.rs                 # Impl Windows (300 LOC)
+├── schannel_posix.rs                   # Impl Linux/macOS (300 LOC)
+└── handshake.rs                        # Lógica común (150 LOC)
+```
+
+**API propuesta:**
+```falcato
+// Conexión HTTPS
+el conn: Entero64 = tls_conectar("api.openai.com", 443);
+// Enviar request
+tls_escribir(conn, "GET / HTTP/1.1\r\nHost: api.openai.com\r\n\r\n");
+// Leer respuesta
+el respuesta: Texto = tls_leer(conn);
+tls_cerrar(conn);
+```
+
+**Criterio:** `tls_conectar("api.openai.com", 443)` conecta exitosamente, handshake TLS 1.2/1.3.
+
+#### Orden de ejecución
+```
+FASE 1 (P0-C): 1-2 horas → MCP servers estables
+FASE 2 (P0-A): 2-3 horas → JSON/HTTP posibles
+FASE 3 (P0-B): 1-2 horas → Serialización completa
+FASE 4 (P1):   3-4 horas → MCP fs, sesiones, API keys
+FASE 5 (P2):   4-6 horas → TUI + HTTPS
+TOTAL: 11-17 horas → Cid completo
+```
+
+#### Notas de seguridad
+- **TLS (Fase 5):** revisión de seguridad crítica antes de mergear (Day-0). Validar certs, evitar MITM, verificar ALPN.
+- **Archivos (Fase 4):** validar rutas (evitar traversal `../`), permisos correctos.
+- **Entorno (Fase 4):** `entorno_obtener` no debe exponer secrets en logs.
+
+#### Estado
+- [x] **FASE 1 (P0-C):** Fixes críticos — ✅ 2026-08-18
+  - [x] `proceso_listo_para_leer`: loop con WaitForSingleObject + PeekNamedPipe cada 10ms (Windows), select con timeout (POSIX)
+  - [x] `proceso_leer_salida_chunk`: WaitForSingleObject(100ms) antes de ReadFile (Windows), select(100ms) antes de read (POSIX)
+  - [x] `tcp_datos_disponibles`: select() con timeout 100ms (Windows y POSIX)
+  - [x] **Criterio verificado:** ejemplo `timeout_fix.fc` demuestra que los timeouts funcionan correctamente
+- [ ] **FASE 2 (P0-A):** Strings dinámicos — 🔴 PENDIENTE
+- [ ] **FASE 3 (P0-B):** Conversión número↔texto — 🔴 PENDIENTE
+- [ ] **FASE 4 (P1):** Archivos + entorno — 🔴 PENDIENTE
+- [ ] **FASE 5 (P2):** TUI + HTTPS — 🔴 PENDIENTE
+
+**Criterio general:** Cid puede usar MCP, HTTP, TUI, sesiones sin workarounds.
+
 ### R7.7 — Aritmética consciente (REDISEÑO — plan aprobado 2026-08-11)
 > La aritmética es de las cosas más importantes: el rediseño NO es parchear bugs, es darle semántica gramatical.
 > **Investigación completa en el diseño (sesión 2026-08-11):** evidencia histórica + estado del arte + propuesta. Resumen abajo.

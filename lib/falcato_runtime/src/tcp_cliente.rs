@@ -67,12 +67,26 @@ mod imp {
         fn inet_addr(cp: *const c_char) -> u32;
         fn setsockopt(s: usize, level: i32, optname: i32, optval: *const u8, optlen: i32) -> i32;
         fn ioctlsocket(s: usize, cmd: i32, argp: *mut u32) -> i32;
+        fn select(
+            nfds: i32,
+            readfds: *mut c_void,
+            writefds: *mut c_void,
+            exceptfds: *mut c_void,
+            timeout: *mut c_void,
+        ) -> i32;
     }
 
     const SOL_SOCKET: i32 = 0xffff;
     const SO_RCVTIMEO: i32 = 0x1006;
     const SO_SNDTIMEO: i32 = 0x1005;
     const FIONREAD: i32 = 0x4004667f;
+
+    // fd_set para Windows (64 sockets max)
+    #[repr(C)]
+    struct FdSet {
+        fd_count: u32,
+        fd_array: [usize; 64],
+    }
 
     extern "C" {
         fn malloc(size: usize) -> *mut c_void;
@@ -196,18 +210,35 @@ mod imp {
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, timeout_ptr, timeout_len);
     }
 
-    /// Verifica si hay datos disponibles para leer sin bloquear.
+    /// Verifica si hay datos disponibles para leer (espera hasta 100ms).
     /// Devuelve 1 si hay datos, 0 si no.
     pub unsafe fn tcp_datos_disponibles(sock: usize) -> i32 {
         if sock == 0 || sock == usize::MAX {
             return 0;
         }
-        let mut bytes_available: u32 = 0;
-        let ret = ioctlsocket(sock, FIONREAD, &mut bytes_available);
-        if ret == 0 && bytes_available > 0 {
-            1
+        
+        // Usar select con timeout de 100ms para esperar datos
+        let mut readfds = FdSet {
+            fd_count: 1,
+            fd_array: [0; 64],
+        };
+        readfds.fd_array[0] = sock;
+        
+        // struct timeval { tv_sec, tv_usec }
+        let mut timeout: [i32; 2] = [0, 100_000]; // 0 sec, 100000 usec = 100ms
+        
+        let result = select(
+            0, // nfds ignorado en Windows
+            &mut readfds as *mut FdSet as *mut c_void,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            timeout.as_mut_ptr() as *mut c_void,
+        );
+        
+        if result > 0 && readfds.fd_count > 0 {
+            1 // Hay datos disponibles
         } else {
-            0
+            0 // Timeout o error
         }
     }
 }
@@ -268,12 +299,25 @@ mod imp {
         fn free(ptr: *mut c_void);
         fn setsockopt(sockfd: i32, level: i32, optname: i32, optval: *const u8, optlen: u32) -> i32;
         fn ioctl(fd: i32, request: u64, argp: *mut u32) -> i32;
+        fn select(
+            nfds: i32,
+            readfds: *mut c_void,
+            writefds: *mut c_void,
+            exceptfds: *mut c_void,
+            timeout: *mut c_void,
+        ) -> i32;
     }
 
     const SOL_SOCKET: i32 = 1;
     const SO_RCVTIMEO: i32 = 20;
     const SO_SNDTIMEO: i32 = 21;
     const FIONREAD: u64 = 0x541b; // Linux
+
+    // fd_set para POSIX (1024 bits = 1024 fds max)
+    #[repr(C)]
+    struct FdSet {
+        fds_bits: [i64; 16],
+    }
 
     pub unsafe fn tcp_conectar(host: *const c_char, puerto: i32) -> i64 {
         if host.is_null() {
@@ -369,19 +413,37 @@ mod imp {
         setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, timeout_ptr, timeout_len);
     }
 
-    /// Verifica si hay datos disponibles para leer sin bloquear.
+    /// Verifica si hay datos disponibles para leer (espera hasta 100ms).
     /// Devuelve 1 si hay datos, 0 si no.
     pub unsafe fn tcp_datos_disponibles(sock: i64) -> i32 {
         if sock <= 0 {
             return 0;
         }
         let s = sock as i32;
-        let mut bytes_available: u32 = 0;
-        let ret = ioctl(s, FIONREAD, &mut bytes_available);
-        if ret == 0 && bytes_available > 0 {
-            1
+        
+        // Usar select con timeout de 100ms para esperar datos
+        let mut readfds = FdSet { fds_bits: [0; 16] };
+        let idx = s as usize / 64;
+        let bit = s as usize % 64;
+        if idx < 16 {
+            readfds.fds_bits[idx] = 1 << bit;
+        }
+        
+        // struct timeval { tv_sec, tv_usec }
+        let mut timeout: [i64; 2] = [0, 100_000]; // 0 sec, 100000 usec = 100ms
+        
+        let result = select(
+            s + 1,
+            &mut readfds as *mut FdSet as *mut c_void,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            timeout.as_mut_ptr() as *mut c_void,
+        );
+        
+        if result > 0 {
+            1 // Hay datos disponibles
         } else {
-            0
+            0 // Timeout o error
         }
     }
 }

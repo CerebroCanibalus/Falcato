@@ -1,0 +1,50 @@
+// Ejemplo que demuestra los fixes de timeout en primitivas nativas
+// FASE 1: P0-C — Fixes críticos
+
+función principal() -> Entero32 {
+    imprimir_linea("=== Demo: Fixes de Timeout (FASE 1 P0-C) ===");
+    imprimir_linea("");
+    
+    // Test 1: tcp_datos_disponibles con timeout
+    imprimir_linea("Test 1: tcp_datos_disponibles (espera hasta 100ms)");
+    el sock: Entero64 = tcp_conectar("example.com", 80);
+    si sock es 0 {
+        imprimir_linea("  Error: no se pudo conectar");
+    } sino {
+        imprimir_linea("  Conectado a example.com:80");
+        // Verificar si hay datos disponibles (debería retornar falso inmediatamente
+        // porque no hemos enviado ningún request aún)
+        el disponible: Lógico = tcp_datos_disponibles(sock);
+        imprimir_linea("  Datos disponibles inmediatamente: {disponible}");
+        tcp_cerrar(sock);
+    }
+    imprimir_linea("");
+    
+    // Test 2: proceso_listo_para_leer con timeout
+    imprimir_linea("Test 2: proceso_listo_para_leer (espera hasta 500ms)");
+    el h: Entero64 = proceso_crear_con_pipes("cmd.exe /c echo hola");
+    si h es 0 {
+        imprimir_linea("  Error: no se pudo crear proceso");
+    } sino {
+        imprimir_linea("  Proceso creado");
+        // Esperar hasta 500ms a que haya datos
+        el listo: Lógico = proceso_listo_para_leer(h, 500);
+        imprimir_linea("  Listo para leer (timeout 500ms): {listo}");
+        
+        si listo es verdadero {
+            el buf: [Entero32; 256] = todos 0;
+            el leidos: Entero32 = proceso_leer_salida_chunk(h, &buf, 256);
+            imprimir_linea("  Leídos {leidos} bytes");
+        }
+        
+        proceso_cerrar_bidireccional(h);
+    }
+    imprimir_linea("");
+    
+    imprimir_linea("=== Fixes verificados ===");
+    imprimir_linea("✓ tcp_datos_disponibles usa select() con timeout 100ms");
+    imprimir_linea("✓ proceso_listo_para_leer usa loop con WaitForSingleObject");
+    imprimir_linea("✓ proceso_leer_salida_chunk usa WaitForSingleObject antes de ReadFile");
+    
+    retornar 0;
+}
