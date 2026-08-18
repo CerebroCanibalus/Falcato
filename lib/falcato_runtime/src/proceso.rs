@@ -5,11 +5,20 @@
 //! API expuesta (C ABI):
 //! - `falcato_proceso_crear(comando) -> Handle`       — lanza el proceso, captura stdout+stderr
 //! - `falcato_proceso_esperar(handle) -> código`      — bloquea hasta terminar, devuelve exit code
-//! - `falcato_proceso_leer_salida(handle) -> Texto*`  — devuelve la salida capturada (heap, caller libera)
+//! - `falcato_proceso_leer_salida_completa(handle) -> Texto*`  — devuelve la salida capturada (heap, caller libera)
 //! - `falcato_proceso_cerrar(handle)`                 — libera el handle
 //!
 //! La salida se captura con un pipe (CreatePipe / pipe()) y un hilo lector
 //! que evita el deadlock cuando el proceso llena el buffer del pipe.
+//!
+//! ## Pipes bidireccionales (para MCP servers y diálogo en vivo)
+//!
+//! - `falcato_proceso_crear_con_pipes(comando) -> Handle` — lanza proceso con stdin/stdout/stderr pipes separados
+//! - `falcato_proceso_escribir(handle, datos, n) -> bytes` — escribe a stdin del proceso
+//! - `falcato_proceso_leer_salida_chunk(handle, buf, n) -> bytes` — lee stdout chunk por chunk (no bloquea hasta EOF)
+//! - `falcato_proceso_leer_error_chunk(handle, buf, n) -> bytes` — lee stderr chunk por chunk
+//! - `falcato_proceso_cerrar_entrada(handle)` — cierra stdin del proceso (envía EOF)
+//! - `falcato_proceso_listo_para_leer(handle, ms) -> bool` — verifica si hay datos disponibles sin bloquear
 
 use std::ffi::c_void;
 
@@ -281,6 +290,237 @@ mod imp {
         }
         drop(proc);
     }
+
+    // ============================================================
+    // Pipes bidireccionales (para MCP servers y diálogo en vivo)
+    // ============================================================
+
+    extern "system" {
+        fn PeekNamedPipe(
+            h_named_pipe: *mut c_void,
+            lp_buffer: *mut c_void,
+            n_buffer_size: u32,
+            lp_bytes_read: *mut u32,
+            lp_total_bytes_available: *mut u32,
+            lp_bytes_left_this_message: *mut u32,
+        ) -> i32;
+        fn WriteFile(
+            h_file: *mut c_void,
+            lp_buffer: *const c_void,
+            n_number_of_bytes_to_write: u32,
+            lp_number_of_bytes_written: *mut u32,
+            lp_overlapped: *mut c_void,
+        ) -> i32;
+    }
+
+    pub struct ProcesoBidireccional {
+        handle: *mut c_void,
+        stdin_write: *mut c_void,
+        stdout_read: *mut c_void,
+        stderr_read: *mut c_void,
+    }
+
+    /// Wrapper Send para mover handles Win32 entre threads.
+    struct HandleSendBid(*mut c_void);
+    unsafe impl Send for HandleSendBid {}
+
+    pub unsafe fn proceso_crear_con_pipes(comando: *const c_char) -> *mut c_void {
+        let comando_bytes = std::ffi::CStr::from_ptr(comando).to_bytes();
+
+        // 1. Crear pipes para stdin, stdout y stderr (heredables por el hijo)
+        let mut read_in: *mut c_void = ptr::null_mut();
+        let mut write_in: *mut c_void = ptr::null_mut();
+        let mut read_out: *mut c_void = ptr::null_mut();
+        let mut write_out: *mut c_void = ptr::null_mut();
+        let mut read_err: *mut c_void = ptr::null_mut();
+        let mut write_err: *mut c_void = ptr::null_mut();
+
+        let mut sa = SECURITY_ATTRIBUTES {
+            n_length: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lp_security_descriptor: ptr::null_mut(),
+            b_inherit_handle: 1,
+        };
+
+        // Pipe stdin (padre escribe, hijo lee)
+        if CreatePipe(&mut read_in, &mut write_in, &mut sa, 0) == 0 {
+            return ptr::null_mut();
+        }
+        // Pipe stdout (hijo escribe, padre lee)
+        if CreatePipe(&mut read_out, &mut write_out, &mut sa, 0) == 0 {
+            CloseHandle(read_in);
+            CloseHandle(write_in);
+            return ptr::null_mut();
+        }
+        // Pipe stderr (hijo escribe, padre lee)
+        if CreatePipe(&mut read_err, &mut write_err, &mut sa, 0) == 0 {
+            CloseHandle(read_in);
+            CloseHandle(write_in);
+            CloseHandle(read_out);
+            CloseHandle(write_out);
+            return ptr::null_mut();
+        }
+
+        // 2. No heredar los lados del padre (solo los del hijo)
+        SetHandleInformation(write_in, HANDLE_FLAG_INHERIT, 0);
+        SetHandleInformation(read_out, HANDLE_FLAG_INHERIT, 0);
+        SetHandleInformation(read_err, HANDLE_FLAG_INHERIT, 0);
+
+        // 3. Configurar STARTUPINFO con stdin/stdout/stderr → pipes
+        let mut si: STARTUPINFO = std::mem::zeroed();
+        si.cb = std::mem::size_of::<STARTUPINFO>() as u32;
+        si.dw_flags = STARTF_USESTDHANDLES;
+        si.h_std_input = read_in;
+        si.h_std_output = write_out;
+        si.h_std_error = write_err;
+
+        let mut pi: PROCESS_INFORMATION = std::mem::zeroed();
+        let mut cmd_utf16 = comando_a_utf16(comando_bytes);
+
+        let ok = CreateProcessW(
+            ptr::null(),
+            cmd_utf16.as_mut_ptr(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            1, // bInheritHandles
+            CREATE_NO_WINDOW,
+            ptr::null_mut(),
+            ptr::null(),
+            &mut si,
+            &mut pi,
+        );
+
+        // Cerrar los lados heredados en el padre (el hijo tiene copias)
+        CloseHandle(read_in);
+        CloseHandle(write_out);
+        CloseHandle(write_err);
+
+        if ok == 0 {
+            CloseHandle(write_in);
+            CloseHandle(read_out);
+            CloseHandle(read_err);
+            return ptr::null_mut();
+        }
+
+        let proc = Box::new(ProcesoBidireccional {
+            handle: pi.h_process,
+            stdin_write: write_in,
+            stdout_read: read_out,
+            stderr_read: read_err,
+        });
+
+        Box::into_raw(proc) as *mut c_void
+    }
+
+    pub unsafe fn proceso_escribir(handle: *mut c_void, datos: *const u8, n: u32) -> i32 {
+        if handle.is_null() || datos.is_null() {
+            return -1;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+        let mut escritos: u32 = 0;
+        let ok = WriteFile(
+            proc.stdin_write,
+            datos as *const c_void,
+            n,
+            &mut escritos,
+            ptr::null_mut(),
+        );
+        if ok == 0 {
+            return -1;
+        }
+        escritos as i32
+    }
+
+    pub unsafe fn proceso_leer_salida_chunk(handle: *mut c_void, buf: *mut u8, n: u32) -> i32 {
+        if handle.is_null() || buf.is_null() {
+            return -1;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+        let mut leidos: u32 = 0;
+        let ok = ReadFile(
+            proc.stdout_read,
+            buf,
+            n,
+            &mut leidos,
+            ptr::null_mut(),
+        );
+        if ok == 0 {
+            return 0; // EOF o error
+        }
+        leidos as i32
+    }
+
+    pub unsafe fn proceso_leer_error_chunk(handle: *mut c_void, buf: *mut u8, n: u32) -> i32 {
+        if handle.is_null() || buf.is_null() {
+            return -1;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+        let mut leidos: u32 = 0;
+        let ok = ReadFile(
+            proc.stderr_read,
+            buf,
+            n,
+            &mut leidos,
+            ptr::null_mut(),
+        );
+        if ok == 0 {
+            return 0; // EOF o error
+        }
+        leidos as i32
+    }
+
+    pub unsafe fn proceso_cerrar_entrada(handle: *mut c_void) {
+        if handle.is_null() {
+            return;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+        if !proc.stdin_write.is_null() {
+            CloseHandle(proc.stdin_write);
+        }
+    }
+
+    pub unsafe fn proceso_listo_para_leer(handle: *mut c_void, _ms: u32) -> i32 {
+        if handle.is_null() {
+            return 0;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+        let mut bytes_disponibles: u32 = 0;
+        let ok = PeekNamedPipe(
+            proc.stdout_read,
+            ptr::null_mut(),
+            0,
+            ptr::null_mut(),
+            &mut bytes_disponibles,
+            ptr::null_mut(),
+        );
+        if ok == 0 {
+            return 0;
+        }
+        if bytes_disponibles > 0 {
+            1
+        } else {
+            0
+        }
+    }
+
+    pub unsafe fn proceso_cerrar_bidireccional(handle: *mut c_void) {
+        if handle.is_null() {
+            return;
+        }
+        let proc = Box::from_raw(handle as *mut ProcesoBidireccional);
+        if !proc.stdin_write.is_null() {
+            CloseHandle(proc.stdin_write);
+        }
+        if !proc.stdout_read.is_null() {
+            CloseHandle(proc.stdout_read);
+        }
+        if !proc.stderr_read.is_null() {
+            CloseHandle(proc.stderr_read);
+        }
+        if !proc.handle.is_null() {
+            CloseHandle(proc.handle);
+        }
+        drop(proc);
+    }
 }
 
 // ============================================================
@@ -406,6 +646,202 @@ mod imp {
             return;
         }
         let _ = Box::from_raw(handle as *mut Proceso);
+    }
+
+    // ============================================================
+    // Pipes bidireccionales (para MCP servers y diálogo en vivo)
+    // ============================================================
+
+    extern "C" {
+        fn write(fd: i32, buf: *const u8, count: usize) -> isize;
+        fn select(nfds: i32, readfds: *mut c_void, writefds: *mut c_void, exceptfds: *mut c_void, timeout: *mut c_void) -> i32;
+    }
+
+    #[repr(C)]
+    struct FdSet {
+        fds_bits: [i64; 16], // 1024 bits = 1024 fds max
+    }
+
+    pub struct ProcesoBidireccional {
+        pid: i32,
+        stdin_write: i32,
+        stdout_read: i32,
+        stderr_read: i32,
+    }
+
+    pub unsafe fn proceso_crear_con_pipes(comando: *const c_char) -> *mut c_void {
+        let comando_str = std::ffi::CStr::from_ptr(comando).to_bytes();
+        let comando_owned = String::from_utf8_lossy(comando_str).to_string();
+
+        // Crear 3 pipes: stdin (padre→hijo), stdout (hijo→padre), stderr (hijo→padre)
+        let mut fds_in: [i32; 2] = [0; 2];
+        let mut fds_out: [i32; 2] = [0; 2];
+        let mut fds_err: [i32; 2] = [0; 2];
+
+        if pipe(fds_in.as_mut_ptr()) != 0 {
+            return ptr::null_mut();
+        }
+        if pipe(fds_out.as_mut_ptr()) != 0 {
+            close(fds_in[0]);
+            close(fds_in[1]);
+            return ptr::null_mut();
+        }
+        if pipe(fds_err.as_mut_ptr()) != 0 {
+            close(fds_in[0]);
+            close(fds_in[1]);
+            close(fds_out[0]);
+            close(fds_out[1]);
+            return ptr::null_mut();
+        }
+
+        let pid = fork();
+        if pid < 0 {
+            close(fds_in[0]);
+            close(fds_in[1]);
+            close(fds_out[0]);
+            close(fds_out[1]);
+            close(fds_err[0]);
+            close(fds_err[1]);
+            return ptr::null_mut();
+        }
+
+        if pid == 0 {
+            // Hijo: redirigir stdin/stdout/stderr
+            close(fds_in[1]);  // cerrar write end de stdin
+            close(fds_out[0]); // cerrar read end de stdout
+            close(fds_err[0]); // cerrar read end de stderr
+
+            dup2(fds_in[0], 0);  // stdin
+            dup2(fds_out[1], 1); // stdout
+            dup2(fds_err[1], 2); // stderr
+
+            close(fds_in[0]);
+            close(fds_out[1]);
+            close(fds_err[1]);
+
+            let sh = b"/bin/sh\0".as_ptr() as *const c_char;
+            let flag = b"-c\0".as_ptr() as *const c_char;
+            let mut cmd_c: Vec<u8> = comando_owned.into_bytes();
+            cmd_c.push(0);
+            let cmd_ptr = cmd_c.as_ptr() as *const c_char;
+            let argv: [*const c_char; 4] = [sh, flag, cmd_ptr, ptr::null()];
+            execvp(sh, argv.as_ptr());
+            std::process::exit(127);
+        }
+
+        // Padre: cerrar los lados heredados
+        close(fds_in[0]);   // cerrar read end de stdin
+        close(fds_out[1]);  // cerrar write end de stdout
+        close(fds_err[1]);  // cerrar write end de stderr
+
+        let proc = Box::new(ProcesoBidireccional {
+            pid,
+            stdin_write: fds_in[1],
+            stdout_read: fds_out[0],
+            stderr_read: fds_err[0],
+        });
+
+        Box::into_raw(proc) as *mut c_void
+    }
+
+    pub unsafe fn proceso_escribir(handle: *mut c_void, datos: *const u8, n: u32) -> i32 {
+        if handle.is_null() || datos.is_null() {
+            return -1;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+        let escritos = write(proc.stdin_write, datos, n as usize);
+        if escritos < 0 {
+            return -1;
+        }
+        escritos as i32
+    }
+
+    pub unsafe fn proceso_leer_salida_chunk(handle: *mut c_void, buf: *mut u8, n: u32) -> i32 {
+        if handle.is_null() || buf.is_null() {
+            return -1;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+        let leidos = read(proc.stdout_read, buf, n as usize);
+        if leidos <= 0 {
+            return 0; // EOF o error
+        }
+        leidos as i32
+    }
+
+    pub unsafe fn proceso_leer_error_chunk(handle: *mut c_void, buf: *mut u8, n: u32) -> i32 {
+        if handle.is_null() || buf.is_null() {
+            return -1;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+        let leidos = read(proc.stderr_read, buf, n as usize);
+        if leidos <= 0 {
+            return 0; // EOF o error
+        }
+        leidos as i32
+    }
+
+    pub unsafe fn proceso_cerrar_entrada(handle: *mut c_void) {
+        if handle.is_null() {
+            return;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+        if proc.stdin_write >= 0 {
+            close(proc.stdin_write);
+        }
+    }
+
+    pub unsafe fn proceso_listo_para_leer(handle: *mut c_void, ms: u32) -> i32 {
+        if handle.is_null() {
+            return 0;
+        }
+        let proc = &*(handle as *mut ProcesoBidireccional);
+
+        // Usar select con timeout
+        let mut readfds = FdSet { fds_bits: [0; 16] };
+        let fd = proc.stdout_read;
+        let idx = fd as usize / 64;
+        let bit = fd as usize % 64;
+        if idx < 16 {
+            readfds.fds_bits[idx] = 1 << bit;
+        }
+
+        // Timeout en microsegundos
+        let mut tv_sec = (ms / 1000) as i64;
+        let mut tv_usec = ((ms % 1000) * 1000) as i64;
+
+        // struct timeval { tv_sec, tv_usec }
+        let mut timeout: [i64; 2] = [tv_sec, tv_usec];
+
+        let result = select(
+            fd + 1,
+            &mut readfds as *mut FdSet as *mut c_void,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            timeout.as_mut_ptr() as *mut c_void,
+        );
+
+        if result > 0 {
+            1
+        } else {
+            0
+        }
+    }
+
+    pub unsafe fn proceso_cerrar_bidireccional(handle: *mut c_void) {
+        if handle.is_null() {
+            return;
+        }
+        let proc = Box::from_raw(handle as *mut ProcesoBidireccional);
+        if proc.stdin_write >= 0 {
+            close(proc.stdin_write);
+        }
+        if proc.stdout_read >= 0 {
+            close(proc.stdout_read);
+        }
+        if proc.stderr_read >= 0 {
+            close(proc.stderr_read);
+        }
+        drop(proc);
     }
 }
 

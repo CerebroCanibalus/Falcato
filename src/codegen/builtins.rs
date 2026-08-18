@@ -2757,6 +2757,210 @@ impl Codegen {
     }
 
     // ============================================================
+    // Proceso bidireccional (pipes para MCP servers)
+    // ============================================================
+
+    /// proceso_crear_con_pipes(comando: Palabra) -> Entero64 (handle, 0 = error)
+    pub(crate) fn builtin_proceso_crear_con_pipes(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let comando = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // falcato_proceso_crear_con_pipes(comando: *const c_char) -> *mut c_void (i64)
+        let fn_id = self.asegurar_funcion_c("falcato_proceso_crear_con_pipes", &[types::I64], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[comando]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// proceso_escribir(handle: Entero64, datos: Palabra, n: Entero32) -> Entero32 (bytes escritos, -1 = error)
+    pub(crate) fn builtin_proceso_escribir(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let datos = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let n = self.compilar_expresion(&argumentos[2], builder, variables)?;
+        // falcato_proceso_escribir(handle: *mut c_void, datos: *const u8, n: u32) -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_proceso_escribir", &[types::I64, types::I64, types::I32], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[handle, datos, n]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// proceso_leer_salida_chunk(handle: Entero64, buf: Entero64, n: Entero32) -> Entero32 (bytes leídos, 0 = EOF)
+    pub(crate) fn builtin_proceso_leer_salida_chunk(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let buf = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let n = self.compilar_expresion(&argumentos[2], builder, variables)?;
+        // falcato_proceso_leer_salida_chunk(handle: *mut c_void, buf: *mut u8, n: u32) -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_proceso_leer_salida_chunk", &[types::I64, types::I64, types::I32], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[handle, buf, n]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// proceso_leer_error_chunk(handle: Entero64, buf: Entero64, n: Entero32) -> Entero32 (bytes leídos, 0 = EOF)
+    pub(crate) fn builtin_proceso_leer_error_chunk(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let buf = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let n = self.compilar_expresion(&argumentos[2], builder, variables)?;
+        // falcato_proceso_leer_error_chunk(handle: *mut c_void, buf: *mut u8, n: u32) -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_proceso_leer_error_chunk", &[types::I64, types::I64, types::I32], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[handle, buf, n]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// proceso_cerrar_entrada(handle: Entero64) — cierra stdin del proceso (envía EOF)
+    pub(crate) fn builtin_proceso_cerrar_entrada(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // falcato_proceso_cerrar_entrada(handle: *mut c_void) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_proceso_cerrar_entrada", &[types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[handle]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// proceso_listo_para_leer(handle: Entero64, ms: Entero32) -> Booleano (1 = hay datos, 0 = no)
+    pub(crate) fn builtin_proceso_listo_para_leer(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let ms = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        // falcato_proceso_listo_para_leer(handle: *mut c_void, ms: u32) -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_proceso_listo_para_leer", &[types::I64, types::I32], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[handle, ms]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// proceso_cerrar_bidireccional(handle: Entero64) — libera el handle bidireccional
+    pub(crate) fn builtin_proceso_cerrar_bidireccional(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let handle = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // falcato_proceso_cerrar_bidireccional(handle: *mut c_void) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_proceso_cerrar_bidireccional", &[types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[handle]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    // ============================================================
+    // TCP Cliente + DNS
+    // ============================================================
+
+    /// tcp_conectar(host: Palabra, puerto: Entero32) -> Entero64 (socket handle, 0 = error)
+    pub(crate) fn builtin_tcp_conectar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let host = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let puerto = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let puerto_i32 = if builder.func.dfg.value_type(puerto) == types::I64 {
+            builder.ins().ireduce(types::I32, puerto)
+        } else {
+            puerto
+        };
+        // falcato_tcp_conectar(host: *const c_char, puerto: i32) -> i64
+        let fn_id = self.asegurar_funcion_c("falcato_tcp_conectar", &[types::I64, types::I32], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[host, puerto_i32]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// dns_resolver(host: Palabra) -> Texto (IP resuelta)
+    pub(crate) fn builtin_dns_resolver(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let host = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // falcato_dns_resolver(host: *const c_char) -> *mut c_char (i64)
+        let fn_id = self.asegurar_funcion_c("falcato_dns_resolver", &[types::I64], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[host]);
+        let ptr = builder.inst_results(call)[0];
+
+        // Construir descriptor Texto desde el puntero C (strlen + malloc + memcpy)
+        let len = self.llamar_strlen(builder, ptr);
+        let uno = builder.ins().iconst(types::I64, 1);
+        let cap = builder.ins().iadd(len, uno);
+
+        let data = self.llamar_malloc(builder, cap);
+        self.llamar_memcpy(builder, data, ptr, cap);
+
+        // Liberar el buffer temporal devuelto por el runtime (malloc'ed)
+        self.llamar_free(builder, ptr);
+
+        let desc = self.descriptor_nuevo(builder);
+        self.guardar_campo_descriptor(builder, desc, Self::OFFSET_PTR, data);
+        self.guardar_campo_descriptor(builder, desc, Self::OFFSET_LEN, len);
+        self.guardar_campo_descriptor(builder, desc, Self::OFFSET_CAP, cap);
+        Ok(desc)
+    }
+
+    /// tcp_establecer_timeout(sock: Entero64, ms: Entero32) — establece timeout de lectura/escritura
+    pub(crate) fn builtin_tcp_establecer_timeout(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let sock = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let ms = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        // falcato_tcp_establecer_timeout(sock: i64, ms: i32) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_tcp_establecer_timeout", &[types::I64, types::I32], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[sock, ms]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// tcp_datos_disponibles(sock: Entero64) -> Booleano (1 = hay datos, 0 = no)
+    pub(crate) fn builtin_tcp_datos_disponibles(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let sock = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // falcato_tcp_datos_disponibles(sock: i64) -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_tcp_datos_disponibles", &[types::I64], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[sock]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    // ============================================================
     // Terminal (R7.2): modo raw + lectura de teclas
     // ============================================================
 

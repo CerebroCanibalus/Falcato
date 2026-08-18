@@ -494,11 +494,11 @@ impl AnalizadorSemantico {
             span: span_vacio.clone(),
             es_publica: true,
         });
-        self.funciones.insert("proceso_leer_salida".to_string(), FirmaFuncion {
-            nombre: "proceso_leer_salida".to_string(),
+        self.funciones.insert("proceso_leer_salida_completa".to_string(), FirmaFuncion {
+            nombre: "proceso_leer_salida_completa".to_string(),
             parametros_genericos: vec![],
             parametros: vec![("handle".to_string(), Tipo::Entero64)],
-            retorno: Some(Tipo::Texto), // salida capturada
+            retorno: Some(Tipo::Texto), // salida capturada (bloquea hasta EOF)
             span: span_vacio.clone(),
             es_publica: true,
         });
@@ -507,6 +507,119 @@ impl AnalizadorSemantico {
             parametros_genericos: vec![],
             parametros: vec![("handle".to_string(), Tipo::Entero64)],
             retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // Proceso bidireccional (pipes para MCP servers)
+        self.funciones.insert("proceso_crear_con_pipes".to_string(), FirmaFuncion {
+            nombre: "proceso_crear_con_pipes".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("comando".to_string(), Tipo::Palabra)],
+            retorno: Some(Tipo::Entero64), // handle (0 = error)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_escribir".to_string(), FirmaFuncion {
+            nombre: "proceso_escribir".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("handle".to_string(), Tipo::Entero64),
+                ("datos".to_string(), Tipo::Entero64), // puntero a datos
+                ("n".to_string(), Tipo::Entero32),     // número de bytes
+            ],
+            retorno: Some(Tipo::Entero32), // bytes escritos (-1 = error)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_leer_salida_chunk".to_string(), FirmaFuncion {
+            nombre: "proceso_leer_salida_chunk".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("handle".to_string(), Tipo::Entero64),
+                ("buf".to_string(), Tipo::Entero64), // puntero a buffer
+                ("n".to_string(), Tipo::Entero32),   // capacidad del buffer
+            ],
+            retorno: Some(Tipo::Entero32), // bytes leídos (0 = EOF)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_leer_error_chunk".to_string(), FirmaFuncion {
+            nombre: "proceso_leer_error_chunk".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("handle".to_string(), Tipo::Entero64),
+                ("buf".to_string(), Tipo::Entero64), // puntero a buffer
+                ("n".to_string(), Tipo::Entero32),   // capacidad del buffer
+            ],
+            retorno: Some(Tipo::Entero32), // bytes leídos (0 = EOF)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_cerrar_entrada".to_string(), FirmaFuncion {
+            nombre: "proceso_cerrar_entrada".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("handle".to_string(), Tipo::Entero64)],
+            retorno: Some(vacio.clone()), // cierra stdin (envía EOF)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_listo_para_leer".to_string(), FirmaFuncion {
+            nombre: "proceso_listo_para_leer".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("handle".to_string(), Tipo::Entero64),
+                ("ms".to_string(), Tipo::Entero32), // timeout en milisegundos
+            ],
+            retorno: Some(Tipo::Booleano), // 1 = hay datos, 0 = no
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_cerrar_bidireccional".to_string(), FirmaFuncion {
+            nombre: "proceso_cerrar_bidireccional".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("handle".to_string(), Tipo::Entero64)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // TCP Cliente + DNS
+        self.funciones.insert("tcp_conectar".to_string(), FirmaFuncion {
+            nombre: "tcp_conectar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("host".to_string(), Tipo::Palabra),
+                ("puerto".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Entero64), // socket handle (0 = error)
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("dns_resolver".to_string(), FirmaFuncion {
+            nombre: "dns_resolver".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("host".to_string(), Tipo::Palabra)],
+            retorno: Some(Tipo::Texto), // IP resuelta
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("tcp_establecer_timeout".to_string(), FirmaFuncion {
+            nombre: "tcp_establecer_timeout".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("sock".to_string(), Tipo::Entero64),
+                ("ms".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("tcp_datos_disponibles".to_string(), FirmaFuncion {
+            nombre: "tcp_datos_disponibles".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("sock".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Booleano), // 1 = hay datos, 0 = no
             span: span_vacio.clone(),
             es_publica: true,
         });

@@ -21,6 +21,7 @@ mod tiempo;
 mod dht;
 mod argumentos;
 mod convertir;
+mod tcp_cliente;
 
 use std::ffi::c_void;
 
@@ -129,6 +130,54 @@ pub unsafe extern "C" fn falcato_proceso_cerrar(handle: *mut c_void) {
 }
 
 // ============================================================
+// Proceso API bidireccional — pipes para diálogo en vivo (MCP servers)
+// ============================================================
+
+/// Lanza un proceso con stdin/stdout/stderr pipes separados para diálogo en vivo.
+/// Devuelve un Handle opaco o NULL si falla.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_crear_con_pipes(comando: *const i8) -> *mut c_void {
+    proceso::proceso_crear_con_pipes(comando as *const std::ffi::c_char)
+}
+
+/// Escribe datos a stdin del proceso. Devuelve bytes escritos o -1 si error.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_escribir(handle: *mut c_void, datos: *const u8, n: u32) -> i32 {
+    proceso::proceso_escribir(handle, datos, n)
+}
+
+/// Lee stdout del proceso chunk por chunk (no bloquea hasta EOF). Devuelve bytes leídos o 0 si EOF.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_leer_salida_chunk(handle: *mut c_void, buf: *mut u8, n: u32) -> i32 {
+    proceso::proceso_leer_salida_chunk(handle, buf, n)
+}
+
+/// Lee stderr del proceso chunk por chunk. Devuelve bytes leídos o 0 si EOF.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_leer_error_chunk(handle: *mut c_void, buf: *mut u8, n: u32) -> i32 {
+    proceso::proceso_leer_error_chunk(handle, buf, n)
+}
+
+/// Cierra stdin del proceso (envía EOF al hijo).
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_cerrar_entrada(handle: *mut c_void) {
+    proceso::proceso_cerrar_entrada(handle)
+}
+
+/// Verifica si hay datos disponibles en stdout sin bloquear. Devuelve 1 si hay datos, 0 si no.
+/// El parámetro `ms` es el timeout para esperar (0 = no bloquear).
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_listo_para_leer(handle: *mut c_void, ms: u32) -> i32 {
+    proceso::proceso_listo_para_leer(handle, ms)
+}
+
+/// Libera el handle del proceso bidireccional (cierra todos los pipes).
+#[no_mangle]
+pub unsafe extern "C" fn falcato_proceso_cerrar_bidireccional(handle: *mut c_void) {
+    proceso::proceso_cerrar_bidireccional(handle)
+}
+
+// ============================================================
 // Terminal API — modo raw y lectura de teclas (TUI)
 // ============================================================
 
@@ -232,4 +281,54 @@ pub unsafe extern "C" fn falcato_dht_bootstrap(
 #[no_mangle]
 pub unsafe extern "C" fn falcato_dht_cerrar(handle: *mut c_void) {
     dht::dht_cerrar(handle);
+}
+
+// ============================================================
+// TCP Cliente + DNS — conexión a servidores y resolución de nombres
+// ============================================================
+
+/// Conecta a host:puerto. host puede ser IP ("127.0.0.1") o nombre ("example.com").
+/// Devuelve socket handle o 0 si falla.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_tcp_conectar(host: *const i8, puerto: i32) -> i64 {
+    #[cfg(target_os = "windows")]
+    {
+        tcp_cliente::tcp_conectar(host as *const std::ffi::c_char, puerto) as i64
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        tcp_cliente::tcp_conectar(host as *const std::ffi::c_char, puerto)
+    }
+}
+
+/// Resuelve nombre de host a IP (string). Devuelve buffer malloc'ed (caller libera) o NULL.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_dns_resolver(host: *const i8) -> *mut i8 {
+    tcp_cliente::dns_resolver(host as *const std::ffi::c_char) as *mut i8
+}
+
+/// Establece timeout de lectura/escritura en milisegundos.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_tcp_establecer_timeout(sock: i64, ms: i32) {
+    #[cfg(target_os = "windows")]
+    {
+        tcp_cliente::tcp_establecer_timeout(sock as usize, ms)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        tcp_cliente::tcp_establecer_timeout(sock, ms)
+    }
+}
+
+/// Verifica si hay datos disponibles para leer sin bloquear. Devuelve 1 si hay datos, 0 si no.
+#[no_mangle]
+pub unsafe extern "C" fn falcato_tcp_datos_disponibles(sock: i64) -> i32 {
+    #[cfg(target_os = "windows")]
+    {
+        tcp_cliente::tcp_datos_disponibles(sock as usize)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        tcp_cliente::tcp_datos_disponibles(sock)
+    }
 }

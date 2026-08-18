@@ -1,0 +1,31 @@
+// Ejemplo de TCP cliente + DNS
+// Demuestra conexión a un servidor HTTP y resolución de nombres
+
+función principal() -> Entero32 {
+    // 1. Resolver DNS
+    imprimir_linea("Resolviendo DNS para example.com...");
+    el ip: Texto = dns_resolver("example.com");
+    el ip_len: Entero32 = texto_longitud(ip);
+    si ip_len es 0 {
+        imprimir_linea("Error: no se pudo resolver DNS");
+        retornar 1;
+    }
+    imprimir("IP resuelta: ");
+    imprimir_linea(ip);
+    texto_liberar(ip);
+
+    // 2. Conectar a example.com:80 (HTTP)
+    imprimir_linea("Conectando a example.com:80...");
+    el sock: Entero64 = tcp_conectar("example.com", 80);
+    si sock es 0 {
+        imprimir_linea("Error: no se pudo conectar");
+        retornar 1;
+    }
+    imprimir_linea("Conectado exitosamente");
+
+    // 3. Cerrar socket
+    tcp_cerrar(sock);
+
+    imprimir_linea("Conexión cerrada");
+    retornar 0;
+}

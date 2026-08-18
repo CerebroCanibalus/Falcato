@@ -421,7 +421,7 @@ Ecosistema estilo crates.io pero **sin registry central**: contenido por hash, �
 | GitHub Actions Release | ✅ **cargo-dist** genera MSI + tarballs + shell/powershell installers |
 | VS Code Extension | ✅ VSIX, tema Falcato Dorado |
 | LSP en agentes (OpenCode) | ✅ 6 features, integrado, verificado |
-| Platform Layer (Linux/macOS) | ✅ Diseñado + implementado, **no testeado** |
+| Platform Layer (Linux/macOS) | 🟡 Diseñado + implementado, **19 fallos en macOS** (Issue #5) |
 | Falso positivo Defender | ⚠️ Sin firma digital — requiere Azure Trusted Signing |
 | `falcato setup` | ✅ VSIX + agentes/skills desde CLI |
 
@@ -530,6 +530,82 @@ Auditoría completa en cada release mayor (v0.5.0, v0.6.0…). Semáforo: 🟢 c
 - **Los 3 pendientes post-R7.7 (break, notación científica, impresión flotante) RESUELTOS 2026-08-11**: `romper`/`continuar` + regex `[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?` + `FlotanteExponente` (`1e3`) + `%.17g` en los 2 caminos de impresión flotante. Suite 16/16 GREEN + 54/54 tests + 68/75 ejemplos. **Lección:** el formato `%.17g` no es solo precisión — da notación científica en la SALIDA (`3.5422368558580461e+22`), perfecto para física/DSP.
 - **F2 `un` — el codegen NUNCA ve el Option sin fix (2026-08-11)**: `un x = 40 + 2` sin tipo explícito → `inferir_tipo` del codegen devuelve `Entero32` (Binaria => Entero32 simplificado) → slot de 4 bytes → guarda el valor CRUDO (sin empaquetar Algo) → EsVariante lee tag de memoria inválida → 0xC0000005. Fix: en `DeclaracionVariable` del codegen, si artículo `Un` + valor Binaria aritmética + sin tipo explícito → forzar `Tipo::Option(inferir_tipo(izq))` ANTES del match de slot. **Lección:** el artículo codifica semántica que el codegen DEBE re-aplicar — no puede confiar solo en `inferir_tipo` (que ignora el artículo).
 - **F2 `un` — pattern matching requiere `Option.Algo` (no `Algo` a secas) (2026-08-11)**: `si x es Algo` no parsea (el parser de condicionales espera `Enum.Variante`). Usar `si x es Option.Algo` (consistente con `Resultado.Exito`). El binding `como v` en `si` NO está implementado (se ignora `_binding`) — usar `el v: T = x?;` dentro del bloque. **Lección:** el binding de variante solo existe en `coincidir`, no en `si es`.
+
+---
+
+## 🔴 Issue #5 — macOS: Diagnóstico completo (2026-08-16)
+> **Reporte:** sebastiankmilo — MacBook Pro M1, macOS Tahoe 26.5.2. Compiló 76 ejemplos, 67 generaron binario, **19 fallan al ejecutar** (10 crash SIGSEGV, 5 colgados, 3 salida basura, 1 incoherente). 48 OK. Referencia: `github.com/CerebroCanibalus/falcato/issues/5`
+
+### Causa de fondo (única)
+La capa macOS fue **copiada de Linux sin verificar constantes, tamaños ni llamadas al sistema**. Nadie ejecutó en un Mac real hasta este issue. Los 3 pilares rotos:
+
+| Capa | Archivo | Bug | Efecto |
+|------|---------|-----|--------|
+| **A (Runtime)** | `lib/falcato_runtime/src/platform.rs:107` | `PTHREAD_MUTEX_SIZE=40` (glibc Linux) → macOS necesita **64** | Heap overflow en todo canal/executor |
+| **B (Codegen)** | `src/platform/macos.rs:65` | `CLOCK_MONOTONIC=1` (Linux) → macOS necesita **6** | Timestamp basura → futuros nunca expiran |
+| **C (Registry)** | `src/platform/registry.rs:264` | `"sleep"→nanosleep` firma `(I64,I64)` pero se llama con 1 arg I32 | Verifier error / no duerme |
+
+### Los 19 fallos por grupo
+
+#### GROUP A — Texto / Interpolación (4 crashes)
+**Ejemplos:** `interpolacion`, `texto_ops`, `bitwise_metodos`, `closures`
+- **Mecanismo:** todos imprimen con `printf`/`puts` usando **strings literales globales** (`Linkage::Local`). En Mach-O arm64 PIC, `global_value` genera relocaciones `PAGE21/PAGEOFF12` contra símbolos locales — si ld64 no los resuelve → puntero basura → `puts(0xDEADBEEF)` → SIGSEGV.
+- **Causa adicional en `closures.fc`:** la interpolación `{resultado}` justo después del `call_indirect` amplifica el problema de globales.
+
+#### GROUP B — Crashes sueltos (6 SIGSEGV)
+**Ejemplos:** `apodo_tipos`, `match_simple`, `tamano_de`, `rangos`, `bitfields`, `calculadora`
+- **Mecanismo mixto:** CR-1 (linkeo sin runtime) + CR-3 (globales Mach-O). Todos usan `imprimir` con strings literales que dependen de globales. Hipótesis: si `hola.fc` (1 global) funciona pero estos (2+ globales) crashean, el problema es la resolución de símbolos locales en Mach-O.
+
+#### GROUP C — Async colgado (5 hangs)
+**Ejemplos:** `futuro_simple`, `cancelar_simple`, `seleccionar_simple`, `select_simple`, `productor_consumidor`
+- **3 bugs encadenados:**
+  1. `CLOCK_MONOTONIC=1` → `clock_gettime(1)` → EINVAL → timestamp basura → `now >= never` → poll retorna 0 para siempre
+  2. `nanosleep` firma rota → sleep no funciona → loop al 100% CPU
+  3. `PTHREAD_MUTEX_SIZE=40` → heap overflow en canales → semáforos corruptos → waiters nunca despiertan
+- **Cadena típica:** `esperar(futuro)` → wrapper sync → `while __poll(ptr) == 0 { dormir(1) }` → poll nunca avanza + dormir no funciona → loop infinito.
+
+#### GROUP D — Argumentos tipados (1 basura)
+**Ejemplo:** `argumentos_tipados` — imprime punteros basura en vez de "¡Hola, sebas!"
+- **Mecanismo:** `argumentos()` en POSIX usa `_NSGetArgc()`/`_NSGetArgv()`. El linker POSIX no genera trampolín `_main`, así que `argc`/`argv` nunca llegan a la función → lee basura de registros.
+
+#### GROUP E — Archivo I/O (1 incoherente)
+**Ejemplo:** `archivo_io` — reporta 2422080 bytes escritos
+- **Mecanismo:** `archivo_escribir` probablemente llama a `write()` con firma C mal declarada en macOS → el valor retornado es basura del stack o resultado de una POSIX distinta.
+
+### Causas raíz detalladas
+
+| ID | Severidad | Bug | Archivos | Afecta |
+|----|-----------|-----|----------|--------|
+| CR-1 | 🔴 CRÍTICA | Linkeo POSIX sin runtime/entry point (`link_objetos` branch no-Windows no pasa runtime, `-lm`, ni genera trampolín `_main`) | `main.rs:1123-1138` | Todos los 19 |
+| CR-2 | 🔴 CRÍTICA | `CallConv::SystemV` en macOS ARM64 (debería ser `AppleAarch64`) → printf variádica lee registros FP no inicializados | `macos.rs:38-40` | Printf basura en floats |
+| CR-3 | 🔴 CRÍTICA | Globales `Linkage::Local` en Mach-O PIC → relocaciones no resueltas → punteros basura | `builtins.rs:790-826`, `expresiones.rs:141-169` | 10+ crashes |
+| CR-4 | 🔴 CRÍTICA | `PTHREAD_MUTEX_SIZE=40` (glibc) en macOS (64 bytes) → heap buffer overflow en canales/executor | `platform.rs:107-110` | 5 hangs + crashes |
+| CR-5 | 🔴 CRÍTICA | `CLOCK_MONOTONIC=1` (Linux) en macOS (=6) → timestamp basura → poll eterno | `macos.rs:65` | 5 hangs |
+| CR-6 | 🟠 ALTA | `"sleep"→nanosleep` firma `(I64,I64)` pero se llama con 1 arg I32 → verifier error o no duerme | `registry.rs:264` | 5 hangs |
+| CR-7 | 🟠 ALTA | Printf declarada `(I64,I64)→I32` no-variádica + bitcast doubles a I64 → flotantes por GPR en vez de FP regs | `builtins.rs:117-128` | Flotantes basura (latente) |
+| CR-8 | 🟡 MEDIA | Closures `call_indirect` usa firma I32 fija, no tipo real → mismatch ABI para tipos ≠ Entero32 | `expresiones.rs:1177-1183` | Closures con Texto/Entero64 |
+| CR-9 | 🟡 MEDIA | `canal_cerrar` destruye semáforos con threads en espera → use-after-free de `sem_t` | `canal.rs:173-181` | Shutdown async |
+| CR-10 | 🟡 MEDIA | `falcato_executor_close` hace `pthread_join` infinito sin timeout | `executor.rs:245-248` | Hang en cierre executor |
+
+### Plan de corrección (orden de impacto)
+
+**Fase 1 — Desbloquear binarios (sin esto nada corre):**
+1. Fix linker POSIX: pasar runtime + `-lm -lpthread` + generar trampolín `_main` (CR-1)
+2. Fix `CLOCK_MONOTONIC` → 6 en macOS (CR-5)
+3. Fix `PTHREAD_MUTEX_SIZE` → 64 en macOS (CR-4)
+
+**Fase 2 — Fix stdio (10+ crashes):**
+4. Fix globales Mach-O: `Linkage::Preemptible` o strings en sección `__TEXT,__cstring` (CR-3)
+5. Fix `CallConv::AppleAarch64` en macOS ARM64 (CR-2)
+
+**Fase 3 — Fix async (5 hangs):**
+6. Fix `nanosleep` → `usleep` (como Linux) o declarar bien la firma (CR-6)
+7. Fix `canal_cerrar` para despertar waiters antes de destruir (CR-9)
+
+**Fase 4 — Fix menores (3 fallos):**
+8. Fix printf variádica (bitcast doubles → F64 real) (CR-7)
+9. Fix closures firma (I32 fijo → tipo real) (CR-8)
+10. Fix archivo_io (revisar firma POSIX de `write`) (CR-10)
 
 ---
 

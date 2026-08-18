@@ -20,6 +20,7 @@ pub mod builtins;
 pub mod expresiones;
 pub mod funciones;
 pub mod generics;
+pub mod math;
 pub mod sentencias;
 pub mod tipos;
 

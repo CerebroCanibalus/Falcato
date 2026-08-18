@@ -1269,7 +1269,11 @@ impl Codegen {
             "conjunto_eliminar" | "conjunto_longitud" | "conjunto_liberar" |
             "tcp_vincular" | "tcp_aceptar" | "tcp_leer" | "tcp_escribir" | "tcp_cerrar" |
             "canal_nuevo" | "canal_enviar" | "canal_recibir" | "canal_cerrar" | "canal_intentar" |
-            "proceso_crear" | "proceso_esperar" | "proceso_leer_salida" | "proceso_cerrar" |
+            "proceso_crear" | "proceso_esperar" | "proceso_leer_salida_completa" | "proceso_cerrar" |
+            "proceso_crear_con_pipes" | "proceso_escribir" | "proceso_leer_salida_chunk" |
+            "proceso_leer_error_chunk" | "proceso_cerrar_entrada" | "proceso_listo_para_leer" |
+            "proceso_cerrar_bidireccional" |
+            "tcp_conectar" | "dns_resolver" | "tcp_establecer_timeout" | "tcp_datos_disponibles" |
             "terminal_modo_raw" | "terminal_leer_tecla" |
             "entrada_leer" |
             "argumentos" |
@@ -1372,8 +1376,19 @@ impl Codegen {
             "canal_intentar" => self.builtin_canal_intentar(builder, variables, &llamada.argumentos),
             "proceso_crear" => self.builtin_proceso_crear(builder, variables, &llamada.argumentos),
             "proceso_esperar" => self.builtin_proceso_esperar(builder, variables, &llamada.argumentos),
-            "proceso_leer_salida" => self.builtin_proceso_leer_salida(builder, variables, &llamada.argumentos),
+            "proceso_leer_salida_completa" => self.builtin_proceso_leer_salida(builder, variables, &llamada.argumentos),
             "proceso_cerrar" => self.builtin_proceso_cerrar(builder, variables, &llamada.argumentos),
+            "proceso_crear_con_pipes" => self.builtin_proceso_crear_con_pipes(builder, variables, &llamada.argumentos),
+            "proceso_escribir" => self.builtin_proceso_escribir(builder, variables, &llamada.argumentos),
+            "proceso_leer_salida_chunk" => self.builtin_proceso_leer_salida_chunk(builder, variables, &llamada.argumentos),
+            "proceso_leer_error_chunk" => self.builtin_proceso_leer_error_chunk(builder, variables, &llamada.argumentos),
+            "proceso_cerrar_entrada" => self.builtin_proceso_cerrar_entrada(builder, variables, &llamada.argumentos),
+            "proceso_listo_para_leer" => self.builtin_proceso_listo_para_leer(builder, variables, &llamada.argumentos),
+            "proceso_cerrar_bidireccional" => self.builtin_proceso_cerrar_bidireccional(builder, variables, &llamada.argumentos),
+            "tcp_conectar" => self.builtin_tcp_conectar(builder, variables, &llamada.argumentos),
+            "dns_resolver" => self.builtin_dns_resolver(builder, variables, &llamada.argumentos),
+            "tcp_establecer_timeout" => self.builtin_tcp_establecer_timeout(builder, variables, &llamada.argumentos),
+            "tcp_datos_disponibles" => self.builtin_tcp_datos_disponibles(builder, variables, &llamada.argumentos),
             "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
             "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
             "entrada_leer" => self.builtin_entrada_leer(builder, variables, &llamada.argumentos),

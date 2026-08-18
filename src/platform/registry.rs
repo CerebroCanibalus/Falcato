@@ -107,8 +107,17 @@ impl BuiltinRegistry {
         r.insert("exit_process", "ExitProcess", &[types::I32], None);
         r.insert("proceso_crear", "falcato_proceso_crear", &[types::I64], Some(types::I64));
         r.insert("proceso_esperar", "falcato_proceso_esperar", &[types::I64], Some(types::I32));
-        r.insert("proceso_leer_salida", "falcato_proceso_leer_salida", &[types::I64], Some(types::I64));
+        r.insert("proceso_leer_salida_completa", "falcato_proceso_leer_salida", &[types::I64], Some(types::I64));
         r.insert("proceso_cerrar", "falcato_proceso_cerrar", &[types::I64], None);
+
+        // Proceso bidireccional (pipes para MCP servers)
+        r.insert("proceso_crear_con_pipes", "falcato_proceso_crear_con_pipes", &[types::I64], Some(types::I64));
+        r.insert("proceso_escribir", "falcato_proceso_escribir", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("proceso_leer_salida_chunk", "falcato_proceso_leer_salida_chunk", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("proceso_leer_error_chunk", "falcato_proceso_leer_error_chunk", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("proceso_cerrar_entrada", "falcato_proceso_cerrar_entrada", &[types::I64], None);
+        r.insert("proceso_listo_para_leer", "falcato_proceso_listo_para_leer", &[types::I64, types::I32], Some(types::I32));
+        r.insert("proceso_cerrar_bidireccional", "falcato_proceso_cerrar_bidireccional", &[types::I64], None);
 
         // Terminal (R7.2): modo raw + lectura de teclas
         r.insert("terminal_modo_raw", "falcato_terminal_modo_raw", &[types::I32], Some(types::I32));
@@ -154,6 +163,12 @@ impl BuiltinRegistry {
             &[types::I64, types::I64, types::I32, types::I32], Some(types::I32));
         r.insert("close_socket", "closesocket",
             &[types::I64], Some(types::I32));
+
+        // TCP Cliente + DNS
+        r.insert("tcp_conectar", "falcato_tcp_conectar", &[types::I64, types::I32], Some(types::I64));
+        r.insert("dns_resolver", "falcato_dns_resolver", &[types::I64], Some(types::I64));
+        r.insert("tcp_establecer_timeout", "falcato_tcp_establecer_timeout", &[types::I64, types::I32], None);
+        r.insert("tcp_datos_disponibles", "falcato_tcp_datos_disponibles", &[types::I64], Some(types::I32));
 
         r
     }
@@ -205,8 +220,17 @@ impl BuiltinRegistry {
         r.insert("exit_process", "_exit", &[types::I32], None);
         r.insert("proceso_crear", "falcato_proceso_crear", &[types::I64], Some(types::I64));
         r.insert("proceso_esperar", "falcato_proceso_esperar", &[types::I64], Some(types::I32));
-        r.insert("proceso_leer_salida", "falcato_proceso_leer_salida", &[types::I64], Some(types::I64));
+        r.insert("proceso_leer_salida_completa", "falcato_proceso_leer_salida", &[types::I64], Some(types::I64));
         r.insert("proceso_cerrar", "falcato_proceso_cerrar", &[types::I64], None);
+
+        // Proceso bidireccional (pipes para MCP servers)
+        r.insert("proceso_crear_con_pipes", "falcato_proceso_crear_con_pipes", &[types::I64], Some(types::I64));
+        r.insert("proceso_escribir", "falcato_proceso_escribir", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("proceso_leer_salida_chunk", "falcato_proceso_leer_salida_chunk", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("proceso_leer_error_chunk", "falcato_proceso_leer_error_chunk", &[types::I64, types::I64, types::I32], Some(types::I32));
+        r.insert("proceso_cerrar_entrada", "falcato_proceso_cerrar_entrada", &[types::I64], None);
+        r.insert("proceso_listo_para_leer", "falcato_proceso_listo_para_leer", &[types::I64, types::I32], Some(types::I32));
+        r.insert("proceso_cerrar_bidireccional", "falcato_proceso_cerrar_bidireccional", &[types::I64], None);
 
         // Terminal (R7.2): modo raw + lectura de teclas
         r.insert("terminal_modo_raw", "falcato_terminal_modo_raw", &[types::I32], Some(types::I32));
@@ -250,6 +274,12 @@ impl BuiltinRegistry {
             &[types::I64, types::I64, types::I32, types::I32], Some(types::I32));
         r.insert("close_socket", "close",
             &[types::I64], Some(types::I32));
+
+        // TCP Cliente + DNS
+        r.insert("tcp_conectar", "falcato_tcp_conectar", &[types::I64, types::I32], Some(types::I64));
+        r.insert("dns_resolver", "falcato_dns_resolver", &[types::I64], Some(types::I64));
+        r.insert("tcp_establecer_timeout", "falcato_tcp_establecer_timeout", &[types::I64, types::I32], None);
+        r.insert("tcp_datos_disponibles", "falcato_tcp_datos_disponibles", &[types::I64], Some(types::I32));
 
         r
     }

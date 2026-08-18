@@ -1,0 +1,33 @@
+// Ejemplo de pipes bidireccionales (para MCP servers y diálogo en vivo)
+// Demuestra comunicación en vivo con un proceso hijo
+
+función principal() -> Entero32 {
+    // Crear proceso con pipes bidireccionales
+    el h: Entero64 = proceso_crear_con_pipes("echo hola desde hijo");
+    si h es 0 {
+        imprimir_linea("Error: no se pudo crear el proceso");
+        retornar 1;
+    }
+
+    // Leer salida chunk por chunk (no bloquea hasta EOF)
+    el buf: [Entero32; 256] = todos 0;
+    el total: Entero32 = 0;
+    
+    // Esperar a que haya datos disponibles (timeout 1000ms)
+    mientras proceso_listo_para_leer(h, 1000) {
+        el leidos: Entero32 = proceso_leer_salida_chunk(h, &buf, 256);
+        si leidos == 0 {
+            romper; // EOF
+        }
+        total = total + leidos;
+        imprimir("Leídos {leidos} bytes. ");
+    }
+
+    imprimir_linea("");
+    imprimir_linea("Total: {total} bytes");
+
+    // Cerrar el proceso bidireccional
+    proceso_cerrar_bidireccional(h);
+    
+    retornar 0;
+}

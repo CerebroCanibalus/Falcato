@@ -112,22 +112,62 @@ Primitivas del runtime para CLIs y agentes (R7).
 |---------|-------|----------|
 | `proceso_crear` | `(Palabra) -> Entero64` | Lanza un proceso; devuelve handle (0=error) |
 | `proceso_esperar` | `(Entero64) -> Entero32` | Espera al proceso; devuelve exit code |
-| `proceso_leer_salida` | `(Entero64) -> Texto` | stdout+stderr capturados |
+| `proceso_leer_salida_completa` | `(Entero64) -> Texto` | stdout+stderr capturados (bloquea hasta EOF) |
 | `proceso_cerrar` | `(Entero64) -> Vacío` | Cierra el handle |
+| `proceso_crear_con_pipes` | `(Palabra) -> Entero64` | Lanza proceso con stdin/stdout/stderr pipes separados (diálogo en vivo) |
+| `proceso_escribir` | `(Entero64, Entero64, Entero32) -> Entero32` | Escribe a stdin del proceso; bytes escritos (-1=error) |
+| `proceso_leer_salida_chunk` | `(Entero64, Entero64, Entero32) -> Entero32` | Lee stdout chunk por chunk (no bloquea hasta EOF); bytes leídos (0=EOF) |
+| `proceso_leer_error_chunk` | `(Entero64, Entero64, Entero32) -> Entero32` | Lee stderr chunk por chunk; bytes leídos (0=EOF) |
+| `proceso_cerrar_entrada` | `(Entero64) -> Vacío` | Cierra stdin del proceso (envía EOF al hijo) |
+| `proceso_listo_para_leer` | `(Entero64, Entero32) -> Booleano` | Verifica si hay datos disponibles sin bloquear (timeout en ms) |
+| `proceso_cerrar_bidireccional` | `(Entero64) -> Vacío` | Cierra handle bidireccional (todos los pipes) |
 | `terminal_modo_raw` | `(Entero32) -> Entero32` | 1=modo raw (sin echo, sin Enter; activa ANSI VT), 0=restaura |
 | `terminal_leer_tecla` | `() -> Entero32` | Lee una tecla sin Enter (flechas = 0x100+) |
 | `entrada_leer` | `() -> Texto` | Lee TODO el stdin hasta EOF |
 | `fecha_unix` | `() -> Entero64` | Segundos desde epoch |
 | `fecha_ms` | `() -> Entero64` | Milisegundos desde epoch |
+| `tcp_conectar` | `(Palabra, Entero32) -> Entero64` | Conecta a host:puerto (resuelve DNS si necesario); socket handle (0=error) |
+| `dns_resolver` | `(Palabra) -> Texto` | Resuelve nombre de host a IP (string) |
+| `tcp_establecer_timeout` | `(Entero64, Entero32) -> Vacío` | Establece timeout de lectura/escritura en ms |
+| `tcp_datos_disponibles` | `(Entero64) -> Booleano` | Verifica si hay datos disponibles sin bloquear |
 
-**Ejemplo (procesos):**
+**Ejemplo (procesos — captura completa):**
 ```falcato
 el h: Entero64 = proceso_crear("falcato verifica app.fc");
 el codigo: Entero32 = proceso_esperar(h);
-el salida: Texto = proceso_leer_salida(h);
+el salida: Texto = proceso_leer_salida_completa(h);
 decir(salida);
 salida.liberar();
 proceso_cerrar(h);
+```
+
+**Ejemplo (procesos — diálogo en vivo para MCP servers):**
+```falcato
+el h: Entero64 = proceso_crear_con_pipes("node mcp_server.js");
+// Escribir a stdin del proceso
+el msg: Texto = texto_desde("{\"jsonrpc\":\"2.0\",\"method\":\"initialize\"}\n");
+proceso_escribir(h, msg.ptr(), texto_longitud(msg) como Entero32);
+// Leer stdout chunk por chunk
+el buf: [Entero32; 1024] = todos 0;
+mientras proceso_listo_para_leer(h, 1000) {
+    el leidos: Entero32 = proceso_leer_salida_chunk(h, &buf, 1024);
+    si leidos es 0 { romper; }
+    // Procesar chunk...
+}
+proceso_cerrar_bidireccional(h);
+```
+
+**Ejemplo (TCP cliente + DNS):**
+```falcato
+// Resolver DNS
+el ip: Texto = dns_resolver("example.com");
+decir(ip);
+ip.liberar();
+// Conectar a servidor HTTP
+el sock: Entero64 = tcp_conectar("example.com", 80);
+tcp_establecer_timeout(sock, 5000); // 5 segundos
+// ... usar tcp_leer/tcp_escribir ...
+tcp_cerrar(sock);
 ```
 
 **Ejemplo (terminal TUI):**
