@@ -1,0 +1,18 @@
+// Test R9.0.4-F5: efecto vectorizable
+función duplicar(el x: Real) -> Real puro vectorizable {
+    retornar x + x;
+}
+
+función sumar_lote(el a: Real, el b: Real, el c: Real, el d: Real) -> Real puro vectorizable {
+    retornar a + b + c + d;
+}
+
+función principal() -> Entero32 {
+    el r1: Real = duplicar(5.0);
+    imprimir_linea("duplicar(5.0) = {r1}");
+    
+    el r2: Real = sumar_lote(1.0, 2.0, 3.0, 4.0);
+    imprimir_linea("sumar_lote = {r2}");
+    
+    retornar 0;
+}

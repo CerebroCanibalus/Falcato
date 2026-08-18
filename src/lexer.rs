@@ -108,6 +108,9 @@ pub enum Token {
     #[token("lee")]
     Lee,
 
+    #[token("vectorizable")]
+    Vectorizable,
+
     #[token("rasgo")]
     Rasgo,
 

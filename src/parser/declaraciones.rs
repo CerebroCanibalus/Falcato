@@ -166,6 +166,13 @@ fn parse_funcion(cursor: &mut ParserCursor) -> Result<Declaracion, ErrorSintaxis
         _ => crate::ast::Efecto::Conservador,
     };
 
+    // Parsear modificador `vectorizable` (auto-vectorizable)
+    let mut es_vectorizable = false;
+    if cursor.actual() == Some(&Token::Vectorizable) {
+        cursor.avanzar();
+        es_vectorizable = true;
+    }
+
     // Parsear nivel de verificación de ownership (borrow checker gradual)
     let nivel_verificacion = match cursor.actual() {
         Some(Token::Verificado) => {
@@ -193,6 +200,7 @@ fn parse_funcion(cursor: &mut ParserCursor) -> Result<Declaracion, ErrorSintaxis
             retorno,
             cuerpo: Bloque { sentencias: Vec::new(), span: Span::vacio() },
             es_insegura,
+            es_vectorizable,
             nivel_verificacion,
             efecto,
             visibilidad: None,
@@ -214,6 +222,7 @@ fn parse_funcion(cursor: &mut ParserCursor) -> Result<Declaracion, ErrorSintaxis
         retorno,
         cuerpo,
         es_insegura,
+        es_vectorizable,
         nivel_verificacion,
         efecto,
         visibilidad: None,

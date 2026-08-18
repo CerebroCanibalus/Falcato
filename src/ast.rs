@@ -59,6 +59,8 @@ pub struct FuncionDecl {
     pub nivel_verificacion: NivelVerificacion,
     /// Anotación de efecto (puro, muta(campo), lee(campo))
     pub efecto: Efecto,
+    /// true si la función está marcada como `vectorizable` (auto-vectorizable por el compiler)
+    pub es_vectorizable: bool,
     /// Visibilidad basada en artículo:
     /// - `None` o `Some(Articulo::El)` = pública (default)
     /// - `Some(Articulo::La)` = privada (solo accesible dentro del módulo)

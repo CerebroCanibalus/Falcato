@@ -394,6 +394,7 @@ pub fn preprocesar(programa: &mut Programa) -> Result<(), String> {
         retorno: func.retorno.clone(),
         cuerpo: bloque(nuevo_cuerpo),
         es_insegura: func.es_insegura,
+        es_vectorizable: func.es_vectorizable,
         nivel_verificacion: func.nivel_verificacion,
         efecto: func.efecto.clone(),
         visibilidad: func.visibilidad,
