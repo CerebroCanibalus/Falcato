@@ -2961,6 +2961,138 @@ impl Codegen {
     }
 
     // ============================================================
+    // Texto dinámico (R7.8 FASE 2): operaciones eficientes sobre strings
+    // ============================================================
+
+    /// texto_agregar_texto(texto: &mut Texto, fragmento: Texto) — append con realloc eficiente
+    pub(crate) fn builtin_texto_agregar_texto(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // Primer argumento: referencia mutable a Texto
+        // En Falcato, Texto es un descriptor en el HEAP (ptr a ptr, len, cap).
+        // &mut base nos da la dirección del stack slot, que contiene el puntero al descriptor.
+        // Necesitamos cargar ese puntero para pasarlo a la función del runtime.
+        let desc_ptr = if let Expresion::Unaria(crate::ast::OperadorUnario::ReferenciaMut, inner, _) = &argumentos[0] {
+            if let Expresion::Identificador(nombre, _) = inner.as_ref() {
+                if let Some((slot, _tipo, _articulo)) = variables.get(nombre) {
+                    // Cargar el puntero al descriptor desde el stack slot
+                    builder.ins().stack_load(types::I64, *slot, 0)
+                } else {
+                    return Err(());
+                }
+            } else {
+                return Err(());
+            }
+        } else {
+            return Err(());
+        };
+        
+        // Segundo argumento: Texto — también es un puntero al descriptor en el heap
+        let frag_desc_ptr = if let Expresion::Identificador(nombre, _) = &argumentos[1] {
+            if let Some((slot, _tipo, _articulo)) = variables.get(nombre) {
+                // Cargar el puntero al descriptor desde el stack slot
+                builder.ins().stack_load(types::I64, *slot, 0)
+            } else {
+                return Err(());
+            }
+        } else {
+            self.compilar_expresion(&argumentos[1], builder, variables)?
+        };
+        
+        // falcato_texto_agregar_texto(desc: i64, frag_desc: i64) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_texto_agregar_texto", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_ptr, frag_desc_ptr]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// texto_poner_byte(texto: &mut Texto, indice: Entero32, byte: Entero32) — mutación in-place
+    pub(crate) fn builtin_texto_poner_byte(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // Primer argumento: referencia mutable a Texto — cargar el puntero al descriptor
+        let desc_ptr = if let Expresion::Unaria(crate::ast::OperadorUnario::ReferenciaMut, inner, _) = &argumentos[0] {
+            if let Expresion::Identificador(nombre, _) = inner.as_ref() {
+                if let Some((slot, _tipo, _articulo)) = variables.get(nombre) {
+                    builder.ins().stack_load(types::I64, *slot, 0)
+                } else {
+                    return Err(());
+                }
+            } else {
+                return Err(());
+            }
+        } else {
+            return Err(());
+        };
+        
+        let indice = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let indice_i32 = if builder.func.dfg.value_type(indice) == types::I64 {
+            builder.ins().ireduce(types::I32, indice)
+        } else {
+            indice
+        };
+        let byte = self.compilar_expresion(&argumentos[2], builder, variables)?;
+        let byte_i32 = if builder.func.dfg.value_type(byte) == types::I64 {
+            builder.ins().ireduce(types::I32, byte)
+        } else {
+            byte
+        };
+        
+        // falcato_texto_poner_byte(desc: i64, i: i32, b: i32) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_texto_poner_byte", &[types::I64, types::I32, types::I32], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_ptr, indice_i32, byte_i32]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// texto_puntero(texto: Texto) -> Entero64 — ptr interno del Texto
+    pub(crate) fn builtin_texto_puntero(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // falcato_texto_puntero(desc: i64) -> i64
+        let fn_id = self.asegurar_funcion_c("falcato_texto_puntero", &[types::I64], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[desc]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// texto_desde_bytes(ptr: Entero64, longitud: Entero32) -> Texto — construir desde buffer crudo
+    pub(crate) fn builtin_texto_desde_bytes(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let longitud = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let longitud_i32 = if builder.func.dfg.value_type(longitud) == types::I64 {
+            builder.ins().ireduce(types::I32, longitud)
+        } else {
+            longitud
+        };
+        
+        // Crear descriptor de salida en stack
+        let desc_out = self.descriptor_nuevo(builder);
+        
+        // falcato_texto_desde_bytes(ptr: i64, n: i32, desc_out: i64) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_texto_desde_bytes", &[types::I64, types::I32, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[ptr, longitud_i32, desc_out]);
+        
+        Ok(desc_out)
+    }
+
+    // ============================================================
     // Terminal (R7.2): modo raw + lectura de teclas
     // ============================================================
 

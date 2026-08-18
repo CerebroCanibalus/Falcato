@@ -624,6 +624,50 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // Texto dinámico (R7.8 FASE 2): operaciones eficientes sobre strings
+        self.funciones.insert("texto_agregar_texto".to_string(), FirmaFuncion {
+            nombre: "texto_agregar_texto".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("texto".to_string(), Tipo::ReferenciaMut(Box::new(Tipo::Texto))),
+                ("fragmento".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_poner_byte".to_string(), FirmaFuncion {
+            nombre: "texto_poner_byte".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("texto".to_string(), Tipo::ReferenciaMut(Box::new(Tipo::Texto))),
+                ("indice".to_string(), Tipo::Entero32),
+                ("byte".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_puntero".to_string(), FirmaFuncion {
+            nombre: "texto_puntero".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Entero64), // puntero interno
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_desde_bytes".to_string(), FirmaFuncion {
+            nombre: "texto_desde_bytes".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("ptr".to_string(), Tipo::Entero64),
+                ("longitud".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
         // Terminal (R7.2): modo raw + lectura de teclas
         self.funciones.insert("terminal_modo_raw".to_string(), FirmaFuncion {
             nombre: "terminal_modo_raw".to_string(),

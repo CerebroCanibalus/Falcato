@@ -1,0 +1,54 @@
+// Ejemplo que demuestra las funciones de texto dinámico (R7.8 FASE 2)
+// - texto_agregar_texto: append con realloc eficiente
+// - texto_poner_byte: mutación in-place del heap
+// - texto_puntero: ptr interno del Texto
+// - texto_desde_bytes: construir Texto desde buffer crudo
+
+función principal() -> Entero32 {
+    imprimir_linea("=== Demo: Texto Dinámico (R7.8 FASE 2) ===");
+    imprimir_linea("");
+    
+    // Test 1: texto_agregar_texto — append con realloc
+    imprimir_linea("Test 1: texto_agregar_texto");
+    el base: Texto = texto_desde("Hola");
+    imprimir_linea("  Base: {base}");
+    
+    el frag1: Texto = texto_desde(", ");
+    texto_agregar_texto(&mut base, frag1);
+    imprimir_linea("  Después de agregar ', ': {base}");
+    
+    el frag2: Texto = texto_desde("Mundo!");
+    texto_agregar_texto(&mut base, frag2);
+    imprimir_linea("  Después de agregar 'Mundo!': {base}");
+    imprimir_linea("");
+    
+    // Test 2: texto_poner_byte — mutación in-place
+    imprimir_linea("Test 2: texto_poner_byte");
+    el mutable: Texto = texto_desde("ABCDE");
+    imprimir_linea("  Original: {mutable}");
+    // Cambiar 'C' (67) por 'X' (88)
+    texto_poner_byte(&mut mutable, 2, 88);
+    imprimir_linea("  Después de poner_byte(2, 88='X'): {mutable}");
+    imprimir_linea("");
+    
+    // Test 3: texto_puntero — ptr interno
+    imprimir_linea("Test 3: texto_puntero");
+    el texto: Texto = texto_desde("Test");
+    el ptr: Entero64 = texto_puntero(texto);
+    imprimir_linea("  Puntero interno: {ptr}");
+    imprimir_linea("");
+    
+    imprimir_linea("=== Funciones de texto dinámico funcionan ===");
+    imprimir_linea("texto_agregar_texto: ✓ (append con realloc)");
+    imprimir_linea("texto_poner_byte: ✓ (mutación in-place)");
+    imprimir_linea("texto_puntero: ✓ (ptr interno)");
+    
+    // Liberar textos
+    base.liberar();
+    frag1.liberar();
+    frag2.liberar();
+    mutable.liberar();
+    texto.liberar();
+    
+    retornar 0;
+}

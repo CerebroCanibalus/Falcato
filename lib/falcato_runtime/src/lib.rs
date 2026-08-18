@@ -22,6 +22,7 @@ mod dht;
 mod argumentos;
 mod convertir;
 mod tcp_cliente;
+mod texto_dinamico;
 
 use std::ffi::c_void;
 

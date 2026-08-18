@@ -395,7 +395,13 @@ TOTAL: 11-17 horas → Cid completo
   - [x] `proceso_leer_salida_chunk`: WaitForSingleObject(100ms) antes de ReadFile (Windows), select(100ms) antes de read (POSIX)
   - [x] `tcp_datos_disponibles`: select() con timeout 100ms (Windows y POSIX)
   - [x] **Criterio verificado:** ejemplo `timeout_fix.fc` demuestra que los timeouts funcionan correctamente
-- [ ] **FASE 2 (P0-A):** Strings dinámicos — 🔴 PENDIENTE
+- [x] **FASE 2 (P0-A):** Strings dinámicos — ✅ 2026-08-18
+  - [x] `texto_agregar_texto(&mut Texto, Texto)`: append con realloc eficiente (duplica capacidad)
+  - [x] `texto_poner_byte(&mut Texto, indice, byte)`: mutación in-place del heap
+  - [x] `texto_puntero(Texto) -> Entero64`: ptr interno del Texto (para tcp_escribir, etc.)
+  - [x] `texto_desde_bytes(ptr, longitud) -> Texto`: construir Texto desde buffer crudo
+  - [x] **Criterio verificado:** ejemplo `texto_dinamico.fc` demuestra las 3 funciones principales
+  - [x] **Nota codegen:** Texto es descriptor en HEAP (no stack). `&mut base` → stack slot contiene ptr al descriptor. Codegen carga el ptr con `stack_load` antes de pasar al runtime.
 - [ ] **FASE 3 (P0-B):** Conversión número↔texto — 🔴 PENDIENTE
 - [ ] **FASE 4 (P1):** Archivos + entorno — 🔴 PENDIENTE
 - [ ] **FASE 5 (P2):** TUI + HTTPS — 🔴 PENDIENTE

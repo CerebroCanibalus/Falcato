@@ -1274,6 +1274,7 @@ impl Codegen {
             "proceso_leer_error_chunk" | "proceso_cerrar_entrada" | "proceso_listo_para_leer" |
             "proceso_cerrar_bidireccional" |
             "tcp_conectar" | "dns_resolver" | "tcp_establecer_timeout" | "tcp_datos_disponibles" |
+            "texto_agregar_texto" | "texto_poner_byte" | "texto_puntero" | "texto_desde_bytes" |
             "terminal_modo_raw" | "terminal_leer_tecla" |
             "entrada_leer" |
             "argumentos" |
@@ -1389,6 +1390,10 @@ impl Codegen {
             "dns_resolver" => self.builtin_dns_resolver(builder, variables, &llamada.argumentos),
             "tcp_establecer_timeout" => self.builtin_tcp_establecer_timeout(builder, variables, &llamada.argumentos),
             "tcp_datos_disponibles" => self.builtin_tcp_datos_disponibles(builder, variables, &llamada.argumentos),
+            "texto_agregar_texto" => self.builtin_texto_agregar_texto(builder, variables, &llamada.argumentos),
+            "texto_poner_byte" => self.builtin_texto_poner_byte(builder, variables, &llamada.argumentos),
+            "texto_puntero" => self.builtin_texto_puntero(builder, variables, &llamada.argumentos),
+            "texto_desde_bytes" => self.builtin_texto_desde_bytes(builder, variables, &llamada.argumentos),
             "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
             "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
             "entrada_leer" => self.builtin_entrada_leer(builder, variables, &llamada.argumentos),

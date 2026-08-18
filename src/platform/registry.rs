@@ -170,6 +170,12 @@ impl BuiltinRegistry {
         r.insert("tcp_establecer_timeout", "falcato_tcp_establecer_timeout", &[types::I64, types::I32], None);
         r.insert("tcp_datos_disponibles", "falcato_tcp_datos_disponibles", &[types::I64], Some(types::I32));
 
+        // Texto dinámico
+        r.insert("texto_agregar_texto", "falcato_texto_agregar_texto", &[types::I64, types::I64], None);
+        r.insert("texto_poner_byte", "falcato_texto_poner_byte", &[types::I64, types::I32, types::I32], None);
+        r.insert("texto_puntero", "falcato_texto_puntero", &[types::I64], Some(types::I64));
+        r.insert("texto_desde_bytes", "falcato_texto_desde_bytes", &[types::I64, types::I32, types::I64], None);
+
         r
     }
 
@@ -280,6 +286,12 @@ impl BuiltinRegistry {
         r.insert("dns_resolver", "falcato_dns_resolver", &[types::I64], Some(types::I64));
         r.insert("tcp_establecer_timeout", "falcato_tcp_establecer_timeout", &[types::I64, types::I32], None);
         r.insert("tcp_datos_disponibles", "falcato_tcp_datos_disponibles", &[types::I64], Some(types::I32));
+
+        // Texto dinámico
+        r.insert("texto_agregar_texto", "falcato_texto_agregar_texto", &[types::I64, types::I64], None);
+        r.insert("texto_poner_byte", "falcato_texto_poner_byte", &[types::I64, types::I32, types::I32], None);
+        r.insert("texto_puntero", "falcato_texto_puntero", &[types::I64], Some(types::I64));
+        r.insert("texto_desde_bytes", "falcato_texto_desde_bytes", &[types::I64, types::I32, types::I64], None);
 
         r
     }
