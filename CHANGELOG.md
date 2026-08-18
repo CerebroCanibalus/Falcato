@@ -1,5 +1,45 @@
 # Changelog de Falcato
 
+## [0.7.0] - 2026-08-18 — "¡Fuese!"
+
+### ➕ ADICIONES
+
+- **Aritmética consciente** (R7.7): el subjuntivo aritmético llega al lenguaje.
+  - `a + b fuese` → checked (overflow → `Resultado.Error`, no crash).
+  - `un x = a + b` → Option (overflow → `Nada`, sin desbordamiento → `Algo(valor)`).
+  - `romper` / `continuar` en bucles.
+  - Notación científica en literales (`6.674e-11`).
+  - Impresión flotante con `%.17g` (round-trip exacto).
+- **20 primitivas nativas para Cid** (R7.8, 5 fases):
+  - Fase 1: fixes de timeout en procesos y TCP (MCP estable).
+  - Fase 2: strings dinámicos (`texto_agregar_texto`, `texto_poner_byte`, `texto_puntero`, `texto_desde_bytes`).
+  - Fase 3: conversión número↔texto (`entero_a_texto`, `flotante_a_texto`, `booleano_a_texto`).
+  - Fase 4: archivos avanzados + entorno (`archivo_agregar`, `archivo_borrar`, `archivo_listar`, `entorno_obtener`, etc.).
+  - Fase 5: TUI + TLS/HTTPS (`terminal_dimensiones`, `tls_conectar/escribir/leer/cerrar`).
+- **Trigonometría completa** (R9.0.4):
+  - Builtins libm: `seno`, `coseno`, `tangente`, `arcseno`, `arccoseno`, `arctangente`, `exp`, `log`, etc.
+  - Sufijos de precisión: `_preciso` (libm), `_rapido` (polinomio), `_aprox` (tabla).
+  - `seno_2pi` / `coseno_2pi` con polinomios minimax en Cranelift (error < 1 ULP).
+  - Efecto `vectorizable` (keyword + parser + AST).
+  - Fase nativa (`estructural Fase` + `fase_avanzar` en stdlib).
+- **Conversión numérica completa** (R9.0.3): `como_entero8/16/32/64` + `como_flotante32/64` — familia unificada.
+- **Structs entre archivos** (R9.0.1): retorno y parámetros de struct cross-file.
+- **Diccionario con tipos compuestos** (R9.0.2): `Diccionario<Texto, Vector<Texto>>` funciona.
+
+### 🔧 ARREGLOS
+
+- **10 fixes macOS** (Issue #5 — CR-1 a CR-9): linker POSIX, `CLOCK_MONOTONIC`, `PTHREAD_MUTEX_SIZE`, globales Mach-O, `CallConv::AppleAarch64`, `nanosleep`, printf variádica, closures firma, `canal_cerrar`.
+- **Aritmética flotante completa**: dispatch por tipo en operaciones binarias (antes usaba sdiv/srem de enteros con F64).
+- **Drop automático** (R6): `free` al final de scope para heap owned (Texto, Vector, Diccionario, Conjunto).
+- **Diccionario**: 4 bugs — SSA dominance, cap=0 → crash, strings internados, structs por tipo no por tamaño.
+- **`vector_obtener` bounds check**: fuera de rango → 0 definido.
+- **`entero_a_texto`** acepta `Entero32` con sextend automático.
+- **Unitest de codebase** (R7.6): suite 12/12 verde, ESPECIFICACIONES.md sin casos abiertos.
+
+### 🔁 REDISEÑO
+
+- **Roadmap reorganizado**: matemática fundamental (R9.0) → JSON → Cid → DAW.
+
 ## [0.6.1] - 2026-08-08
 
 ### ➕ ADICIONES
