@@ -949,6 +949,7 @@ impl Backend {
             ("puro", "Anotación de efecto: sin side effects", CompletionItemKind::KEYWORD),
             ("muta", "Anotación de efecto: muta campo(s)", CompletionItemKind::KEYWORD),
             ("lee", "Anotación de efecto: lee campo(s)", CompletionItemKind::KEYWORD),
+            ("vectorizable", "Modificador de función: auto-vectorizable por el compiler", CompletionItemKind::KEYWORD),
             ("fut", "Función asíncrona (futuro)", CompletionItemKind::KEYWORD),
             ("esperar", "Espera un futuro (await)", CompletionItemKind::KEYWORD),
             ("lanzar", "Lanza un hilo/tarea", CompletionItemKind::KEYWORD),
@@ -1013,6 +1014,10 @@ impl Backend {
             ("Vacío", "Tipo unitario (sin valor)"),
             ("Vector", "Vector dinámico genérico (heap, ¡liberar!)"),
             ("Resultado", "Result<T,E> — Exito(valor) o Error(codigo)"),
+            ("Fase", "Estado de oscilador: { valor: Real, inc: Real } — librerias/math.fc"),
+            ("Real_preciso", "apodo de Real — libm (error < 1 ULP)"),
+            ("Real_rapido", "apodo de Real — polinomio grado 5 (error ~2^-16)"),
+            ("Real_aprox", "apodo de Real — tabla 256 + lerp (error ~2^-10)"),
         ];
 
         for (t, doc) in tipos {
@@ -1061,6 +1066,38 @@ impl Backend {
             ("canal_nuevo", "(capacidad: Entero32) -> Canal", CompletionItemKind::FUNCTION),
             ("canal_enviar", "(canal: Canal, valor: Entero32) -> Vacío", CompletionItemKind::FUNCTION),
             ("canal_recibir", "(canal: Canal) -> Entero32", CompletionItemKind::FUNCTION),
+            // Trigonometría — F1: libm (preciso)
+            ("seno", "(x: Real) -> Real — seno via libm", CompletionItemKind::FUNCTION),
+            ("coseno", "(x: Real) -> Real — coseno via libm", CompletionItemKind::FUNCTION),
+            ("tangente", "(x: Real) -> Real — tangente via libm", CompletionItemKind::FUNCTION),
+            ("arcseno", "(x: Real) -> Real — arco seno via libm", CompletionItemKind::FUNCTION),
+            ("arccoseno", "(x: Real) -> Real — arco coseno via libm", CompletionItemKind::FUNCTION),
+            ("arctangente", "(x: Real) -> Real — arco tangente via libm", CompletionItemKind::FUNCTION),
+            ("arctangente2", "(y: Real, x: Real) -> Real — arco tangente2", CompletionItemKind::FUNCTION),
+            ("senoh", "(x: Real) -> Real — seno hiperbólico", CompletionItemKind::FUNCTION),
+            ("cosenoh", "(x: Real) -> Real — coseno hiperbólico", CompletionItemKind::FUNCTION),
+            ("tangenteh", "(x: Real) -> Real — tangente hiperbólica", CompletionItemKind::FUNCTION),
+            ("exp", "(x: Real) -> Real — exponencial", CompletionItemKind::FUNCTION),
+            ("log", "(x: Real) -> Real — logaritmo natural", CompletionItemKind::FUNCTION),
+            ("log10", "(x: Real) -> Real — logaritmo base 10", CompletionItemKind::FUNCTION),
+            ("piso", "(x: Real) -> Real — floor", CompletionItemKind::FUNCTION),
+            ("techo", "(x: Real) -> Real — ceil", CompletionItemKind::FUNCTION),
+            ("fabs", "(x: Real) -> Real — valor absoluto flotante", CompletionItemKind::FUNCTION),
+            ("fmod", "(a: Real, b: Real) -> Real — módulo flotante", CompletionItemKind::FUNCTION),
+            // Trigonometría — F4: precisión
+            ("seno_preciso", "(x: Real) -> Real — seno preciso (libm)", CompletionItemKind::FUNCTION),
+            ("coseno_preciso", "(x: Real) -> Real — coseno preciso (libm)", CompletionItemKind::FUNCTION),
+            ("tangente_preciso", "(x: Real) -> Real — tangente precisa (libm)", CompletionItemKind::FUNCTION),
+            ("exp_preciso", "(x: Real) -> Real — exp preciso (libm)", CompletionItemKind::FUNCTION),
+            ("log_preciso", "(x: Real) -> Real — log preciso (libm)", CompletionItemKind::FUNCTION),
+            // Trigonometría — F7: polinomios minimax
+            ("seno_rapido", "(x: Real) -> Real — seno rápido (polinomio)", CompletionItemKind::FUNCTION),
+            ("coseno_rapido", "(x: Real) -> Real — coseno rápido (polinomio)", CompletionItemKind::FUNCTION),
+            ("seno_2pi", "(fase: Real) -> Real — seno(2π×fase), fase ∈ [0,1)", CompletionItemKind::FUNCTION),
+            ("coseno_2pi", "(fase: Real) -> Real — coseno(2π×fase), fase ∈ [0,1)", CompletionItemKind::FUNCTION),
+            ("exp_rapido", "(x: Real) -> Real — exp rápido (libm)", CompletionItemKind::FUNCTION),
+            ("log_rapido", "(x: Real) -> Real — log rápido (libm)", CompletionItemKind::FUNCTION),
+            ("seno_aprox", "(x: Real) -> Real — seno aproximado (placeholder)", CompletionItemKind::FUNCTION),
         ];
 
         for (name, sig, kind) in builtins {
