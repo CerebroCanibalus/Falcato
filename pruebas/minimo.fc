@@ -1,0 +1,18 @@
+función principal() -> Entero32 {
+    el dir: Texto = texto_desde("pruebas");
+    los archivos: Vector<Texto> = archivo_listar(dir);
+    imprimir_linea("listar OK");
+    el n: Entero32 = vector_longitud<Texto>(archivos);
+    imprimir_linea("n = {n}");
+    el i: Entero32 = 0;
+    mientras i < n {
+        el nombre: Texto = vector_obtener<Texto>(archivos, i);
+        imprimir_linea("  - {nombre}");
+        texto_liberar(nombre);
+        i = i + 1;
+    }
+    vector_liberar<Texto>(archivos);
+    texto_liberar(dir);
+    imprimir_linea("FIN OK");
+    retornar 0;
+}

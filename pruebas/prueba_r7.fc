@@ -1,0 +1,34 @@
+// Prueba de humo R7.1-R7.3 — verificar primitivas del sistema
+// R7.1: procesos con captura de salida
+// R7.2: terminal raw (solo compila/activa — no interactivo aquí)
+// R7.3: entrada estándar con pipe
+
+función principal() -> Entero32 {
+    // R7.3 — stdin: leer TODO el pipe
+    el entrada: Texto = entrada_leer();
+    imprimir_linea("STDIN[{entrada}]");
+    texto_liberar(entrada);
+
+    // R7.1 — spawn: ejecutar falcato verifica y capturar salida
+    el h: Entero64 = proceso_crear("D:/Falcato/target/release/falcato.exe verifica D:/Falcato/ejemplos/argumentos_tipados.fc");
+    si h == 0 {
+        imprimir_linea("ERROR: no se pudo crear el proceso");
+        retornar 1;
+    }
+    el codigo: Entero32 = proceso_esperar(h);
+    el salida: Texto = proceso_leer_salida(h);
+    imprimir_linea("EXIT[{codigo}]");
+    imprimir_linea("SALIDA[{salida}]");
+    texto_liberar(salida);
+    proceso_cerrar(h);
+
+    // R7.2 — terminal raw: activar y restaurar (sin leer tecla en pipe)
+    el ok: Entero32 = terminal_modo_raw(1);
+    imprimir_linea("RAW[{ok}]");
+    terminal_modo_raw(0);
+
+    // R7.4 (parcial) — fecha
+    el ahora: Entero64 = fecha_unix();
+    imprimir_linea("UNIX[{ahora}]");
+    retornar 0;
+}

@@ -1,0 +1,197 @@
+// prueba_r78.fc — Verificación integral de primitivas R7.8 (Fase 0 de Cid)
+// ============================================================================
+// Prueba: strings dinámicos, conversión número↔texto, archivos avanzados,
+// entorno, aleatorio, terminal, TLS, fixes de timeout en procesos/TCP.
+//
+// Ejecutar desde D:\Falcato (linker usa ruta relativa al runtime):
+//   falcato run pruebas\prueba_r78.fc
+// ============================================================================
+
+función principal() -> Entero32 {
+    imprimir_linea("=== R7.8: Strings dinámicos ===");
+
+    // texto_agregar_texto(&mut t, fragmento)
+    el t: Texto = texto_desde("hola");
+    el frag: Texto = texto_desde(" mundo");
+    texto_agregar_texto(&mut t, frag);
+    imprimir_linea("agregar_texto: {t}");
+    texto_liberar(frag);
+    texto_liberar(t);
+
+    // texto_poner_byte(&mut t, i, b) — 'Z' = 90
+    el t2: Texto = texto_desde("abc");
+    texto_poner_byte(&mut t2, 0, 90);
+    imprimir_linea("poner_byte: {t2}");
+    texto_liberar(t2);
+
+    // texto_puntero + texto_desde_bytes (round-trip)
+    el t3: Texto = texto_desde("bytes");
+    el ptr: Entero64 = texto_puntero(t3);
+    el n3: Entero32 = texto_longitud(t3);
+    el t4: Texto = texto_desde_bytes(ptr, n3);
+    imprimir_linea("desde_bytes: {t4}");
+    texto_liberar(t3);
+    texto_liberar(t4);
+
+    imprimir_linea("");
+    imprimir_linea("=== R7.8: Conversión número↔texto ===");
+
+    el s1: Texto = entero_a_texto(como_entero64(12345));
+    imprimir_linea("entero_a_texto: {s1}");
+    texto_liberar(s1);
+
+    el s2: Texto = flotante_a_texto(3.14159);
+    imprimir_linea("flotante_a_texto: {s2}");
+    texto_liberar(s2);
+
+    el s3: Texto = booleano_a_texto(verdadero);
+    imprimir_linea("booleano_a_texto: {s3}");
+    texto_liberar(s3);
+
+    imprimir_linea("");
+    imprimir_linea("=== R7.8: Archivos avanzados ===");
+
+    // archivo_escribir/leer/existe: ruta = Palabra, contenido = Texto
+    el contenido: Texto = texto_desde("linea 1\nlinea 2\n");
+    archivo_escribir("pruebas\\r78_test.txt", contenido);
+    imprimir_linea("escribir OK");
+
+    el extra: Texto = texto_desde("linea 3\n");
+    el ruta: Texto = texto_desde("pruebas\\r78_test.txt");
+    archivo_agregar(ruta, extra);
+    imprimir_linea("agregar OK");
+
+    el leido: Texto = archivo_leer("pruebas\\r78_test.txt");
+    imprimir_linea("leido: {leido}");
+    texto_liberar(leido);
+
+    el ruta2: Texto = texto_desde("pruebas\\r78_test_renombrado.txt");
+    archivo_renombrar(ruta, ruta2);
+    imprimir_linea("renombrar OK");
+
+    el existe: Booleano = archivo_existe("pruebas\\r78_test_renombrado.txt");
+    imprimir_linea("existe renombrado: {existe}");
+
+    archivo_borrar(ruta2);
+    imprimir_linea("borrar OK");
+
+    // archivo_listar
+    el dir: Texto = texto_desde("pruebas");
+    los archivos: Vector<Texto> = archivo_listar(dir);
+    el n_arch: Entero32 = vector_longitud<Texto>(archivos);
+    imprimir_linea("listar {dir}: {n_arch} archivos");
+    el i: Entero32 = 0;
+    mientras i < n_arch {
+        el nombre: Texto = vector_obtener<Texto>(archivos, i);
+        imprimir_linea("  - {nombre}");
+        texto_liberar(nombre);
+        i = i + 1;
+    }
+    vector_liberar<Texto>(archivos);
+    texto_liberar(dir);
+    texto_liberar(ruta);
+    texto_liberar(ruta2);
+    texto_liberar(extra);
+
+    imprimir_linea("");
+    imprimir_linea("=== R7.8: Entorno, directorio, aleatorio ===");
+
+    el env: Texto = entorno_obtener(texto_desde("USERNAME"));
+    imprimir_linea("USERNAME: {env}");
+    texto_liberar(env);
+
+    el cwd: Texto = directorio_actual();
+    imprimir_linea("cwd: {cwd}");
+    texto_liberar(cwd);
+
+    el r1: Entero64 = aleatorio();
+    el r2: Entero64 = aleatorio();
+    imprimir_linea("aleatorio: {r1} / {r2}");
+
+    imprimir_linea("");
+    imprimir_linea("=== R7.8: Terminal ===");
+
+    el dims: Entero64 = terminal_dimensiones();
+    el ancho: Entero32 = como_entero32(dims);
+    el alto: Entero32 = como_entero32(dims >> 32);
+    imprimir_linea("terminal: {ancho}x{alto}");
+
+    imprimir_linea("");
+    imprimir_linea("=== R7.8: TLS/HTTPS ===");
+
+    el conn: Entero64 = tls_conectar(texto_desde("example.com"), 443);
+    si conn != 0 {
+        imprimir_linea("tls_conectar OK (conn={conn})");
+        el req: Texto = texto_desde("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n");
+        el req_ptr: Entero64 = texto_puntero(req);
+        el req_len: Entero32 = texto_longitud(req);
+        el escritos: Entero32 = tls_escribir(conn, req_ptr, req_len);
+        imprimir_linea("tls_escribir: {escritos} bytes");
+        texto_liberar(req);
+
+        el buf: [Entero32; 4096] = todos 0;
+        el leidos_tls: Entero32 = tls_leer(conn, &buf, 4096);
+        imprimir_linea("tls_leer: {leidos_tls} bytes");
+        si leidos_tls > 0 {
+            el respuesta: Texto = texto_desde_bytes(&buf, leidos_tls);
+            imprimir_linea("respuesta (primeros 80): {respuesta}");
+            texto_liberar(respuesta);
+        }
+        tls_cerrar(conn);
+    } sino {
+        imprimir_linea("tls_conectar FALLÓ");
+    }
+
+    imprimir_linea("");
+    imprimir_linea("=== R7.8: Fixes de timeout (procesos) ===");
+
+    // proceso_listo_para_leer con timeout: cmd /c echo hola
+    el h: Entero64 = proceso_crear_con_pipes("cmd.exe /c echo hola desde pipe");
+    si h != 0 {
+        el listo: Booleano = proceso_listo_para_leer(h, 3000);
+        imprimir_linea("listo_para_leer(3000ms): {listo}");
+        si listo {
+            el chunk_buf: [Entero32; 256] = todos 0;
+            el leidos: Entero32 = proceso_leer_salida_chunk(h, &chunk_buf, 256);
+            imprimir_linea("leer_salida_chunk: {leidos} bytes");
+            si leidos > 0 {
+                el chunk: Texto = texto_desde_bytes(&chunk_buf, leidos);
+                imprimir_linea("chunk: {chunk}");
+                texto_liberar(chunk);
+            }
+        }
+        proceso_cerrar_bidireccional(h);
+    } sino {
+        imprimir_linea("proceso_crear_con_pipes FALLÓ");
+    }
+
+    imprimir_linea("");
+    imprimir_linea("=== R7.8: Fixes de timeout (TCP) ===");
+
+    // tcp_datos_disponibles: conectar a un servidor que responde
+    el sock: Entero64 = tcp_conectar("example.com", 80);
+    si sock != 0 {
+        tcp_establecer_timeout(sock, 3000);
+        el req2: Texto = texto_desde("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n");
+        el req2_ptr: Entero64 = texto_puntero(req2);
+        el req2_len: Entero32 = texto_longitud(req2);
+        tcp_escribir(sock, req2_ptr, req2_len);
+        texto_liberar(req2);
+
+        // esperar datos con tcp_datos_disponibles (debería esperar ahora)
+        el hay: Booleano = tcp_datos_disponibles(sock);
+        imprimir_linea("tcp_datos_disponibles: {hay}");
+        si hay {
+            el buf2: [Entero32; 1024] = todos 0;
+            el leidos2: Entero32 = tcp_leer(sock, &buf2, 1024);
+            imprimir_linea("tcp_leer: {leidos2} bytes");
+        }
+        tcp_cerrar(sock);
+    } sino {
+        imprimir_linea("tcp_conectar FALLÓ");
+    }
+
+    imprimir_linea("");
+    imprimir_linea("=== FIN: todas las pruebas ejecutadas ===");
+    retornar 0;
+}

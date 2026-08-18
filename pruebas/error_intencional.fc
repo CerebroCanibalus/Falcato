@@ -1,0 +1,6 @@
+función principal() -> Entero32 {
+    el x: Entero32 = 5;
+    mover x;
+    imprimir_linea(x);
+    retornar 0;
+}
