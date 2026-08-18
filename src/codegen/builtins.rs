@@ -3093,6 +3093,82 @@ impl Codegen {
     }
 
     // ============================================================
+    // Conversión numérica (R7.8 FASE 3): número → texto
+    // ============================================================
+
+    /// entero_a_texto(n: Entero64) -> Texto — convierte entero a texto decimal
+    pub(crate) fn builtin_entero_a_texto(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let n = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        
+        // Crear descriptor de salida
+        let desc_out = self.descriptor_nuevo(builder);
+        
+        // falcato_entero_a_texto(n: i64, desc_out: i64) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_entero_a_texto", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[n, desc_out]);
+        
+        Ok(desc_out)
+    }
+
+    /// flotante_a_texto(f: Flotante64) -> Texto — convierte flotante a texto (%.17g)
+    pub(crate) fn builtin_flotante_a_texto(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let f = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        
+        // Crear descriptor de salida
+        let desc_out = self.descriptor_nuevo(builder);
+        
+        // falcato_flotante_a_texto(f: f64, desc_out: i64) -> void
+        // Nota: necesitamos convertir f64 a i64 (reinterpretación de bits) para pasar a la función C
+        let flags = cranelift_codegen::ir::MemFlags::new();
+        let f_i64 = builder.ins().bitcast(types::I64, flags, f);
+        let fn_id = self.asegurar_funcion_c("falcato_flotante_a_texto", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[f_i64, desc_out]);
+        
+        Ok(desc_out)
+    }
+
+    /// booleano_a_texto(b: Booleano) -> Texto — convierte booleano a "verdadero"/"falso"
+    pub(crate) fn builtin_booleano_a_texto(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let b = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // Booleano es i8 en Falcato, necesitamos extenderlo a i32 para la función C
+        let b_tipo = builder.func.dfg.value_type(b);
+        let b_i32 = if b_tipo == types::I8 {
+            builder.ins().uextend(types::I32, b)
+        } else if b_tipo == types::I64 {
+            builder.ins().ireduce(types::I32, b)
+        } else {
+            b
+        };
+        
+        // Crear descriptor de salida
+        let desc_out = self.descriptor_nuevo(builder);
+        
+        // falcato_booleano_a_texto(b: i32, desc_out: i64) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_booleano_a_texto", &[types::I32, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[b_i32, desc_out]);
+        
+        Ok(desc_out)
+    }
+
+    // ============================================================
     // Terminal (R7.2): modo raw + lectura de teclas
     // ============================================================
 

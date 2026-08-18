@@ -23,6 +23,7 @@ mod argumentos;
 mod convertir;
 mod tcp_cliente;
 mod texto_dinamico;
+mod conversion_numerica;
 
 use std::ffi::c_void;
 

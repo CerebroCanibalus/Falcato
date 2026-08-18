@@ -1275,6 +1275,7 @@ impl Codegen {
             "proceso_cerrar_bidireccional" |
             "tcp_conectar" | "dns_resolver" | "tcp_establecer_timeout" | "tcp_datos_disponibles" |
             "texto_agregar_texto" | "texto_poner_byte" | "texto_puntero" | "texto_desde_bytes" |
+            "entero_a_texto" | "flotante_a_texto" | "booleano_a_texto" |
             "terminal_modo_raw" | "terminal_leer_tecla" |
             "entrada_leer" |
             "argumentos" |
@@ -1394,6 +1395,9 @@ impl Codegen {
             "texto_poner_byte" => self.builtin_texto_poner_byte(builder, variables, &llamada.argumentos),
             "texto_puntero" => self.builtin_texto_puntero(builder, variables, &llamada.argumentos),
             "texto_desde_bytes" => self.builtin_texto_desde_bytes(builder, variables, &llamada.argumentos),
+            "entero_a_texto" => self.builtin_entero_a_texto(builder, variables, &llamada.argumentos),
+            "flotante_a_texto" => self.builtin_flotante_a_texto(builder, variables, &llamada.argumentos),
+            "booleano_a_texto" => self.builtin_booleano_a_texto(builder, variables, &llamada.argumentos),
             "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
             "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
             "entrada_leer" => self.builtin_entrada_leer(builder, variables, &llamada.argumentos),

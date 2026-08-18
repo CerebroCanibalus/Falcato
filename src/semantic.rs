@@ -668,6 +668,32 @@ impl AnalizadorSemantico {
             es_publica: true,
         });
 
+        // Conversión numérica (R7.8 FASE 3): número → texto
+        self.funciones.insert("entero_a_texto".to_string(), FirmaFuncion {
+            nombre: "entero_a_texto".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("n".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("flotante_a_texto".to_string(), FirmaFuncion {
+            nombre: "flotante_a_texto".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("f".to_string(), Tipo::Flotante64)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("booleano_a_texto".to_string(), FirmaFuncion {
+            nombre: "booleano_a_texto".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("b".to_string(), Tipo::Booleano)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
         // Terminal (R7.2): modo raw + lectura de teclas
         self.funciones.insert("terminal_modo_raw".to_string(), FirmaFuncion {
             nombre: "terminal_modo_raw".to_string(),

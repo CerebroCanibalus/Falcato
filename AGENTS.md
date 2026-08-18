@@ -402,7 +402,12 @@ TOTAL: 11-17 horas → Cid completo
   - [x] `texto_desde_bytes(ptr, longitud) -> Texto`: construir Texto desde buffer crudo
   - [x] **Criterio verificado:** ejemplo `texto_dinamico.fc` demuestra las 3 funciones principales
   - [x] **Nota codegen:** Texto es descriptor en HEAP (no stack). `&mut base` → stack slot contiene ptr al descriptor. Codegen carga el ptr con `stack_load` antes de pasar al runtime.
-- [ ] **FASE 3 (P0-B):** Conversión número↔texto — 🔴 PENDIENTE
+- [x] **FASE 3 (P0-B):** Conversión número↔texto — ✅ 2026-08-18
+  - [x] `entero_a_texto(Entero64) -> Texto`: formato "%lld" (decimal con signo)
+  - [x] `flotante_a_texto(Flotante64) -> Texto`: formato "%.17g" (precisión round-trip)
+  - [x] `booleano_a_texto(Booleano) -> Texto`: "verdadero"/"falso"
+  - [x] **Criterio verificado:** ejemplo `conversion_numerica.fc` demuestra las 3 funciones
+  - [x] **Nota codegen:** Flotante requiere `bitcast` de f64 a i64 antes de pasar a función C. Booleano requiere `uextend` de i8 a i32.
 - [ ] **FASE 4 (P1):** Archivos + entorno — 🔴 PENDIENTE
 - [ ] **FASE 5 (P2):** TUI + HTTPS — 🔴 PENDIENTE
 

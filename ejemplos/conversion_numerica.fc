@@ -1,0 +1,52 @@
+// Ejemplo que demuestra las funciones de conversión numérica (R7.8 FASE 3)
+// - entero_a_texto: convierte entero a texto decimal
+// - flotante_a_texto: convierte flotante a texto (%.17g)
+// - booleano_a_texto: convierte booleano a "verdadero"/"falso"
+
+función principal() -> Entero32 {
+    imprimir_linea("=== Demo: Conversión Numérica (R7.8 FASE 3) ===");
+    imprimir_linea("");
+
+    // Test 1: entero_a_texto
+    imprimir_linea("Test 1: entero_a_texto");
+    el num: Entero64 = 12345;
+    el texto_num: Texto = entero_a_texto(num);
+    imprimir_linea("  12345 → {texto_num}");
+    texto_num.liberar();
+
+    el negativo: Entero64 = -9876;
+    el texto_neg: Texto = entero_a_texto(negativo);
+    imprimir_linea("  -9876 → {texto_neg}");
+    texto_neg.liberar();
+    imprimir_linea("");
+
+    // Test 2: flotante_a_texto
+    imprimir_linea("Test 2: flotante_a_texto");
+    el pi: Flotante64 = 3.14159265358979;
+    el texto_pi: Texto = flotante_a_texto(pi);
+    imprimir_linea("  3.14159... → {texto_pi}");
+    texto_pi.liberar();
+
+    el grande: Flotante64 = 1.23e15;
+    el texto_grande: Texto = flotante_a_texto(grande);
+    imprimir_linea("  1.23e15 → {texto_grande}");
+    texto_grande.liberar();
+    imprimir_linea("");
+
+    // Test 3: booleano_a_texto
+    imprimir_linea("Test 3: booleano_a_texto");
+    el es_verd: Lógico = verdadero;
+    el texto_verd: Texto = booleano_a_texto(es_verd);
+    imprimir_linea("  verdadero → {texto_verd}");
+    texto_verd.liberar();
+
+    el es_fals: Lógico = falso;
+    el texto_fals: Texto = booleano_a_texto(es_fals);
+    imprimir_linea("  falso → {texto_fals}");
+    texto_fals.liberar();
+    imprimir_linea("");
+
+    imprimir_linea("=== Todas las conversiones funcionan ===");
+
+    retornar 0;
+}
