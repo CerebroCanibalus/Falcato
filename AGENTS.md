@@ -335,7 +335,7 @@ pruebas/unitest/
   - [x] **F4 — Tipos de precisión**: `Real_preciso`, `Real_rapido`, `Real_aprox` via `apodo` + builtins `_preciso` (`seno_preciso`, `coseno_preciso`, `tangente_preciso`, `exp_preciso`, `log_preciso`) **✅ 2026-08-17**
   - [x] **F5 — Efecto `vectorizable`**: keyword + parser + AST (metadata; codegen SIMD pendiente) **✅ 2026-08-17**
   - [x] **F6 — Fase nativa**: `estructural Fase` + `fase_avanzar` en stdlib (`librerias/math.fc`) **✅ 2026-08-17**
-  - [ ] **F7 — Polinomios minimax REALES**: reemplazar libm con polinomios Remez grado 5/7 en math.rs
+  - [x] **F7 — Polinomios minimax REALES**: seno_2pi (Horner grado 5) + coseno_2pi (Horner grado 6) en math.rs **✅ 2026-08-17**
 
 **Bloque 2 — JSON parsing (DESBLOQUEA Cid):**
 - [ ] **R9.1.0 — Librería JSON mínima** (`librerias/json.fc`): parser recursive descent para MCP
