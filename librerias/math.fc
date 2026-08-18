@@ -1,0 +1,35 @@
+// librerias/math.fc — Funciones matemáticas para DAW
+// F6: Fase nativa para osciladores
+//
+// NOTA: Fase se pasa por valor (no &mut) porque el compiler
+// no resuelve structs a través de ReferenciaMut(Nombre("T")).
+// Cuando se arregle R9.0.1 completo, cambiar a &mut.
+
+// Estado de un oscilador de fase
+estructural Fase {
+    valor: Real,       // fase actual [0, 1)
+    inc: Real,         // incremento por muestra (frecuencia / sample_rate)
+}
+
+// Crear una nueva Fase
+función fase_nuevo(el freq: Real, el sample_rate: Real) -> Fase {
+    el inc: Real = freq / sample_rate;
+    el resultado: Fase = Fase { valor: 0.0, inc: inc };
+    retornar resultado;
+}
+
+// Avanzar la fase y retornar la nueva fase (pasar por valor)
+función fase_avanzar(el fase: Fase) -> Fase puro vectorizable {
+    el nuevo_valor: Real = fase.valor + fase.inc;
+    si nuevo_valor >= 1.0 {
+        el resultado: Fase = Fase { valor: nuevo_valor - 1.0, inc: fase.inc };
+        retornar resultado;
+    }
+    el resultado: Fase = Fase { valor: nuevo_valor, inc: fase.inc };
+    retornar resultado;
+}
+
+// Obtener el valor del oscilador sin avanzar
+función fase_valor(el fase: Fase) -> Real puro {
+    retornar seno_2pi(fase.valor);
+}

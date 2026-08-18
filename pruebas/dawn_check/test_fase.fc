@@ -1,0 +1,49 @@
+// Test F6: Fase nativa — por valor (sin &mut, bug de resolución)
+estructural Fase {
+    valor: Real,
+    inc: Real,
+}
+
+función fase_nuevo(el freq: Real, el sample_rate: Real) -> Fase {
+    el inc: Real = freq / sample_rate;
+    el resultado: Fase = Fase { valor: 0.0, inc: inc };
+    retornar resultado;
+}
+
+// Retorna (fase_nueva, valor_seno) — sin &mut
+función fase_avanzar(el fase: Fase) -> Fase puro vectorizable {
+    el nuevo_valor: Real = fase.valor + fase.inc;
+    si nuevo_valor >= 1.0 {
+        el resultado: Fase = Fase { valor: nuevo_valor - 1.0, inc: fase.inc };
+        retornar resultado;
+    }
+    el resultado: Fase = Fase { valor: nuevo_valor, inc: fase.inc };
+    retornar resultado;
+}
+
+// Obtener valor sin avanzar
+función fase_valor(el fase: Fase) -> Real puro {
+    retornar seno_2pi(fase.valor);
+}
+
+función principal() -> Entero32 {
+    el osc: Fase = fase_nuevo(440.0, 44100.0);
+    imprimir_linea("inc = {osc.inc}");
+    
+    // Avanzar encadenando
+    el osc2: Fase = fase_avanzar(osc);
+    el osc3: Fase = fase_avanzar(osc2);
+    el osc4: Fase = fase_avanzar(osc3);
+    
+    el v1: Real = fase_valor(osc2);
+    el v2: Real = fase_valor(osc3);
+    el v3: Real = fase_valor(osc4);
+    imprimir_linea("val1 = {v1}, val2 = {v2}, val3 = {v3}");
+    
+    // Reset
+    el osc5: Fase = fase_nuevo(440.0, 44100.0);
+    el v4: Real = fase_valor(osc5);
+    imprimir_linea("reset: val4 = {v4}");
+    
+    retornar 0;
+}
