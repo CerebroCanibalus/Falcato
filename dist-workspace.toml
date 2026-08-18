@@ -13,17 +13,8 @@ installers = ["shell", "powershell", "msi"]
 targets = ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
 # Build command
 build-command = "cargo build --release"
-
-# Regla Day-0: TODO en español, incluidos los releases.
-# El título/cuerpo del GitHub Release se genera desde el CHANGELOG.md (en español).
-# Mensaje de éxito de los instaladores (shell/powershell) en español.
+# Regla Day-0: TODO en español
 install-success-msg = "Falcato instalado correctamente."
-
-# El changelog alimenta el body del release (release-bodies).
-[package]
-name = "falcato"
-version = "0.7.0"
-description = "Lenguaje de programación de sistemas iberohablante sobre Cranelift"
-repository = "https://github.com/CerebroCanibalus/falcato"
+# El changelog alimenta el body del release
 changelog = "CHANGELOG.md"
 
