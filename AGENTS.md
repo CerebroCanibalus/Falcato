@@ -333,7 +333,7 @@ pruebas/unitest/
   - [x] **F2 — Builtins _rapido/_2pi**: funcional (usan libm)
   - [x] **F3 — Builtins _aprox**: placeholder
   - [x] **F4 — Tipos de precisión**: `Real_preciso`, `Real_rapido`, `Real_aprox` via `apodo` + builtins `_preciso` (`seno_preciso`, `coseno_preciso`, `tangente_preciso`, `exp_preciso`, `log_preciso`) **✅ 2026-08-17**
-  - [ ] **F5 — SIMD `vectorizable`**: effect + codegen vectorizado (4×Real, 8×Real32)
+  - [x] **F5 — Efecto `vectorizable`**: keyword + parser + AST (metadata; codegen SIMD pendiente) **✅ 2026-08-17**
   - [ ] **F6 — Fase nativa**: `estructural Fase` + `fase_avanzar` en stdlib (`librerias/math.fc`)
   - [ ] **F7 — Polinomios minimax REALES**: reemplazar libm con polinomios Remez grado 5/7 en math.rs
 
