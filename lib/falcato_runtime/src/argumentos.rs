@@ -181,7 +181,7 @@ mod imp {
         }
 
         for i in 0..count {
-            let (data, len) = copiar_str(*argv_ptr.add(i));
+            let (data, len) = copiar_str(*(*argv_ptr).add(i));
             let desc = malloc(TAM_DESCRIPTOR) as *mut u8;
             if desc.is_null() {
                 continue;

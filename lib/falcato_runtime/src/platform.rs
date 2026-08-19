@@ -95,11 +95,11 @@ mod imp {
         fn pthread_mutex_lock(mtx: *mut c_void) -> i32;
         fn pthread_mutex_unlock(mtx: *mut c_void) -> i32;
         fn pthread_mutex_destroy(mtx: *mut c_void) -> i32;
-        fn sem_init(sem: *mut c_void, pshared: i32, value: u32) -> i32;
-        fn sem_wait(sem: *mut c_void) -> i32;
-        fn sem_trywait(sem: *mut c_void) -> i32;
-        fn sem_post(sem: *mut c_void) -> i32;
-        fn sem_destroy(sem: *mut c_void) -> i32;
+        fn sys_sem_init(sem: *mut c_void, pshared: i32, value: u32) -> i32;
+        fn sys_sem_wait(sem: *mut c_void) -> i32;
+        fn sys_sem_trywait(sem: *mut c_void) -> i32;
+        fn sys_sem_post(sem: *mut c_void) -> i32;
+        fn sys_sem_destroy(sem: *mut c_void) -> i32;
         fn malloc(size: usize) -> *mut c_void;
         fn free(ptr: *mut c_void);
     }
@@ -117,53 +117,50 @@ mod imp {
     #[cfg(not(target_os = "macos"))]
     const SEM_T_SIZE: usize = 32;         // x86_64 Linux
 
-    pub type Mutex = [u8; PTHREAD_MUTEX_SIZE];
-    pub type Semaphore = [u8; SEM_T_SIZE];
-
-    pub unsafe fn mutex_init() -> *mut Mutex {
-        let mtx = malloc(PTHREAD_MUTEX_SIZE) as *mut Mutex;
+    pub unsafe fn mutex_init() -> *mut c_void {
+        let mtx = malloc(PTHREAD_MUTEX_SIZE);
         if !mtx.is_null() {
-            pthread_mutex_init(mtx as *mut c_void, core::ptr::null());
+            pthread_mutex_init(mtx, core::ptr::null());
         }
         mtx
     }
 
-    pub unsafe fn sem_init(initial_count: i32, _max_count: i32) -> *mut Semaphore {
-        let sem = malloc(SEM_T_SIZE) as *mut Semaphore;
+    pub unsafe fn sem_init(initial_count: i32, _max_count: i32) -> *mut c_void {
+        let sem = malloc(SEM_T_SIZE);
         if !sem.is_null() {
-            sem_init(sem as *mut c_void, 0, initial_count as u32);
+            sys_sem_init(sem, 0, initial_count as u32);
         }
         sem
     }
 
-    pub unsafe fn mutex_lock(mtx: *mut Mutex) -> i32 {
-        pthread_mutex_lock(mtx as *mut c_void)
+    pub unsafe fn mutex_lock(mtx: *mut c_void) -> i32 {
+        pthread_mutex_lock(mtx)
     }
 
-    pub unsafe fn mutex_unlock(mtx: *mut Mutex) -> i32 {
-        pthread_mutex_unlock(mtx as *mut c_void)
+    pub unsafe fn mutex_unlock(mtx: *mut c_void) -> i32 {
+        pthread_mutex_unlock(mtx)
     }
 
-    pub unsafe fn sem_wait(sem: *mut Semaphore) -> i32 {
-        sem_wait(sem as *mut c_void)
+    pub unsafe fn sem_wait(sem: *mut c_void) -> i32 {
+        sys_sem_wait(sem)
     }
 
-    pub unsafe fn sem_trywait(sem: *mut Semaphore) -> i32 {
-        sem_trywait(sem as *mut c_void)
+    pub unsafe fn sem_trywait(sem: *mut c_void) -> i32 {
+        sys_sem_trywait(sem)
     }
 
-    pub unsafe fn sem_post(sem: *mut Semaphore) -> i32 {
-        sem_post(sem as *mut c_void)
+    pub unsafe fn sem_post(sem: *mut c_void) -> i32 {
+        sys_sem_post(sem)
     }
 
-    pub unsafe fn mutex_destroy(mtx: *mut Mutex) {
-        pthread_mutex_destroy(mtx as *mut c_void);
-        free(mtx as *mut c_void);
+    pub unsafe fn mutex_destroy(mtx: *mut c_void) {
+        pthread_mutex_destroy(mtx);
+        free(mtx);
     }
 
-    pub unsafe fn sem_destroy(sem: *mut Semaphore) {
-        sem_destroy(sem as *mut c_void);
-        free(sem as *mut c_void);
+    pub unsafe fn sem_destroy(sem: *mut c_void) {
+        sys_sem_destroy(sem);
+        free(sem);
     }
 }
 
