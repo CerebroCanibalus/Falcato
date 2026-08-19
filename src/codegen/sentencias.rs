@@ -264,15 +264,12 @@ impl Codegen {
                                     _ => false,
                                 };
                                 // F-001: builtins que retornan colecciones (Vector, Diccionario,
-                                // Texto) devuelven un puntero I64 al descriptor en heap.
-                                // Hay que copiar los 24 bytes del descriptor, no guardar el puntero.
-                                let es_coleccion_builtin = matches!(
-                                    tipo,
-                                    Tipo::Nombre(ref n) if n == "Vector" || n == "Diccionario" || n == "Conjunto"
-                                ) || matches!(
-                                    tipo,
-                                    Tipo::Nombre(ref n) if n == "Texto"
-                                );
+                                  // Texto) devuelven un puntero I64 al descriptor en heap.
+                                  // Hay que copiar los 24 bytes del descriptor, no guardar el puntero.
+                                  let es_coleccion_builtin = matches!(
+                                      tipo,
+                                      Tipo::Vector(_) | Tipo::Diccionario(_, _) | Tipo::Conjunto(_) | Tipo::Texto
+                                  );
                                 if es_llamada_struct || es_coleccion_builtin {
                                     let base_ptr = builder.ins().stack_addr(types::I64, slot, 0);
                                     let src_ptr = self.compilar_expresion(&decl.valor, builder, variables)?;

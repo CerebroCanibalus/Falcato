@@ -200,23 +200,23 @@ impl Codegen {
             Tipo::Entero32 |
             Tipo::Natural32 |
             Tipo::Flotante32 => 4,
-            Tipo::Entero64 |
-            Tipo::Natural64 |
-            Tipo::Flotante64 |
-            Tipo::Palabra |
-            Tipo::Texto |
-            Tipo::Vector(_) |
-            Tipo::Diccionario(_, _) |
-            Tipo::Conjunto(_) |
-            Tipo::Resultado(_, _) |
-            Tipo::Option(_) |
-            Tipo::Puntero(_) |
-            Tipo::Referencia(_) |
-            Tipo::ReferenciaMut(_) |
-            Tipo::ReferenciaConLifetime(_, _) |
-            Tipo::ReferenciaMutConLifetime(_, _) |
-            Tipo::ReferenciaSelf(_) |
-            Tipo::ReferenciaMutSelf(_) => 8,
+              Tipo::Entero64 |
+              Tipo::Natural64 |
+              Tipo::Flotante64 |
+              Tipo::Palabra |
+              Tipo::Texto |
+              Tipo::Vector(_) |
+              Tipo::Diccionario(_, _) |
+              Tipo::Conjunto(_) |
+              Tipo::Resultado(_, _) |
+              Tipo::Option(_) |
+              Tipo::Puntero(_) |
+              Tipo::Referencia(_) |
+              Tipo::ReferenciaMut(_) |
+              Tipo::ReferenciaConLifetime(_, _) |
+              Tipo::ReferenciaMutConLifetime(_, _) |
+              Tipo::ReferenciaSelf(_) |
+              Tipo::ReferenciaMutSelf(_) => 8,
             Tipo::Array(tipo_elem, longitud) => self.tamano_tipo(tipo_elem) * (*longitud as u32),
             Tipo::ArrayGenerico(tipo_elem, _) => {
                 // En monomorfizaciÃƒÂ³n, esto se reemplaza por Array con tamaÃƒÂ±o conocido
@@ -300,8 +300,9 @@ impl Codegen {
                     "texto_nuevo" | "texto_desde" | "texto_concatenar" | "texto_subtexto" => {
                         Tipo::Texto
                     }
-                    "archivo_leer" => Tipo::Texto,
-                    "vector_nuevo" => Tipo::Vector(Box::new(Tipo::Entero32)),
+                      "archivo_leer" => Tipo::Texto,
+                      "archivo_listar" => Tipo::Vector(Box::new(Tipo::Texto)),
+                      "vector_nuevo" => Tipo::Vector(Box::new(Tipo::Entero32)),
                     "canal_nuevo" => Tipo::Entero64,
                     "tcp_vincular" | "tcp_aceptar" => Tipo::Entero64,
                     "abs" | "max" | "min" | "texto_longitud" | "texto_comparar" | "archivo_escribir" => {

@@ -578,11 +578,11 @@ Ecosistema estilo crates.io pero **sin registry central**: contenido por hash, �
 
 | ID | Bug | Pieza bloqueada | Estado |
 |----|-----|-----------------|--------|
-| F-001 | `archivo_listar` CRASHEA (0xC0000005) al asignar `Vector<Texto>` — runtime escribe descriptor bien, codegen devuelve `desc_out` pero la asignación crashea. `archivo_leer` (mismo patrón) SÍ funciona → bug específico de Vector | `fs.fc` (MCP) | ✅ **RESUELTO** — `copiar_mem` para colecciones builtin en `sentencias.rs` |
+| F-001 | `archivo_listar` CRASHEA (0xC0000005) al asignar `Vector<Texto>` | `fs.fc` (MCP) | ✅ **RESUELTO** — (1) `inferir_tipo` en codegen/tipos.rs reconoce `archivo_listar` → `Vector<Texto>`; (2) runtime usa array de punteros a descriptores (no inline) |
 | F-002 | Inconsistencia de API: `archivo_escribir/leer/existe` esperan `Palabra` (ruta literal) mientras `archivo_agregar/renombrar/borrar` esperan `Texto` | ergonomía | ⏳ sugerencia |
 | F-003 | Inconsistencia de API: `tcp_conectar` espera `Palabra` (host literal) mientras `tls_conectar` espera `Texto` | ergonomía | ⏳ sugerencia |
 | F-004 | `entero_a_texto` espera `Entero64` — un `Entero32` da T001; requiere `como_entero64()` manual | ergonomía | ✅ **RESUELTO** — `sextend` automático a I64 en `builtins.rs` |
-| F-005 | `flotante_a_texto(3.14159)` → "3.1415899999999999" (precisión float64 cruda, sin formateo) | JSON serializer (números feos) | ✅ **RESUELTO** — runtime ya usa `%.17g` desde R9.0.3 |
+| F-005 | `flotante_a_texto(3.14159)` → "3.1415899999999999" (precisión float64 cruda, sin formateo) | JSON serializer (números feos) | ✅ **RESUELTO** — runtime usa `%.15g` (precisión razonable, notación científica si necesario) |
 
 ## Estado de distribución (v0.5.0 — Alpha)
 | Aspecto | Estado |

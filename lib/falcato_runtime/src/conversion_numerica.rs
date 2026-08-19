@@ -73,7 +73,7 @@ pub unsafe extern "C" fn falcato_entero_a_texto(n: i64, desc_out: i64) {
 }
 
 /// Convierte un flotante (f64) a texto.
-/// Formato: "%.17g" (precisión round-trip, notación científica si necesario).
+/// Formato: "%.15g" (precisión razonable, notación científica si necesario).
 ///
 /// # Safety
 /// - `desc_out` debe ser un puntero válido a un descriptor de Texto (24 bytes)
@@ -87,9 +87,9 @@ pub unsafe extern "C" fn falcato_flotante_a_texto(f_bits: i64, desc_out: i64) {
     // Reinterpretar los bits como f64
     let f = f64::from_bits(f_bits as u64);
 
-    // Buffer temporal para snprintf (32 bytes es suficiente para f64 con %.17g)
+    // Buffer temporal para snprintf (32 bytes es suficiente para f64 con %.15g)
     let mut buffer = [0u8; 64];
-    let format = b"%.17g\0";
+    let format = b"%.15g\0";
 
     let len = snprintf(
         buffer.as_mut_ptr(),

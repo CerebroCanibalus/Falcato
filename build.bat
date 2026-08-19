@@ -16,7 +16,8 @@ if not exist "Cargo.toml" (
     exit /b 1
 )
 
-echo [1/4] Compilando compilador Falcato...
+set PROGRESS=[░░░░░░░░░░░░░░░░░░░░]
+echo %PROGRESS% [1/4] Compilando compilador Falcato...
 cargo build --release
 
 if errorlevel 1 (
@@ -24,7 +25,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [2/4] Ejecutando tests...
+set PROGRESS=[█████░░░░░░░░░░░░░░░]
+echo %PROGRESS% [2/4] Ejecutando tests...
 cargo test
 
 if errorlevel 1 (
@@ -32,7 +34,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [3/4] Compilando ejemplo hola_mundo.fc...
+set PROGRESS=[██████████░░░░░░░░░░]
+echo %PROGRESS% [3/4] Compilando ejemplo hola_mundo.fc...
 target\release\falcato.exe compila ejemplos\hola_mundo.fc --salida hola_mundo.exe
 
 if errorlevel 1 (
@@ -40,7 +43,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [4/4] Ejecutando hola_mundo.exe...
+set PROGRESS=[███████████████░░░░░]
+echo %PROGRESS% [4/4] Ejecutando hola_mundo.exe...
 hola_mundo.exe
 
 if errorlevel 1 (
@@ -48,7 +52,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
+set PROGRESS=[████████████████████]
 echo.
-echo ==========================================
-echo ¡Compilación exitosa!
+echo %PROGRESS% ¡Compilación exitosa!
 echo ==========================================

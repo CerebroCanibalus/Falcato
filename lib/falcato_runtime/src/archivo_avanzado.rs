@@ -377,28 +377,36 @@ mod imp {
         }
         FindClose(handle);
 
-        // Construir array de descriptores Texto en heap
-        let count = nombres.len();
-        let tam_descriptor = 24usize; // sizeof(Texto descriptor)
-        let array_size = count * tam_descriptor;
-        let array_ptr = malloc(array_size) as *mut u8;
-        if array_ptr.is_null() {
-            // Liberar nombres
-            for (ptr, _) in nombres {
-                free(ptr as *mut c_void);
-            }
-            return;
-        }
+          // Construir array de PUNTEROS a descriptores Texto en heap
+          // Convención: Vector<Texto> contiene punteros a descriptores individuales
+          let count = nombres.len();
+          let tam_puntero = 8usize; // sizeof(puntero)
+          let array_size = count * tam_puntero;
+          let array_ptr = malloc(array_size) as *mut u8;
+          if array_ptr.is_null() {
+              // Liberar nombres
+              for (ptr, _) in nombres {
+                  free(ptr as *mut c_void);
+              }
+              return;
+          }
 
-        // Copiar cada descriptor al array
-        for (i, (nombre_ptr, nombre_len)) in nombres.iter().enumerate() {
-            let desc_ptr = array_ptr.offset((i * tam_descriptor) as isize);
-            let cap = nombre_len + 1;
-            // Escribir ptr, len, cap en el descriptor
-            *(desc_ptr as *mut i64) = *nombre_ptr as i64;
-            *(desc_ptr.offset(8) as *mut i64) = *nombre_len as i64;
-            *(desc_ptr.offset(16) as *mut i64) = cap as i64;
-        }
+          // Crear un descriptor individual para cada nombre y guardar puntero en el array
+          for (i, (nombre_ptr, nombre_len)) in nombres.iter().enumerate() {
+              // Crear descriptor de Texto en heap (24 bytes)
+              let desc_ptr = malloc(24) as *mut u8;
+              if desc_ptr.is_null() {
+                  free(*nombre_ptr as *mut c_void);
+                  continue;
+              }
+              let cap = *nombre_len + 1;
+              // Escribir ptr, len, cap en el descriptor
+              *(desc_ptr as *mut i64) = *nombre_ptr as i64;
+              *(desc_ptr.offset(8) as *mut i64) = *nombre_len as i64;
+              *(desc_ptr.offset(16) as *mut i64) = cap as i64;
+              // Guardar puntero al descriptor en el array
+              *(array_ptr.offset((i * tam_puntero) as isize) as *mut i64) = desc_ptr as i64;
+          }
 
         // Escribir descriptor del Vector<Texto>
         escribir_campo(desc_out, OFFSET_PTR, array_ptr as i64);
@@ -614,22 +622,30 @@ mod imp {
         }
         closedir(d);
 
-        let count = nombres.len();
-        let tam_descriptor = 24usize;
-        let array_size = count * tam_descriptor;
-        let array_ptr = malloc(array_size) as *mut u8;
-        if array_ptr.is_null() {
-            for (ptr, _) in nombres { free(ptr as *mut c_void); }
-            return;
-        }
+          // Construir array de PUNTEROS a descriptores Texto en heap
+          // Convención: Vector<Texto> contiene punteros a descriptores individuales
+          let count = nombres.len();
+          let tam_puntero = 8usize;
+          let array_size = count * tam_puntero;
+          let array_ptr = malloc(array_size) as *mut u8;
+          if array_ptr.is_null() {
+              for (ptr, _) in nombres { free(ptr as *mut c_void); }
+              return;
+          }
 
-        for (i, (nombre_ptr, nombre_len)) in nombres.iter().enumerate() {
-            let desc_ptr = array_ptr.offset((i * tam_descriptor) as isize);
-            let cap = nombre_len + 1;
-            *(desc_ptr as *mut i64) = *nombre_ptr as i64;
-            *(desc_ptr.offset(8) as *mut i64) = *nombre_len as i64;
-            *(desc_ptr.offset(16) as *mut i64) = cap as i64;
-        }
+          // Crear un descriptor individual para cada nombre y guardar puntero en el array
+          for (i, (nombre_ptr, nombre_len)) in nombres.iter().enumerate() {
+              let desc_ptr = malloc(24) as *mut u8;
+              if desc_ptr.is_null() {
+                  free(*nombre_ptr as *mut c_void);
+                  continue;
+              }
+              let cap = *nombre_len + 1;
+              *(desc_ptr as *mut i64) = *nombre_ptr as i64;
+              *(desc_ptr.offset(8) as *mut i64) = *nombre_len as i64;
+              *(desc_ptr.offset(16) as *mut i64) = cap as i64;
+              *(array_ptr.offset((i * tam_puntero) as isize) as *mut i64) = desc_ptr as i64;
+          }
 
         escribir_campo(desc_out, OFFSET_PTR, array_ptr as i64);
         escribir_campo(desc_out, OFFSET_LEN, count as i64);
