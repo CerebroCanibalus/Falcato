@@ -1,0 +1,61 @@
+// unitest_forward_refs.fc — F-006: previene regresión del two-pass
+// ============================================================================
+// Spec: el analizador semántico hace DOS PASADAS.
+//   - Pasada 1: recolecta firmas de funciones, structs, enums, rasgos, apodos.
+//   - Pasada 2: analiza cuerpos de funciones, métodos y pruebas.
+//
+// Por tanto, una función puede llamarse ANTES de declararse en el archivo
+// (forward reference) y la inferencia de tipos del retorno debe resolver
+// correctamente. Antes del fix, el analizador procesaba en orden secuencial
+// y caía en el default `Tipo::Entero32` para cualquier llamada a una función
+// aún no registrada — falso positivo de "T001 Disconcordancia de tipo".
+// ============================================================================
+
+prueba "forward ref simple: bool" {
+    el r: Booleano = _forward_bool(texto_desde("hola"));
+    afirmar(r);
+}
+
+prueba "forward ref entre funciones mutuamente recursivas" {
+    el n: Entero32 = _es_par(4);
+    afirmar(n == 1);
+}
+
+prueba "forward ref con retorno Booleano (caso F-006)" {
+    el a: Entero32 = 5;
+    el b: Entero32 = 5;
+    el eq: Booleano = (a == b);
+    afirmar(eq);
+}
+
+prueba "struct forward ref" {
+    el p: Punto = _crear_punto();
+    afirmar(p.x == 10);
+    afirmar(p.y == 20);
+}
+
+// == Funciones declaradas DESPUÉS de su uso (forward refs) ====================
+
+función _forward_bool(la t: Texto) -> Booleano {
+    retornar texto_longitud(t) >= 0;
+}
+
+función _es_par(el n: Entero32) -> Entero32 {
+    si n == 0 { retornar 1; }
+    retornar _es_impar(n - 1);
+}
+
+función _es_impar(el n: Entero32) -> Entero32 {
+    si n == 0 { retornar 0; }
+    retornar _es_par(n - 1);
+}
+
+estructural Punto {
+    x: Entero32,
+    y: Entero32,
+}
+
+función _crear_punto() -> Punto {
+    el p: Punto = Punto { x: 10, y: 20 };
+    retornar p;
+}

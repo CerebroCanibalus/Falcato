@@ -1,5 +1,61 @@
 # Changelog de Falcato
 
+## [0.7.2] - 2026-08-19
+
+### 🔧 ARREGLOS
+
+- **F-006 — Análisis semántico en dos pasadas (BLOQUEANTE)**: el analizador
+  semántico ahora recolecta firmas en una primera pasada y analiza cuerpos
+  en una segunda. Esto resuelve falsos positivos de `[T001]` y `[T011]` cuando
+  una función llama a otra declarada más abajo (forward reference). Antes
+  del fix, la inferencia de tipos caía en el default `Entero32` y producía
+  errores espurios como "balance_ok es Entero32 pero se declaró Booleano".
+
+  Ejemplo que antes fallaba y ahora compila:
+  ```falcato
+  función usa_validar(la t: Texto) -> Booleano {
+      el r: Booleano = _validar(t);  // _validar declarada abajo
+      retornar r;
+  }
+  función _validar(la t: Texto) -> Booleano { retornar verdadero; }
+  ```
+
+  Cubre también forward references de **structs, enums, rasgos, apodos y
+  métodos de impl** (no solo funciones). Patrón estándar de compiladores
+  modernos (Rust, Go, Zig).
+
+- **Detección de shadowing (warnings T031-T035)**: declaraciones duplicadas
+  de funciones, structs, enums, rasgos o apodos ahora emiten un warning con
+  span, en vez de sobrescribirse silenciosamente. Antes, `json_reparador.fc`
+  tenía `_jr_copiar` y `_jr_es_igual` duplicadas (líneas 163/119 y 253/123)
+  y la última definición ganaba sin avisar — bomba de tiempo silenciosa.
+
+  Los warnings no bloquean la compilación. Códigos:
+  - `T031` Función duplicada
+  - `T032` Struct duplicado
+  - `T033` Enum duplicado
+  - `T034` Rasgo duplicado
+  - `T035` Apodo duplicado
+
+  Salida `--json` ahora incluye el campo `warnings: [...]`.
+
+### 🐛 BUGS DESCUBIERTOS (no resueltos en este release)
+
+- **F-007 — `Vacio` vs `Vacío` en archivos de Cid**: el lexer solo reconoce
+  `Vacío` (con tilde) como tipo `Tipo::Vacio`. Varios archivos de Cid
+  (`json_reparador.fc`, `http.fc`) escriben `Vacio` (sin tilde), que el
+  parser acepta como `Tipo::Nombre("Vacio")` pero el codegen panicea con
+  "No se puede compilar tipo Nombre 'Vacio' sin resolver". Es bug del
+  archivo, no del compiler. Fix recomendado: en Cid, sed `s/-> Vacio/-> Vacío/g`.
+
+### ✅ VERIFICACIÓN
+
+- `cargo test`: 54/54 verde
+- `pruebas/unitest/`: 18 archivos (incluido nuevo `unitest_forward_refs.fc`)
+- Ejemplos: 76/83 compilan (7 intencionales)
+- Caso del reporte (Cid `json_reparador.fc`): ✅ verifica sin errores
+  (2 warnings `T031` por duplicados que el código silenciaba — fix recomendado)
+
 ## [0.7.1] - 2026-08-19
 
 ### 🔧 ARREGLOS

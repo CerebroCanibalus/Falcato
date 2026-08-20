@@ -539,7 +539,15 @@ fn compilar_individual(
     let mut semantica = AnalizadorSemantico::nuevo();
     semantica.analizar(&programa)
         .map_err(|e| format!("Errores semánticos:\n{}", e))?;
-    println!("[Falcato] Análisis semántico: sin errores de concordancia");
+    if semantica.errores.hay_warnings() {
+        for w in &semantica.errores.warnings {
+            eprintln!("{}", w);
+        }
+        println!("[Falcato] Análisis semántico: sin errores de concordancia ({} advertencia(s))",
+            semantica.errores.cantidad_warnings());
+    } else {
+        println!("[Falcato] Análisis semántico: sin errores de concordancia");
+    }
 
     let mut codegen = Codegen::nuevo("main")
         .map_err(|e| format!("Error inicializando codegen: {}", e))?;
@@ -668,10 +676,31 @@ fn verificar_fuente(archivo: &str, fuente: &str, json: bool, incremental: bool) 
         }
     }
 
+    // F-006: imprimir warnings (shadowing de declaraciones) sin abortar
+    if !json && semantica.errores.hay_warnings() {
+        for w in &semantica.errores.warnings {
+            eprintln!("{}", w);
+        }
+    }
+
     if json {
-        println!("{{\"ok\":true,\"archivo\":\"{}\"}}", escapar_json(archivo));
+        let warnings_json: String = semantica.errores.warnings.iter()
+            .map(formato_error_json)
+            .collect::<Vec<_>>()
+            .join(",");
+        if warnings_json.is_empty() {
+            println!("{{\"ok\":true,\"archivo\":\"{}\"}}", escapar_json(archivo));
+        } else {
+            println!("{{\"ok\":true,\"archivo\":\"{}\",\"warnings\":[{}]}}",
+                escapar_json(archivo), warnings_json);
+        }
     } else {
-        println!("[Falcato] '{}' verificado: sin errores", archivo);
+        if semantica.errores.hay_warnings() {
+            println!("[Falcato] '{}' verificado: sin errores ({} advertencia(s))",
+                archivo, semantica.errores.cantidad_warnings());
+        } else {
+            println!("[Falcato] '{}' verificado: sin errores", archivo);
+        }
         if incremental {
             escribir_cache_check(archivo, fuente);
         }
@@ -891,6 +920,12 @@ fn ejecutar_pruebas(archivos: &[String], _json: bool) -> Result<(), String> {
     let mut semantica = AnalizadorSemantico::nuevo();
     semantica.analizar(&programa)
         .map_err(|e| format!("Errores semánticos:\n{}", e))?;
+    // F-006: warnings (shadowing) no abortan, pero se reportan
+    if semantica.errores.hay_warnings() {
+        for w in &semantica.errores.warnings {
+            eprintln!("{}", w);
+        }
+    }
 
     let mut codegen = Codegen::nuevo("main")
         .map_err(|e| format!("Error inicializando codegen: {}", e))?;

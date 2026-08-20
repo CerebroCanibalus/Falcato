@@ -89,6 +89,10 @@ impl std::error::Error for ErrorCompilador {}
 #[derive(Debug, Clone, Default)]
 pub struct Errores {
     pub errores: Vec<ErrorCompilador>,
+    /// Warnings: no bloquean la compilación, pero se reportan al usuario
+    /// (categoría Warning W### o cualquier código que el compilador decida
+    /// tratar como advertencia — p. ej. T031-T039: shadowing/duplicados).
+    pub warnings: Vec<ErrorCompilador>,
 }
 
 impl Errores {
@@ -100,6 +104,11 @@ impl Errores {
         self.errores.push(error);
     }
 
+    /// Añade un warning (no bloquea la compilación).
+    pub fn agregar_warning(&mut self, warning: ErrorCompilador) {
+        self.warnings.push(warning);
+    }
+
     pub fn esta_vacio(&self) -> bool {
         self.errores.is_empty()
     }
@@ -108,8 +117,16 @@ impl Errores {
         !self.errores.is_empty()
     }
 
+    pub fn hay_warnings(&self) -> bool {
+        !self.warnings.is_empty()
+    }
+
     pub fn cantidad(&self) -> usize {
         self.errores.len()
+    }
+
+    pub fn cantidad_warnings(&self) -> usize {
+        self.warnings.len()
     }
 }
 
@@ -117,6 +134,9 @@ impl fmt::Display for Errores {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for error in &self.errores {
             writeln!(f, "{}", error)?;
+        }
+        for warning in &self.warnings {
+            writeln!(f, "{}", warning)?;
         }
         Ok(())
     }

@@ -96,17 +96,19 @@ wix/main.wxs             # Plantilla MSI (cargo-dist)
 dist-workspace.toml      # Config cargo-dist
 ```
 
-## Estado del proyecto (v0.6.1)
+## Estado del proyecto (v0.7.2)
 Pipeline end-to-end operativo. Turing-completo con:
 - **Core:** variables, ops, condicionales, bucles, arrays, structs, enums, generics (const+type)
 - **Ownership:** `el`/`la`/`un`/`los`/`las`, mover/copiar/prestar, `&T`/`&mut T`, field-level borrowing, lifetimes léxicos, regiones, self-ref `&yo`, efectos `puro`/`muta`/`lee`, branch-aware liveness, borrow checker gradual (N0→N1→N2)
 - **Async:** threads reales, TCP (Winsock2), canales mpsc, thread pool, cancelación, stackless futures, `con_executor`, `seleccionar { }`
-- **Built-ins:** Texto, Vector, Diccionario, Conjunto, Resultado<T,E>, bitwise, I/O polimórfico, interpolación, file I/O, matemáticas, sizeof
-- **Plataforma:** Capas A/B/C — Windows+Linux+macOS
+- **Built-ins:** Texto, Vector, Diccionario, Conjunto, Resultado<T,E>, Option<T>, bitwise, I/O polimórfico, interpolación, file I/O, matemáticas, trigonometría, sizeof
+- **Plataforma:** Capas A/B/C — Windows+Linux+macOS (10 fixes macOS en 0.7.0)
 - **LSP:** 6 features, integrado OpenCode, signature help, code actions, context-aware completion
+- **Aritmética consciente (0.7.0):** `a + b fuese` (checked), `un x = a + b` (Option), `romper`/`continuar`, notación científica `1e3`
+- **Análisis semántico two-pass (0.7.2):** forward references de funciones/structs/enums/rasgos/apodos/métodos de impl; detección de shadowing con warnings T031-T035
 - **Docs:** GUIA.md + 15 capítulos, REFERENCIA.md, ERRORES.md, skill falcato-language, VS Code Extension (Falcato Dorado)
 - **Instalación:** cargo-dist (MSI+shell+powershell), `falcato setup --all`, install.ps1 legacy
-- **54/54 tests pasan. 68/75 ejemplos compilan** (7 restantes son errores intencionales de demostración).
+- **54/54 tests + 18 unitest pasan. 76/83 ejemplos compilan** (7 restantes son errores intencionales de demostración).
 
 ## Reorganización de módulos (2026-08-19)
 > **Objetivo:** Dividir módulos gigantes (>1500 LOC) en submódulos manejables. Prioridad: deuda técnica mientras Cid trabaja.
@@ -757,6 +759,7 @@ Auditoría completa en cada release mayor (v0.5.0, v0.6.0…). Semáforo: 🟢 c
 ---
 
 ## Descubrimientos (lecciones — causa raíz + fix)
+- **F-006 — Análisis semántico en UNA sola pasada rompía forward references (2026-08-19)**: `json_parsear` (línea 201 de `json_reparador.fc`) llamaba a `_jr_validar_balance` (línea 264). El analizador procesaba declaraciones en orden secuencial — cuando llegaba al cuerpo de `json_parsear`, la firma de `_jr_validar_balance` aún no estaba en `self.funciones` → `buscar_funcion` devolvía `None` → `inferir_tipo` (tipos.rs:370) caía en `Tipo::Entero32` por defecto. Resultado: `[T001] balance_ok es Entero32 pero se declaró Booleano` (falso positivo). Fix: refactor del dispatcher en dos pasadas — `recolectar_firmas_decl` (firma de funciones, structs, enums, rasgos, apodos, métodos de impl, imports, módulos anidados) ANTES de `analizar_cuerpos_decl` (cuerpos de funciones/métodos/pruebas). Patrón estándar (Rust, Go, Zig). **Bonus:** detección de shadowing (warnings T031-T035) — antes las funciones duplicadas se sobrescribían silenciosamente (`json_reparador.fc` tenía `_jr_copiar` en líneas 119/163 y `_jr_es_igual` en 123/253). **Lección:** el bug reportado como "inferencia booleana rota" era en realidad un orden de inicialización — la sospecha del reporte apuntaba a `tipos.rs` pero la causa estaba en `mod.rs`. **Validado por:** `pruebas/unitest/unitest_forward_refs.fc` (4/4 verde) + caso del reporte (`json_reparador.fc` verifica sin errores, 2 warnings T031). **Bug colateral F-007:** los archivos de Cid escriben `Vacio` (sin tilde) en vez de `Vacío` — bug de archivos, no del compiler; el lexer solo reconoce `Vacío`. Fix recomendado en Cid: `sed 's/-> Vacio\b/-> Vacío/g' src/lib/*.fc`.
 - **R9.0.2 — el Diccionario distinguía structs por TAMAÑO, no por TIPO (2026-08-13)**: `diccionario_cargar_valor`/`guardar_valor` usaban `match tamano_tipo` — un struct de 8 bytes (2×Entero32, como InfoNota) caía en el caso I64 y guardaba el PUNTERO en vez del struct (y al cargar devolvía el struct empaquetado como si fuera un puntero → `canal: -1396705240` con 1 entrada, y basura con resize). Fix: distinguir por `tipo_es_struct` (no por tamaño) — structs se copian del ptr (loads/stores) y se cargan devolviendo el PUNTERO al bucket. Además: declaración con `diccionario_obtener<K,Struct>` copia del ptr al slot (patrón R9.0.1), e `inferir_tipo` del codegen conoce que `diccionario_obtener<K,V>` retorna V. **Lección:** el tamaño no define la semántica — un struct de 8 bytes NO es un Entero64.
 - **R6 — retorno temprano en bucle panica `liberar_scope` (bug pre-existente, 2026-08-13)**: `retornar 1` dentro de un `si` anidado en un bucle llamaba `liberar_scope(0)` que libera TODO el heap (incluidas variables de scopes exteriores como `d: Diccionario`). Los epílogos de bucles/ramas intentaban luego `liberar_scope(marca)` con marcas obsoletas (desde > len) → panic "range start index X out of range". Fix en `liberar_scope`: guard `if desde > heap_vivas.len() { podar scope_marcas; return Ok }` + poda de `scope_marcas` tras truncate. **Efecto colateral:** arregló `ejemplos/argumentos_tipados.fc` (panica pre-existente) → 68/75 ejemplos (paridad con AGENTS.md).
 - **R9.0.3 — conversión numérica era un builtin por función, no una familia (2026-08-13)**: `como_entero32`/`como_entero64` eran `ireduce`/`sextend` fijos y la semántica registraba `como_entero32` esperando SOLO `Entero64`. Fix: helper único `builtin_conversion_numerica(destino)` que despacha por tipo fuente→destino — entero→entero (sextend/ireduce), flotante→entero (`fcvt_to_sint` trunca hacia cero como cast C), entero→flotante (`fcvt_from_sint`), flotante→flotante (`fpromote`/`fdemote`). En semántica, flag `es_conversion_numerica` (como `es_polimorfica`) acepta cualquier tipo numérico. API: `como_entero8/16/32/64` + `como_flotante32/64`. **Lección:** una familia de builtins con misma semántica = un helper con `Tipo` destino, no N funciones duplicadas. Verificado: `3.7→3`, `-3.9→-3` (trunca hacia cero), `440→f64 440`, i8/i16/i64. `test_conv.fc`.

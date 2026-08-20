@@ -502,4 +502,21 @@ No puedes modificar algo que no es 'tuyo'.",
         }
         self.errores.agregar(error);
     }
+
+    /// Helper para reportar warnings (no bloquean la compilación).
+    /// Usado por F-006 para detectar shadowing (declaraciones duplicadas)
+    /// sin romper archivos que ya compilan con duplicados (ej. `json_reparador.fc`).
+    pub(crate) fn reportar_warning(
+        &mut self,
+        codigo: u32,
+        span: &Span,
+        mensaje: String,
+        sugerencia: Option<String>,
+    ) {
+        let mut warning = ErrorCompilador::nuevo(CategoriaError::Tipo, codigo, span.clone(), mensaje);
+        if let Some(sug) = sugerencia {
+            warning = warning.con_sugerencia(sug);
+        }
+        self.errores.agregar_warning(warning);
+    }
 }

@@ -43,6 +43,13 @@ pub mod codigos {
     pub const BUCLE_NO_BOOLEANO: u32 = 12;
     pub const ASIGNACION_INCOMPATIBLE: u32 = 13;
 
+    // T031-T039: Shadowing / declaraciones duplicadas (warnings, no errores)
+    pub const FUNCION_DUPLICADA: u32 = 31;
+    pub const STRUCT_DUPLICADO: u32 = 32;
+    pub const ENUM_DUPLICADO: u32 = 33;
+    pub const RASGO_DUPLICADO: u32 = 34;
+    pub const APODO_DUPLICADO: u32 = 35;
+
     // M001-M099: Módulos
     pub const VISIBILIDAD_PRIVADA: u32 = 1;
     pub const SIMBOLO_NO_ENCONTRADO: u32 = 2;
@@ -1604,9 +1611,36 @@ impl AnalizadorSemantico {
         });
     }
 
+    /// Analiza un programa completo en dos pasadas (F-006).
+    ///
+    /// **Pasada 1 — Recolección de firmas**: registra TODAS las firmas
+    /// (funciones, structs, enums, rasgos, apodos, imports, métodos de impl)
+    /// ANTES de analizar cualquier cuerpo. Esto resuelve el bug F-006
+    /// (forward references) y previene el bug silencioso de shadowing:
+    /// una segunda declaración del mismo símbolo ahora genera un warning
+    /// con span, en vez de sobrescribirse silenciosamente.
+    ///
+    /// **Pasada 2 — Análisis de cuerpos**: analiza los cuerpos de funciones,
+    /// métodos de impl y bloques `prueba`. Con todas las firmas registradas,
+    /// la inferencia de tipos de llamadas a funciones forward-referenceadas
+    /// resuelve correctamente.
+    ///
+    /// Patrón estándar (Rust, Go, Zig hacen equivalente).
     pub fn analizar(&mut self, programa: &Programa) -> Result<(), Errores> {
+        // Pasada 1: recolectar firmas (sin analizar cuerpos)
         for decl in &programa.declaraciones {
-            self.analizar_declaracion(decl);
+            self.recolectar_firmas_decl(decl);
+        }
+
+        // Si la pasada 1 ya detectó errores fatales (duplicados de nivel grave),
+        // cortamos aquí — analizar cuerpos con tablas corruptas solo empeoraría.
+        if self.errores.hay_errores() {
+            return Err(self.errores.clone());
+        }
+
+        // Pasada 2: analizar cuerpos (funciones, métodos, pruebas)
+        for decl in &programa.declaraciones {
+            self.analizar_cuerpos_decl(decl);
         }
 
         if self.errores.hay_errores() {
@@ -1616,12 +1650,33 @@ impl AnalizadorSemantico {
         }
     }
 
-    fn analizar_declaracion(&mut self, decl: &Declaracion) {
+    /// **Pasada 1 del análisis (F-006)**: recolecta firmas sin tocar cuerpos.
+    ///
+    /// Para cada declaración, registra su firma/nombre en la tabla correspondiente.
+    /// Detecta shadowing (declaración duplicada) y emite un **warning** con span
+    /// — antes el shadowing se silenciaba y la última definición ganaba, lo que
+    /// producía bugs difíciles de rastrear (ej. `json_reparador.fc` tiene
+    /// `_jr_copiar` y `_jr_es_igual` duplicadas; antes ganaba la última en orden
+    /// de archivo sin avisar).
+    ///
+    /// Patrón estándar de compilers: Rust, Go, Zig recolectan firmas antes
+    /// de analizar cuerpos.
+    fn recolectar_firmas_decl(&mut self, decl: &Declaracion) {
         match decl {
             Declaracion::Funcion(func) => {
                 let es_top_level = self.modulo_actual.is_empty();
                 let nombre_registro = self.nombre_con_modulo(&func.nombre);
                 let es_publica = Self::es_funcion_publica(func, es_top_level);
+
+                // Detección de shadowing (warning, no error)
+                if self.funciones.contains_key(&nombre_registro) {
+                    self.reportar_warning(
+                        FUNCION_DUPLICADA,
+                        &func.span,
+                        format!("Función '{}' ya fue declarada; la nueva definición reemplaza a la anterior", func.nombre),
+                        Some(format!("Renombra la función o elimina una de las dos declaraciones")),
+                    );
+                }
 
                 let firma = FirmaFuncion {
                     nombre: nombre_registro.clone(),
@@ -1634,10 +1689,19 @@ impl AnalizadorSemantico {
                     es_publica,
                 };
                 self.funciones.insert(nombre_registro, firma);
-                self.analizar_funcion(func);
             }
             Declaracion::Estructural(s) => {
                 let nombre_registro = self.nombre_con_modulo(&s.nombre);
+
+                if self.structs.contains_key(&nombre_registro) {
+                    self.reportar_warning(
+                        STRUCT_DUPLICADO,
+                        &s.span,
+                        format!("Struct '{}' ya fue declarado", s.nombre),
+                        Some("Renombra el struct o elimina la declaración duplicada".to_string()),
+                    );
+                }
+
                 self.structs.insert(nombre_registro, InfoStruct {
                     nombre: s.nombre.clone(),
                     campos: s.campos.clone(),
@@ -1647,6 +1711,16 @@ impl AnalizadorSemantico {
             }
             Declaracion::Enumeracion(e) => {
                 let nombre_registro = self.nombre_con_modulo(&e.nombre);
+
+                if self.enums.contains_key(&nombre_registro) {
+                    self.reportar_warning(
+                        ENUM_DUPLICADO,
+                        &e.span,
+                        format!("Enum '{}' ya fue declarado", e.nombre),
+                        Some("Renombra el enum o elimina la declaración duplicada".to_string()),
+                    );
+                }
+
                 self.enums.insert(nombre_registro, InfoEnum {
                     nombre: e.nombre.clone(),
                     parametros_genericos: e.parametros_genericos.clone(),
@@ -1656,12 +1730,23 @@ impl AnalizadorSemantico {
             }
             Declaracion::Apodo(a) => {
                 let nombre_registro = self.nombre_con_modulo(&a.nombre);
+
+                if self.aliases.contains_key(&nombre_registro) {
+                    self.reportar_warning(
+                        APODO_DUPLICADO,
+                        &a.span,
+                        format!("Apodo '{}' ya fue declarado", a.nombre),
+                        Some("Renombra el apodo o elimina la declaración duplicada".to_string()),
+                    );
+                }
+
                 self.aliases.insert(nombre_registro, a.tipo.clone());
             }
             Declaracion::Modulo(modulo) => {
+                // Recursión: entrar al módulo, recolectar firmas, salir
                 self.modulo_actual.push(modulo.nombre.clone());
                 for decl in &modulo.contenido {
-                    self.analizar_declaracion(decl);
+                    self.recolectar_firmas_decl(decl);
                 }
                 self.modulo_actual.pop();
             }
@@ -1679,6 +1764,15 @@ impl AnalizadorSemantico {
                 }
             }
             Declaracion::Rasgo(rasgo) => {
+                if self.rasgos.contains_key(&rasgo.nombre) {
+                    self.reportar_warning(
+                        RASGO_DUPLICADO,
+                        &rasgo.span,
+                        format!("Rasgo '{}' ya fue declarado", rasgo.nombre),
+                        Some("Renombra el rasgo o elimina la declaración duplicada".to_string()),
+                    );
+                }
+
                 self.rasgos.insert(rasgo.nombre.clone(), InfoRasgo {
                     nombre: rasgo.nombre.clone(),
                     metodos: rasgo.metodos.clone(),
@@ -1686,13 +1780,67 @@ impl AnalizadorSemantico {
                 });
             }
             Declaracion::Implementacion(imp) => {
+                // Registrar la impl (la asociación rasgo→tipo)
                 let tipo_nombre = self.nombre_tipo_string(&imp.tipo);
                 self.impls.insert(
                     (imp.rasgo.clone(), tipo_nombre.clone()),
                     imp.metodos.iter().map(|m| m.nombre.clone()).collect()
                 );
-                
-                // Verificar que el rasgo existe
+
+                // Registrar cada método como función para que sea llamable
+                // (análisis de tipos en el cuerpo viene en la pasada 2)
+                let prefijo = format!("{}::{}", tipo_nombre, imp.rasgo);
+                for metodo in &imp.metodos {
+                    let nombre_registro = format!("{}::{}", prefijo, metodo.nombre);
+                    if self.funciones.contains_key(&nombre_registro) {
+                        self.reportar_warning(
+                            FUNCION_DUPLICADA,
+                            &metodo.span,
+                            format!("Método '{}' del impl '{}' para '{}' ya fue declarado",
+                                metodo.nombre, imp.rasgo, tipo_nombre),
+                            Some("Renombra el método o elimina el impl duplicado".to_string()),
+                        );
+                    }
+
+                    let firma = FirmaFuncion {
+                        nombre: nombre_registro.clone(),
+                        parametros_genericos: metodo.parametros_genericos.clone(),
+                        parametros: metodo.parametros.iter()
+                            .map(|p| (p.nombre.clone(), p.tipo.clone()))
+                            .collect(),
+                        retorno: metodo.retorno.clone(),
+                        span: metodo.span.clone(),
+                        es_publica: true,
+                    };
+                    self.funciones.insert(nombre_registro, firma);
+                }
+            }
+            Declaracion::Prueba(_) => {
+                // Las pruebas se analizan en pasada 2; nada que recolectar aquí
+            }
+        }
+    }
+
+    /// **Pasada 2 del análisis (F-006)**: analiza los cuerpos de funciones,
+    /// métodos de impl y bloques `prueba`. Para entonces, todas las firmas
+    /// ya están en las tablas, así que las llamadas forward-referenceadas
+    /// (como `json_parsear` llamando a `_jr_validar_balance` declarada más
+    /// abajo) infieren correctamente el tipo de retorno en vez de caer en
+    /// el default `Entero32`.
+    fn analizar_cuerpos_decl(&mut self, decl: &Declaracion) {
+        match decl {
+            Declaracion::Funcion(func) => {
+                self.analizar_funcion(func);
+            }
+            Declaracion::Modulo(modulo) => {
+                self.modulo_actual.push(modulo.nombre.clone());
+                for decl in &modulo.contenido {
+                    self.analizar_cuerpos_decl(decl);
+                }
+                self.modulo_actual.pop();
+            }
+            Declaracion::Implementacion(imp) => {
+                // Validar consistencia rasgo↔impl
                 if !self.rasgos.contains_key(&imp.rasgo) {
                     self.reportar_error(
                         CategoriaError::Tipo,
@@ -1702,14 +1850,13 @@ impl AnalizadorSemantico {
                         Some(format!("Declara el rasgo con: rasgo {} {{ ... }}", imp.rasgo))
                     );
                 }
-                
-                // Verificar que todos los métodos del rasgo están implementados
+
                 let metodos_requeridos: Vec<String> = if let Some(rasgo_info) = self.rasgos.get(&imp.rasgo) {
                     rasgo_info.metodos.iter().map(|m| m.nombre.clone()).collect()
                 } else {
                     Vec::new()
                 };
-                
+
                 for nombre_metodo in &metodos_requeridos {
                     if !imp.metodos.iter().any(|m| m.nombre == *nombre_metodo) {
                         self.reportar_error(
@@ -1722,8 +1869,8 @@ impl AnalizadorSemantico {
                         );
                     }
                 }
-                
-                // Analizar cada método como función normal
+
+                // Analizar cada método
                 for metodo in &imp.metodos {
                     self.analizar_funcion(metodo);
                 }
@@ -1733,6 +1880,9 @@ impl AnalizadorSemantico {
                 self.entorno = Entorno::con_padre(entorno_anterior);
                 self.analizar_bloque(&prueba.bloque);
                 self.entorno = *self.entorno.padre.take().unwrap_or_else(|| Box::new(Entorno::nuevo()));
+            }
+            _ => {
+                // Estructural, Enumeracion, Apodo, Usar, Rasgo: ya procesados en pasada 1
             }
         }
     }
