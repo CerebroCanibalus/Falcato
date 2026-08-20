@@ -27,6 +27,7 @@ pub enum Token {
     Es,
 
     #[token("está")]
+    #[token("esta")]
     Esta,
 
     #[token("fuese")]
@@ -51,12 +52,14 @@ pub enum Token {
     Estructural,
     
     #[token("enumeración")]
+    #[token("enumeracion")]
     Enumeracion,
     
     #[token("usar")]
     Usar,
     
     #[token("módulo")]
+    #[token("modulo")]
     Modulo,
     
     #[token("todos")]
@@ -173,6 +176,7 @@ pub enum Token {
     EnteroCorto,
     
     #[token("EnteroMínimo")]
+    #[token("EnteroMinimo")]
     EnteroMinimo,
     
     #[token("Natural")]
@@ -185,6 +189,7 @@ pub enum Token {
     NaturalCorto,
     
     #[token("NaturalMínimo")]
+    #[token("NaturalMinimo")]
     NaturalMinimo,
     
     #[token("Real")]
@@ -200,6 +205,7 @@ pub enum Token {
     RealCorto,
     
     #[token("Lógico")]
+    #[token("Logico")]
     Logico,
     
     #[token("Entero8")]
@@ -248,6 +254,7 @@ pub enum Token {
     Resultado,
     
     #[token("Vacío")]
+    #[token("Vacio")]
     Vacio,
 
     // Literales

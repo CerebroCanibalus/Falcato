@@ -1,5 +1,55 @@
 # Changelog de Falcato
 
+## [0.7.3] - 2026-08-19
+
+### ➕ ADICIONES
+
+- **Aliases sin tilde para keywords con tilde (ergonomía de typing)**:
+  las 9 keywords con tilde aceptan ahora también su forma sin tilde como
+  alias equivalente. La forma canónica en docs sigue siendo con tilde,
+  pero el parser acepta cualquiera — un hispanohablante que tipea rápido
+  ya no se encuentra con errores inesperados por omitir tildes.
+
+  Inventario:
+  - `función` ↔ `funcion` (alias preexistente)
+  - `está` ↔ `esta`
+  - `enumeración` ↔ `enumeracion`
+  - `módulo` ↔ `modulo`
+  - `región` ↔ `region` (alias preexistente)
+  - `EnteroMínimo` ↔ `EnteroMinimo`
+  - `NaturalMínimo` ↔ `NaturalMinimo`
+  - `Lógico` ↔ `Logico`
+  - `Vacío` ↔ `Vacio`
+
+  Logos es case-sensitive: `Logico` (sin tilde, mayúscula inicial) es
+  alias de `Lógico`; `logico` (todo minúscula) sigue siendo un
+  identificador válido. Misma convención que el resto de CamelCase.
+
+  Nota: `el modulo: Entero32` o `el vacio: Entero32` ahora emiten error
+  de "palabra reservada" — comportamiento idéntico al que ya tenía
+  `el Módulo` o `el Vacío` con tilde. Consistente con todas las
+  keywords.
+
+### 🔧 ARREGLOS
+
+- **F-007 (resuelto)**: `Vacio` (sin tilde) ahora compila en lugar de
+  panicar el codegen con "tipo Nombre 'Vacio' sin resolver". Archivos
+  de Cid (`json_reparador.fc`, `http.fc`) que escribían `Vacio` ya no
+  necesitan el fix manual `sed 's/-> Vacio/-> Vacío/g'`.
+
+- **Ejemplo `apodo_tipos.fc`**: la variable `el minimo` se renombró a
+  `el minimo_val` para no chocar con el nuevo alias `EnteroMinimo`.
+  Cambio trivial: el ejemplo sigue demostrando lo mismo (apodos + tipos
+  naturales + tamaños como adjetivos).
+
+### ✅ VERIFICACIÓN
+
+- `cargo test`: 54/54 verde
+- `pruebas/unitest/`: 19 archivos (incluido nuevo `unitest_aliases_sin_tilde.fc`, 6/6 verde)
+- Ejemplos: 76/83 compilan (7 intencionales)
+- `apodo_tipos.fc`: ✅ compila y ejecuta correctamente con `minimo_val`
+- Caso F-007 (Cid `json_reparador.fc` con `Vacio` sin tilde): ✅ ya no panica
+
 ## [0.7.2] - 2026-08-19
 
 ### 🔧 ARREGLOS
