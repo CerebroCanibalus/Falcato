@@ -70,14 +70,26 @@ src/
 ├── lexer.rs             # Lexer (logos)
 ├── parser/              # Parser modular (mod, errores, tipos, expresiones, sentencias, declaraciones)
 ├── ast.rs               # AST con Span
-├── semantic.rs          # Concordancia Lingüística
-├── codegen/             # Cranelift (mod, funciones, sentencias, expresiones, builtins, generics, tipos)
+├── semantic/            # Concordancia Lingüística (modularizado)
+│   ├── mod.rs           # Core, estructuras, dispatcher
+│   ├── tipos.rs         # Verificación de tipos, inferencia, compatibilidad
+│   ├── ownership.rs     # Ownership, borrowing, moves
+│   ├── funciones.rs     # Funciones, llamadas, genéricos, traits
+│   └── sentencias.rs    # Sentencias, bloques, control de flujo
+├── codegen/             # Cranelift (mod, funciones, sentencias, expresiones, generics, tipos)
+│   └── builtins/        # Builtins modulares (io, texto, vector, math, etc.)
 ├── codegen_helpers.rs   # BlockBuilder, VariableManager, CFunctionCache, MemoryHelper
 ├── platform/            # multiplataforma (mod, registry, traits, linker, windows, linux, macos)
 ├── futuros.rs           # Análisis async/state machine
 ├── resolver.rs          # Módulos e imports
 ├── backend.rs           # Backend trait
-└── lsp.rs               # Servidor LSP
+└── lsp/                 # Servidor LSP modularizado
+    ├── mod.rs           # Backend principal, LanguageServer trait
+    ├── indice.rs        # IndiceSemantico, InfoVariableLsp, etc.
+    ├── completar.rs     # Autocompletado
+    ├── diagnostico.rs   # Diagnósticos y errores
+    ├── hover.rs         # Hover y signature help
+    └── referencias.rs   # Find references
 
 lib/falcato_runtime/     # Canal, Executor, Thread — staticlink
 wix/main.wxs             # Plantilla MSI (cargo-dist)
@@ -95,6 +107,73 @@ Pipeline end-to-end operativo. Turing-completo con:
 - **Docs:** GUIA.md + 15 capítulos, REFERENCIA.md, ERRORES.md, skill falcato-language, VS Code Extension (Falcato Dorado)
 - **Instalación:** cargo-dist (MSI+shell+powershell), `falcato setup --all`, install.ps1 legacy
 - **54/54 tests pasan. 68/75 ejemplos compilan** (7 restantes son errores intencionales de demostración).
+
+## Reorganización de módulos (2026-08-19)
+> **Objetivo:** Dividir módulos gigantes (>1500 LOC) en submódulos manejables. Prioridad: deuda técnica mientras Cid trabaja.
+
+### Estado actual (antes de reorganización)
+| Módulo | LOC | Estado |
+|--------|-----|--------|
+| `semantic.rs` | 4317 | 🔴 2.88× el límite |
+| `codegen/builtins.rs` | 3685 | 🔴 2.46× el límite |
+| `lsp.rs` | 1713 | 🟡 1.14× el límite |
+
+### Fase 1: Dividir `semantic.rs` (4317 → 5 módulos) ✅ EN PROGRESO
+```
+src/semantic/
+├── mod.rs              (~400 LOC) - Estructuras, entorno, dispatcher
+├── tipos.rs            (~800 LOC) - Verificación de tipos, inferencia, compatibilidad
+├── ownership.rs        (~600 LOC) - Análisis de ownership, borrowing, moves
+├── funciones.rs        (~700 LOC) - Análisis de funciones, llamadas, genéricos
+└── sentencias.rs       (~1000 LOC) - Análisis de sentencias, bloques, control de flujo
+```
+
+**Distribución de funciones:**
+- **`mod.rs`**: `InfoVariable`, `Entorno`, `InfoStruct`, `FirmaFuncion`, `InfoEnum`, `InfoRasgo`, `AnalizadorSemantico::nuevo()`, `registrar_builtins()`, `metodo_a_builtin()`, `distancia_levenshtein()`, `sugerir_nombre()`, `buscar_funcion()`, `resolver_glob()`, `buscar_struct()`, `buscar_enum()`, dispatcher `analizar_programa()`, `analizar_declaracion()`
+- **`tipos.rs`**: `inferir_tipo()`, `tipo_literal()`, `tipo_operacion()`, `tipo_operacion_unaria()`, `resolver_alias()`, `tipos_compatibles()`, `es_numerico()`, `es_entero()`, `es_flotante()`, `adaptar_literales_binaria()`, `es_comparable()`, `nombre_tipo_string()`
+- **`ownership.rs`**: Lógica de `el`/`la`/`un`/`los`/`las`, verificación de moves/copies/borrows, use-after-move, borrow checker (N0/N1/N2), `es_mutable()`, `articulo_a_str()`
+- **`funciones.rs`**: `analizar_funcion()`, `aplicar_tipo_args_a_firma()`, `sustituir_genericos()`, verificación de llamadas, traits y bounds (`tiene_bound()`)
+- **`sentencias.rs`**: `analizar_bloque()`, `analizar_sentencia()`, condicionales, bucles, match, declaraciones, asignaciones, retornos
+
+### Fase 2: Dividir `codegen/builtins.rs` (3685 → 11 módulos) ⏳ PENDIENTE
+```
+src/codegen/builtins/
+├── mod.rs              (~200 LOC) - Dispatcher principal
+├── io.rs               (~250 LOC) - imprimir, afirmar, dormir, interpolación
+├── texto.rs            (~500 LOC) - texto_* (nuevo, desde, agregar, etc.)
+├── vector.rs           (~250 LOC) - vector_* (nuevo, agregar, obtener, etc.)
+├── diccionario.rs      (~500 LOC) - diccionario_* y conjunto_*
+├── math.rs             (~450 LOC) - abs, max, min, raiz, potencia, trig, etc.
+├── archivo.rs          (~200 LOC) - archivo_* (leer, escribir, existe)
+├── tcp.rs              (~200 LOC) - tcp_* (vincular, aceptar, leer, etc.)
+├── canal.rs            (~150 LOC) - canal_* (nuevo, enviar, recibir, etc.)
+├── proceso.rs          (~200 LOC) - proceso_* (crear, esperar, leer_salida, etc.)
+└── sistema.rs          (~200 LOC) - otros builtins (tamano_de, conversion, etc.)
+```
+
+### Fase 3: Dividir `lsp.rs` (1713 → 6 módulos) ⏳ PENDIENTE
+```
+src/lsp/
+├── mod.rs              (~400 LOC) - Backend principal, LanguageServer trait
+├── indice.rs           (~300 LOC) - IndiceSemantico, InfoVariableLsp, etc.
+├── completar.rs        (~250 LOC) - Autocompletado
+├── diagnostico.rs      (~200 LOC) - Diagnósticos y errores
+├── hover.rs            (~250 LOC) - Hover y signature help
+└── referencias.rs      (~300 LOC) - Find references
+```
+
+### Impacto esperado
+| Módulo | Antes | Después | Reducción |
+|--------|-------|---------|-----------|
+| `semantic.rs` | 4317 LOC | 5 módulos de ~700 LOC | ✅ -84% |
+| `codegen/builtins.rs` | 3685 LOC | 11 módulos de ~300 LOC | ✅ -92% |
+| `lsp.rs` | 1713 LOC | 6 módulos de ~280 LOC | ✅ -84% |
+
+**Total:** 3 módulos gigantes → 22 módulos manejables
+
+### Keywords eliminadas (2026-08-19)
+- `tipo` — nunca usada en parser/semantic, solo en lexer y LSP autocompletado
+- `entonces` — nunca usada en parser/semantic, solo en lexer
 
 ## Tipos naturales (commit 1ba66b7 — 2026-08-03)
 Nombres en español que mapean a tamaños por defecto + adjetivos de tamaño:
@@ -798,6 +877,45 @@ La capa macOS fue **copiada de Linux sin verificar constantes, tamaños ni llama
 5. Self-referential structs sin workarounds
 6. LLM genera bit manipulation sin alucinar máscaras (campos de bits) — ✅ parcial
 7. Compiler auto-vectoriza loops `puro` sin `unsafe`
+
+---
+
+## Reorganización de módulos (2026-08-19)
+
+### semantic.rs → semantic/ (modularizado) ✅
+
+**Antes:** `src/semantic.rs` (4316 LOC) — archivo monolítico
+
+**Después:** `src/semantic/` con 5 submódulos:
+- `mod.rs` (2291 LOC) — estructuras, entorno, dispatcher, `registrar_builtins()`, `analizar_declaracion()`
+- `tipos.rs` (1201 LOC) — `inferir_tipo()`, `tipo_operacion()`, `tipos_compatibles()`, `resolver_alias()`
+- `sentencias.rs` (505 LOC) — `analizar_sentencia()`, `analizar_bloque()`, `reportar_error()`
+- `funciones.rs` (142 LOC) — `analizar_funcion()`, `aplicar_tipo_args_a_firma()`, `sustituir_genericos()`
+- `ownership.rs` (25 LOC) — `es_mutable()`, `articulo_a_str()`
+
+### codegen/builtins.rs → codegen/builtins/ (modularizado) ✅
+
+**Antes:** `src/codegen/builtins.rs` (3684 LOC) — archivo monolítico
+
+**Después:** `src/codegen/builtins/` con 12 submódulos:
+- `mod.rs` (15 LOC) — declaraciones de submódulos
+- `io.rs` (485 LOC) — imprimir, afirmar, dormir, interpolación, string literals
+- `tcp.rs` (255 LOC) — tcp_vincular/aceptar/leer/escribir/cerrar/conectar/dns/timeout
+- `canal.rs` (184 LOC) — canal_nuevo/enviar/recibir/cerrar, cancelar, intentar
+- `texto.rs` (479 LOC) — texto_nuevo/desde/agregar/longitud/liberar/concatenar/subtexto/comparar/etc.
+- `conversion.rs` (237 LOC) — como_entero64/32, conversion_numerica, entero/flotante/booleano_a_texto
+- `archivo.rs` (294 LOC) — archivo_leer/escribir/existe/agregar/borrar/renombrar/listar
+- `math.rs` (414 LOC) — abs/max/min/raiz/potencia, trigonometría, hiperbólicas, exp/log, piso/techo
+- `vector.rs` (219 LOC) — vector_nuevo/agregar/obtener/longitud/liberar
+- `diccionario.rs` (518 LOC) — diccionario_*, conjunto_*, hash, comparar_claves
+- `proceso.rs` (198 LOC) — proceso_crear/esperar/leer_salida/cerrar/pipes/chunk
+- `sistema.rs` (333 LOC) — tamano_de, entorno, directorio, aleatorio, terminal, entrada, argumentos, fecha
+- `tls.rs` (98 LOC) — tls_conectar/escribir/leer/datos_disponibles/cerrar
+
+### Keywords eliminadas
+
+- `tipo` — nunca usada en parser/semantic, solo en lexer y LSP autocompletado
+- `entonces` — nunca usada en parser/semantic, solo en lexer
 
 ---
 

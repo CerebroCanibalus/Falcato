@@ -964,7 +964,7 @@ impl Backend {
             ("todos", "Inicialización de arreglo con valor", CompletionItemKind::KEYWORD),
             ("direccion_de", "Obtiene la dirección de una función", CompletionItemKind::KEYWORD),
             ("dir_de", "Obtiene la dirección de una función (abreviatura)", CompletionItemKind::KEYWORD),
-            ("tipo", "Keyword de tipo (contextual)", CompletionItemKind::KEYWORD),
+            
         ];
 
         for (kw, doc, kind) in keywords {

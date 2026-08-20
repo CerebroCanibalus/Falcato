@@ -1,5 +1,14 @@
 # Changelog de Falcato
 
+## [0.7.1] - 2026-08-19
+
+### 🔧 ARREGLOS
+
+- **Reorganización de módulos**: división de archivos monolíticos en submódulos manejables para reducir deuda técnica.
+  - `semantic.rs` (4316 LOC) → `semantic/` con 5 submódulos (`mod.rs`, `tipos.rs`, `sentencias.rs`, `funciones.rs`, `ownership.rs`).
+  - `codegen/builtins.rs` (3684 LOC) → `codegen/builtins/` con 12 submódulos (`io.rs`, `tcp.rs`, `canal.rs`, `texto.rs`, `conversion.rs`, `archivo.rs`, `math.rs`, `vector.rs`, `diccionario.rs`, `proceso.rs`, `sistema.rs`, `tls.rs`).
+- **Keywords eliminadas**: `tipo` y `entonces` removidas del lexer y LSP (nunca usadas en parser/semantic).
+
 ## [0.7.0] - 2026-08-18 — "¡Fuese!"
 
 ### ➕ ADICIONES

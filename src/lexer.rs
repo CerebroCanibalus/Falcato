@@ -20,9 +20,6 @@ pub enum Token {
     #[token("si")]
     Si,
     
-    #[token("entonces")]
-    Entonces,
-    
     #[token("sino")]
     Sino,
 
@@ -88,9 +85,6 @@ pub enum Token {
     
     #[token("como")]
     Como,
-    
-    #[token("tipo")]
-    Tipo,
 
     #[token("región")]
     #[token("region")]
