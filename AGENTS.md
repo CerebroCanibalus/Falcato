@@ -96,7 +96,7 @@ wix/main.wxs             # Plantilla MSI (cargo-dist)
 dist-workspace.toml      # Config cargo-dist
 ```
 
-## Estado del proyecto (v0.7.3)
+## Estado del proyecto (v0.7.4)
 Pipeline end-to-end operativo. Turing-completo con:
 - **Core:** variables, ops, condicionales, bucles, arrays, structs, enums, generics (const+type)
 - **Ownership:** `el`/`la`/`un`/`los`/`las`, mover/copiar/prestar, `&T`/`&mut T`, field-level borrowing, lifetimes léxicos, regiones, self-ref `&yo`, efectos `puro`/`muta`/`lee`, branch-aware liveness, borrow checker gradual (N0→N1→N2)
@@ -109,6 +109,7 @@ Pipeline end-to-end operativo. Turing-completo con:
 - **Aliases sin tilde (0.7.3):** las 9 keywords con tilde aceptan versión sin tilde (`Vacío`/`Vacio`, `Lógico`/`Logico`, `módulo`/`modulo`, etc.). Logos case-sensitive: solo `Modulo` (mayúscula inicial) es alias, `modulo` (lowercase) sigue siendo identificador.
 - **Docs:** GUIA.md + 15 capítulos, REFERENCIA.md, ERRORES.md, skill falcato-language, VS Code Extension (Falcato Dorado)
 - **Instalación:** cargo-dist (MSI+shell+powershell), `falcato setup --all`, install.ps1 legacy
+- **v0.7.4 (2026-08-21):** `sino pues`/`sino po` (else-if español, cadenas completas) · API `Texto` unificada en archivo_*/tcp/dns con coerción `Palabra`→`Texto` (3.4) · aliases `estruct`, `&muta`/`&cambia` · escritura a través de `&muta T` (F-010/S003) · `retornar Struct{}` (3.8) · escapes desconocidos → `[S008]` compile-time (F-012) · builtins memoria debug + `--depurar-memoria=0..3` (esqueleto) · flush stdout + panic handler + `[C009]` (3.1)
 - **54/54 tests + 19 unitest pasan. 76/83 ejemplos compilan** (7 restantes son errores intencionales de demostración).
 
 ## Reorganización de módulos (2026-08-19)
