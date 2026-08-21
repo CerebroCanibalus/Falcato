@@ -384,6 +384,10 @@ impl BuiltinRegistry {
         // el caller en cada llamada. El registry solo remapea el nombre.
         self.insert_variadic("printf", "printf",
             &[types::I64], Some(types::I32));
+        // 3.1a — flush tras imprimir_linea: fflush(NULL) fuerza salida inmediata
+        // aunque el programa crashee después (evita perder prints de debug)
+        self.insert("fflush", "fflush",
+            &[types::I64], Some(types::I32));
 
         // File I/O
         self.insert("fopen", "fopen",

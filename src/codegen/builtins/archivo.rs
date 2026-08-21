@@ -7,13 +7,29 @@ impl Codegen {
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
         argumentos: &Vec<Expresion>,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let ruta = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let tipo_ruta = self.inferir_tipo(&argumentos[0], variables);
+        let ruta_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // 3.4: Palabra→Texto unificado — Palabra es I64 directo, Texto es descriptor
+        let (c_ruta, _buf_ruta) = if tipo_ruta == crate::ast::Tipo::Texto {
+            let ptr = self.cargar_campo_descriptor(builder, ruta_val, Self::OFFSET_PTR);
+            let len = self.cargar_campo_descriptor(builder, ruta_val, Self::OFFSET_LEN);
+            let uno = builder.ins().iconst(types::I64, 1);
+            let cap = builder.ins().iadd(len, uno);
+            let buf = self.llamar_malloc(builder, cap);
+            self.llamar_memcpy(builder, buf, ptr, len);
+            let cero = builder.ins().iconst(types::I8, 0);
+            let fin = builder.ins().iadd(buf, len);
+            builder.ins().store(cranelift_codegen::ir::MemFlags::new(), cero, fin, 0);
+            (buf, Some(buf))
+        } else {
+            (ruta_val, None)
+        };
 
         // fopen(ruta, "rb")
         let modo = self.crear_string_literal(builder, "rb");
         let fopen_id = self.asegurar_funcion_c("fopen", &[types::I64, types::I64], Some(types::I64));
         let fopen_ref = self.module.declare_func_in_func(fopen_id, builder.func);
-        let call_fopen = builder.ins().call(fopen_ref, &[ruta, modo]);
+        let call_fopen = builder.ins().call(fopen_ref, &[c_ruta, modo]);
         let file = builder.inst_results(call_fopen)[0];
 
         // if file == NULL ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ descriptor vacÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­o, else leer contenido
@@ -78,6 +94,9 @@ impl Codegen {
         let fclose_ref = self.module.declare_func_in_func(fclose_id, builder.func);
         builder.ins().call(fclose_ref, &[file]);
 
+        // 3.4: liberar buffer C-string temporal si se alocó
+        if let Some(buf) = _buf_ruta { self.llamar_free(builder, buf); }
+
         // Crear descriptor Texto
         let desc_ok = self.descriptor_nuevo(builder);
         self.guardar_campo_descriptor(builder, desc_ok, Self::OFFSET_PTR, data);
@@ -103,7 +122,23 @@ impl Codegen {
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
         argumentos: &Vec<Expresion>,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let ruta = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let tipo_ruta = self.inferir_tipo(&argumentos[0], variables);
+        let ruta_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // 3.4: Palabra→Texto unificado — Palabra es I64 directo, Texto es descriptor
+        let (c_ruta, _buf_ruta) = if tipo_ruta == crate::ast::Tipo::Texto {
+            let ptr = self.cargar_campo_descriptor(builder, ruta_val, Self::OFFSET_PTR);
+            let len = self.cargar_campo_descriptor(builder, ruta_val, Self::OFFSET_LEN);
+            let uno = builder.ins().iconst(types::I64, 1);
+            let cap = builder.ins().iadd(len, uno);
+            let buf = self.llamar_malloc(builder, cap);
+            self.llamar_memcpy(builder, buf, ptr, len);
+            let cero = builder.ins().iconst(types::I8, 0);
+            let fin = builder.ins().iadd(buf, len);
+            builder.ins().store(cranelift_codegen::ir::MemFlags::new(), cero, fin, 0);
+            (buf, Some(buf))
+        } else {
+            (ruta_val, None)
+        };
         let desc = self.compilar_expresion(&argumentos[1], builder, variables)?;
 
         let ptr = self.cargar_campo_descriptor(builder, desc, Self::OFFSET_PTR);
@@ -113,7 +148,7 @@ impl Codegen {
         let modo = self.crear_string_literal(builder, "wb");
         let fopen_id = self.asegurar_funcion_c("fopen", &[types::I64, types::I64], Some(types::I64));
         let fopen_ref = self.module.declare_func_in_func(fopen_id, builder.func);
-        let call_fopen = builder.ins().call(fopen_ref, &[ruta, modo]);
+        let call_fopen = builder.ins().call(fopen_ref, &[c_ruta, modo]);
         let file = builder.inst_results(call_fopen)[0];
 
         // if file == NULL ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ retornar -1
@@ -147,6 +182,8 @@ impl Codegen {
 
         // merge: select(es_nulo, -1, 0)
         builder.switch_to_block(merge);
+        // 3.4: liberar buffer C-string temporal si se alocó (en merge, no en bloque lleno)
+        if let Some(buf) = _buf_ruta { self.llamar_free(builder, buf); }
         let resultado = builder.ins().select(es_nulo, menos_uno, cero_32);
         builder.seal_block(merge);
 
@@ -161,13 +198,29 @@ impl Codegen {
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
         argumentos: &Vec<Expresion>,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let ruta = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let tipo_ruta = self.inferir_tipo(&argumentos[0], variables);
+        let ruta_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // 3.4: Palabra→Texto unificado — Palabra es I64 directo, Texto es descriptor
+        let (c_ruta, _buf_ruta) = if tipo_ruta == crate::ast::Tipo::Texto {
+            let ptr = self.cargar_campo_descriptor(builder, ruta_val, Self::OFFSET_PTR);
+            let len = self.cargar_campo_descriptor(builder, ruta_val, Self::OFFSET_LEN);
+            let uno = builder.ins().iconst(types::I64, 1);
+            let cap = builder.ins().iadd(len, uno);
+            let buf = self.llamar_malloc(builder, cap);
+            self.llamar_memcpy(builder, buf, ptr, len);
+            let cero = builder.ins().iconst(types::I8, 0);
+            let fin = builder.ins().iadd(buf, len);
+            builder.ins().store(cranelift_codegen::ir::MemFlags::new(), cero, fin, 0);
+            (buf, Some(buf))
+        } else {
+            (ruta_val, None)
+        };
 
         // fopen(ruta, "rb")
         let modo = self.crear_string_literal(builder, "rb");
         let fopen_id = self.asegurar_funcion_c("fopen", &[types::I64, types::I64], Some(types::I64));
         let fopen_ref = self.module.declare_func_in_func(fopen_id, builder.func);
-        let call_fopen = builder.ins().call(fopen_ref, &[ruta, modo]);
+        let call_fopen = builder.ins().call(fopen_ref, &[c_ruta, modo]);
         let file = builder.inst_results(call_fopen)[0];
 
         // if file != NULL ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ fclose + retornar 1, else retornar 0
@@ -194,6 +247,8 @@ impl Codegen {
 
         // merge: select(no_nulo, 1, 0) como I8
         builder.switch_to_block(merge);
+        // 3.4: liberar buffer C-string temporal si se alocó (en merge)
+        if let Some(buf) = _buf_ruta { self.llamar_free(builder, buf); }
         let uno_8 = builder.ins().iconst(types::I8, 1);
         let cero_8 = builder.ins().iconst(types::I8, 0);
         let resultado = builder.ins().select(no_nulo, uno_8, cero_8);

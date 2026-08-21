@@ -85,6 +85,8 @@ pub struct Codegen {
     pub(crate) executor_worker_generado: bool,
     /// Si true, imprime el CLIF de cada función antes de definirla (flag --emit-clif)
     pub(crate) emit_clif: bool,
+    /// Nivel de depuración de memoria (0=off, 1=guardián, 2=cirujano, 3=enfermizo)
+    pub(crate) nivel_memoria: u8,
     // ─── R6: Drop automático ────────────────────────────────────────────────
     /// Declaraciones de funciones no genéricas: nombre → declaración.
     /// Para consultar el artículo de un parámetro (el=owned→mueve, la=presta).
@@ -165,6 +167,7 @@ impl Codegen {
             executor_pool_var: None,
             executor_worker_generado: false,
             emit_clif: false,
+            nivel_memoria: 0,
             declaraciones: HashMap::new(),
             heap_vivas: Vec::new(),
             scope_marcas: Vec::new(),
@@ -176,6 +179,11 @@ impl Codegen {
     /// Activa la emisión de CLIF (flag --emit-clif).
     pub fn con_emit_clif(&mut self, activo: bool) -> &mut Self {
         self.emit_clif = activo;
+        self
+    }
+
+    pub fn con_nivel_memoria(&mut self, v: u8) -> &mut Self {
+        self.nivel_memoria = v;
         self
     }
 
@@ -330,14 +338,32 @@ impl Codegen {
             }
         }
 
-        // Tercera pasada: compilar cuerpos (solo funciones no genÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ricas)
+        // Tercera pasada: compilar cuerpos (solo funciones no genericas)
+        // 3.1c — si codegen falla, error duro — nunca continuar silencioso.
+        let mut fallidas: Vec<(String, Span)> = Vec::new();
         for (_prefijo, decl) in &todas {
             if let Declaracion::Funcion(func) = decl {
                 if func.parametros_genericos.is_empty() {
+                    if func.es_insegura && func.cuerpo.sentencias.is_empty() {
+                        continue;
+                    }
                     if let Err(_) = self.compilar_funcion(func) {
-                        // Error ya agregado a self.errores
+                        fallidas.push((func.nombre.clone(), func.span.clone()));
+                    } else if !self.funciones.contains_key(&func.nombre) {
+                        self.errores.agregar(ErrorCompilador::nuevo(
+                            CategoriaError::Interno,
+                            99,
+                            func.span.clone(),
+                            format!("La funcion '{}' fue declarada pero no se emitio al objeto (codegen la salto en silencio)", func.nombre),
+                        ));
+                        fallidas.push((func.nombre.clone(), func.span.clone()));
                     }
                 }
+            }
+        }
+        if !fallidas.is_empty() {
+            for (nombre, span) in &fallidas {
+                eprintln!("[C009] {}:{}:{}: la funcion '{}' no se pudo compilar y no sera vinculada (causaria LNK2019)", span.archivo, span.inicio.linea, span.inicio.columna, nombre);
             }
         }
 

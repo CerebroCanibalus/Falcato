@@ -27,6 +27,7 @@ impl Codegen {
                     let func_id = self.asegurar_funcion_c("puts", &[types::I64], Some(types::I32));
                     let func_ref = self.module.declare_func_in_func(func_id, builder.func);
                     builder.ins().call(func_ref, &[ptr]);
+                    self.flush_stdout(builder);
                 } else {
                     let fmt_ptr = self.crear_string_literal(builder, "%s");
                     let func_id = self.asegurar_funcion_c("printf", &[types::I64, types::I64], Some(types::I32));
@@ -64,6 +65,9 @@ impl Codegen {
                 let func_id = self.asegurar_funcion_c("printf", &[types::I64, types::I64], Some(types::I32));
                 let func_ref = self.module.declare_func_in_func(func_id, builder.func);
                 builder.ins().call(func_ref, &[fmt_ptr, val_i64]);
+                if con_newline {
+                    self.flush_stdout(builder);
+                }
             }
             Tipo::Booleano => {
                 // Booleano: imprimir "verdadero"/"falso"
@@ -82,6 +86,7 @@ impl Codegen {
                     let puts_id = self.asegurar_funcion_c("puts", &[types::I64], Some(types::I32));
                     let puts_ref = self.module.declare_func_in_func(puts_id, builder.func);
                     builder.ins().call(puts_ref, &[msg_true]);
+                    self.flush_stdout(builder);
                 } else {
                     let msg_true = self.crear_string_literal(builder, "verdadero");
                     let fmt_ptr = self.crear_string_literal(builder, "%s");
@@ -98,6 +103,7 @@ impl Codegen {
                     let puts_id2 = self.asegurar_funcion_c("puts", &[types::I64], Some(types::I32));
                     let puts_ref2 = self.module.declare_func_in_func(puts_id2, builder.func);
                     builder.ins().call(puts_ref2, &[msg_false]);
+                    self.flush_stdout(builder);
                 } else {
                     let msg_false = self.crear_string_literal(builder, "falso");
                     let fmt_ptr2 = self.crear_string_literal(builder, "%s");
@@ -137,6 +143,9 @@ impl Codegen {
                     args = vec![fmt_ptr, val];
                 }
                 builder.ins().call(func_ref, &args);
+                if con_newline {
+                    self.flush_stdout(builder);
+                }
             }
             _ => {
                 // Palabra u otro puntero: camino original
@@ -145,6 +154,7 @@ impl Codegen {
                     let func_id = self.asegurar_funcion_c("puts", &[types::I64], Some(types::I32));
                     let func_ref = self.module.declare_func_in_func(func_id, builder.func);
                     builder.ins().call(func_ref, &[msg_ptr]);
+                    self.flush_stdout(builder);
                 } else {
                     let fmt_ptr = self.crear_string_literal(builder, "%s");
                     let func_id = self.asegurar_funcion_c("printf", &[types::I64, types::I64], Some(types::I32));
@@ -155,6 +165,16 @@ impl Codegen {
         }
 
         Ok(builder.ins().iconst(types::I64, 0))
+    }
+
+    /// 3.1a — flush stdout tras imprimir_linea.
+    /// Llama a fflush(NULL) para forzar salida inmediata aunque el programa
+    /// crashee después (evita perder prints de debug por buffering).
+    pub(crate) fn flush_stdout(&mut self, builder: &mut FunctionBuilder) {
+        let zero = builder.ins().iconst(types::I64, 0);
+        let func_id = self.asegurar_funcion_c("fflush", &[types::I64], Some(types::I32));
+        let func_ref = self.module.declare_func_in_func(func_id, builder.func);
+        builder.ins().call(func_ref, &[zero]);
     }
 
     pub(crate) fn builtin_afirmar(
@@ -389,6 +409,7 @@ impl Codegen {
             let func_ref = self.module.declare_func_in_func(func_id, builder.func);
             let fmt_ptr = self.crear_string_literal(builder, "%s\0");
             builder.ins().call(func_ref, &[fmt_ptr, nl_ptr]);
+            self.flush_stdout(builder);
         }
 
         Ok(builder.ins().iconst(types::I64, 0))

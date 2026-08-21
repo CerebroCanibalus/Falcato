@@ -175,7 +175,22 @@ impl Codegen {
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
         argumentos: &[Expresion],
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let host = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let tipo_host = self.inferir_tipo(&argumentos[0], variables);
+        let host_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let (host_cstr, _buf_host) = if tipo_host == crate::ast::Tipo::Texto {
+            let ptr = self.cargar_campo_descriptor(builder, host_val, Self::OFFSET_PTR);
+            let len = self.cargar_campo_descriptor(builder, host_val, Self::OFFSET_LEN);
+            let uno = builder.ins().iconst(types::I64, 1);
+            let cap = builder.ins().iadd(len, uno);
+            let buf = self.llamar_malloc(builder, cap);
+            self.llamar_memcpy(builder, buf, ptr, len);
+            let cero = builder.ins().iconst(types::I8, 0);
+            let fin = builder.ins().iadd(buf, len);
+            builder.ins().store(cranelift_codegen::ir::MemFlags::new(), cero, fin, 0);
+            (buf, Some(buf))
+        } else {
+            (host_val, None)
+        };
         let puerto = self.compilar_expresion(&argumentos[1], builder, variables)?;
         let puerto_i32 = if builder.func.dfg.value_type(puerto) == types::I64 {
             builder.ins().ireduce(types::I32, puerto)
@@ -185,7 +200,9 @@ impl Codegen {
         // falcato_tcp_conectar(host: *const c_char, puerto: i32) -> i64
         let fn_id = self.asegurar_funcion_c("falcato_tcp_conectar", &[types::I64, types::I32], Some(types::I64));
         let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
-        let call = builder.ins().call(fn_ref, &[host, puerto_i32]);
+        let _res_tcp = builder.ins().call(fn_ref, &[host_cstr, puerto_i32]);
+        if let Some(buf) = _buf_host { self.llamar_free(builder, buf); }
+        let call = _res_tcp;
         Ok(builder.inst_results(call)[0])
     }
 
@@ -196,12 +213,29 @@ impl Codegen {
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
         argumentos: &[Expresion],
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let host = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let tipo_host = self.inferir_tipo(&argumentos[0], variables);
+        let host_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let (host_cstr, _buf_host) = if tipo_host == crate::ast::Tipo::Texto {
+            let ptr = self.cargar_campo_descriptor(builder, host_val, Self::OFFSET_PTR);
+            let len = self.cargar_campo_descriptor(builder, host_val, Self::OFFSET_LEN);
+            let uno = builder.ins().iconst(types::I64, 1);
+            let cap = builder.ins().iadd(len, uno);
+            let buf = self.llamar_malloc(builder, cap);
+            self.llamar_memcpy(builder, buf, ptr, len);
+            let cero = builder.ins().iconst(types::I8, 0);
+            let fin = builder.ins().iadd(buf, len);
+            builder.ins().store(cranelift_codegen::ir::MemFlags::new(), cero, fin, 0);
+            (buf, Some(buf))
+        } else {
+            (host_val, None)
+        };
         // falcato_dns_resolver(host: *const c_char) -> *mut c_char (i64)
         let fn_id = self.asegurar_funcion_c("falcato_dns_resolver", &[types::I64], Some(types::I64));
         let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
-        let call = builder.ins().call(fn_ref, &[host]);
+        let call = builder.ins().call(fn_ref, &[host_cstr]);
         let ptr = builder.inst_results(call)[0];
+
+        if let Some(buf) = _buf_host { self.llamar_free(builder, buf); }
 
         // Construir descriptor Texto desde el puntero C (strlen + malloc + memcpy)
         let len = self.llamar_strlen(builder, ptr);

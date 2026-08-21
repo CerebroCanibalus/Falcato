@@ -610,7 +610,7 @@ impl AnalizadorSemantico {
             nombre: "tcp_conectar".to_string(),
             parametros_genericos: vec![],
             parametros: vec![
-                ("host".to_string(), Tipo::Palabra),
+                ("host".to_string(), Tipo::Texto),
                 ("puerto".to_string(), Tipo::Entero32),
             ],
             retorno: Some(Tipo::Entero64),
@@ -620,7 +620,7 @@ impl AnalizadorSemantico {
         self.funciones.insert("dns_resolver".to_string(), FirmaFuncion {
             nombre: "dns_resolver".to_string(),
             parametros_genericos: vec![],
-            parametros: vec![("host".to_string(), Tipo::Palabra)],
+            parametros: vec![("host".to_string(), Tipo::Texto)],
             retorno: Some(Tipo::Texto),
             span: span_vacio.clone(),
             es_publica: true,
@@ -1189,7 +1189,7 @@ impl AnalizadorSemantico {
         self.funciones.insert("archivo_leer".to_string(), FirmaFuncion {
             nombre: "archivo_leer".to_string(),
             parametros_genericos: vec![],
-            parametros: vec![("ruta".to_string(), Tipo::Palabra)],
+            parametros: vec![("ruta".to_string(), Tipo::Texto)],
             retorno: Some(Tipo::Texto),
             span: span_vacio.clone(),
             es_publica: true,
@@ -1198,7 +1198,7 @@ impl AnalizadorSemantico {
             nombre: "archivo_escribir".to_string(),
             parametros_genericos: vec![],
             parametros: vec![
-                ("ruta".to_string(), Tipo::Palabra),
+                ("ruta".to_string(), Tipo::Texto),
                 ("contenido".to_string(), Tipo::Texto),
             ],
             retorno: Some(Tipo::Entero32),
@@ -1208,7 +1208,7 @@ impl AnalizadorSemantico {
         self.funciones.insert("archivo_existe".to_string(), FirmaFuncion {
             nombre: "archivo_existe".to_string(),
             parametros_genericos: vec![],
-            parametros: vec![("ruta".to_string(), Tipo::Palabra)],
+            parametros: vec![("ruta".to_string(), Tipo::Texto)],
             retorno: Some(Tipo::Booleano),
             span: span_vacio.clone(),
             es_publica: true,
@@ -1591,6 +1591,43 @@ impl AnalizadorSemantico {
             span: span_vacio.clone(),
         };
         let tipo_t_opt = Tipo::Generico("T".to_string());
+
+        // Memoria debug — lente graduable (niveles 0-3)
+        self.funciones.insert("memoria_usada".to_string(), FirmaFuncion {
+            nombre: "memoria_usada".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("memoria_volcar".to_string(), FirmaFuncion {
+            nombre: "memoria_volcar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("ptr".to_string(), Tipo::Entero64),
+                ("n".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Vacio),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("memoria_rastrear".to_string(), FirmaFuncion {
+            nombre: "memoria_rastrear".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("ptr".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Vacio),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("memoria_canario_verificar".to_string(), FirmaFuncion {
+            nombre: "memoria_canario_verificar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("ptr".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
 
         self.enums.insert("Option".to_string(), InfoEnum {
             nombre: "Option".to_string(),

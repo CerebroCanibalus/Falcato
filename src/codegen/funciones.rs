@@ -87,6 +87,20 @@ impl Codegen {
             None
         };
 
+        // 3.1b — instalar manejador de panics si es principal (auto-flush + stack trace)
+        if func.nombre == "principal" {
+            let func_id = self.asegurar_funcion_c("falcato_instalar_manejador_panico", &[], None);
+            let func_ref = self.module.declare_func_in_func(func_id, builder.func);
+            builder.ins().call(func_ref, &[]);
+            // Memoria debug — lente graduable (nivel 0=off)
+            if self.nivel_memoria > 0 {
+                let mem_id = self.asegurar_funcion_c("falcato_memoria_init", &[types::I8], None);
+                let mem_ref = self.module.declare_func_in_func(mem_id, builder.func);
+                let nivel_val = builder.ins().iconst(types::I8, self.nivel_memoria as i64);
+                builder.ins().call(mem_ref, &[nivel_val]);
+            }
+        }
+
         // ParÃ¡metros como variables
         for (i, param) in func.parametros.iter().enumerate() {
             // +1 si hay sret (el primer block_param es el ptr oculto)

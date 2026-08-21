@@ -322,9 +322,9 @@ fn parse_atom(cursor: &mut ParserCursor) -> Result<Expresion, ErrorSintaxis> {
             let span_inicio = cursor.span_actual();
             cursor.avanzar(); // &
             
-            // Verificar si es &mut
-            if cursor.actual() == Some(&Token::Mut) {
-                cursor.avanzar(); // mut
+            // Verificar si es &mut (alias: &muta, &cambia)
+            if cursor.actual() == Some(&Token::Mut) || cursor.actual() == Some(&Token::Muta) {
+                cursor.avanzar(); // mut / muta / cambia (cambia ya es Mut)
                 let expr = parse_expresion(cursor)?;
                 let span = Span::combinar(&span_inicio, expr.span());
                 return Ok(Expresion::Unaria(
@@ -428,6 +428,16 @@ fn parse_atom(cursor: &mut ParserCursor) -> Result<Expresion, ErrorSintaxis> {
             let span = cursor.span_actual();
             cursor.avanzar();
             Ok(Expresion::Literal(Literal::Palabra(val, span)))
+        }
+        Some(Token::PalabraLiteral(None)) => {
+            // F-012: escape desconocido en literal — error con span real
+            let span = cursor.span_actual();
+            cursor.avanzar();
+            Err(ErrorSintaxis::nuevo(
+                8,
+                span,
+                "escape desconocido en literal de texto (ej: \\C). Usa \\\\ para barra invertida".to_string(),
+            ))
         }
         Some(Token::CaracterLiteral(Some(c))) => {
             let val = *c;

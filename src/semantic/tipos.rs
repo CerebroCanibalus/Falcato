@@ -631,7 +631,16 @@ impl AnalizadorSemantico {
             }
             Expresion::AccesoCampo(expr, nombre_campo, span) => {
                 let tipo_expr = self.inferir_tipo(expr);
-                match &tipo_expr {
+                // S003 fix: acceso a campo a través de referencia (&T / &mut T) — desreferenciar
+                let tipo_base = match &tipo_expr {
+                    Tipo::Referencia(inner) | Tipo::ReferenciaMut(inner) |
+                    Tipo::ReferenciaConLifetime(_, inner) | Tipo::ReferenciaMutConLifetime(_, inner) |
+                    Tipo::ReferenciaSelf(inner) | Tipo::ReferenciaMutSelf(inner) => {
+                        self.resolver_alias(inner)
+                    }
+                    _ => tipo_expr.clone(),
+                };
+                match &tipo_base {
                     Tipo::Nombre(nombre_struct) => {
                         let info_opt = self.buscar_struct(nombre_struct);
                         match info_opt {
@@ -1139,6 +1148,7 @@ impl AnalizadorSemantico {
             (Tipo::Entero64, Tipo::ReferenciaMutConLifetime(_, _)) |
             (Tipo::Entero64, Tipo::ReferenciaSelf(_)) |
             (Tipo::Entero64, Tipo::ReferenciaMutSelf(_)) => true,
+            (Tipo::Texto, Tipo::Palabra) => true, // 3.4: Palabra literal → Texto (fopen, tcp, etc.)
             _ => false,
         }
     }

@@ -26,6 +26,8 @@ mod texto_dinamico;
 mod conversion_numerica;
 mod archivo_avanzado;
 mod tls;
+mod panic_handler;
+mod memoria_debug;
 
 use std::ffi::c_void;
 
@@ -336,3 +338,5 @@ pub unsafe extern "C" fn falcato_tcp_datos_disponibles(sock: i64) -> i32 {
         tcp_cliente::tcp_datos_disponibles(sock)
     }
 }
+
+

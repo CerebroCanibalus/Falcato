@@ -80,6 +80,9 @@ enum Comandos {
         /// Diagnósticos como JSON estructurado (agentes LLM, CI)
         #[arg(long)]
         json: bool,
+        /// Depuración de memoria graduable (0=off, 1=guardián, 2=cirujano, 3=enfermizo)
+        #[arg(long = "depurar-memoria", alias = "debug-mem", value_name = "NIVEL", default_missing_value = "1", num_args = 0..=1, require_equals = false)]
+        depurar_memoria: Option<String>,
     },
     /// Compila y ejecuta archivos .fc
     #[command(name = "corre", alias = "run", alias = "ejecutar", help_template = TEMPLATE_AYUDA)]
@@ -87,6 +90,9 @@ enum Comandos {
         /// Archivo(s) fuente .fc (principal + dependencias)
         #[arg(required = true)]
         archivos: Vec<String>,
+        /// Depuración de memoria graduable (0=off, 1=guardián, 2=cirujano, 3=enfermizo)
+        #[arg(long = "depurar-memoria", alias = "debug-mem", value_name = "NIVEL", default_missing_value = "1", num_args = 0..=1, require_equals = false)]
+        depurar_memoria: Option<String>,
         /// Argumentos para el programa ejecutado
         #[arg(allow_hyphen_values = true, last = true)]
         args: Vec<String>,
@@ -183,6 +189,20 @@ enum PaqueteComandos {
 
 /// Construye el comando con el template de ayuda en español y los textos de
 /// help/version hispanizados, recursivamente en TODOS los subcomandos.
+fn parsear_nivel_memoria(val: Option<&str>) -> u8 {
+    match val {
+        None => 0,
+        Some("") | Some("1") => 1,
+        Some("0") => 0,
+        Some("2") => 2,
+        Some("3") => 3,
+        Some(s) => {
+            eprintln!("[WARN] nivel de memoria '{}' no válido, usando 1 (válidos: 0,1,2,3)", s);
+            1
+        }
+    }
+}
+
 fn parsear_cli() -> Cli {
     use clap::CommandFactory;
 
@@ -222,20 +242,24 @@ fn main() {
             release,
             emit_clif,
             json,
+            depurar_memoria,
         } => {
+            let nivel = parsear_nivel_memoria(depurar_memoria.as_deref());
             if let Err(e) = compilar(&archivos,
                 output.as_deref(),
                 target.as_deref(),
                 release,
                 emit_clif,
                 json,
+                nivel,
             ) {
                 eprintln!("[ERROR] {}", e);
                 std::process::exit(1);
             }
         }
-        Comandos::Run { archivos, args } => {
-            if let Err(e) = compilar_y_ejecutar(&archivos, &args) {
+        Comandos::Run { archivos, depurar_memoria, args } => {
+            let nivel = parsear_nivel_memoria(depurar_memoria.as_deref());
+            if let Err(e) = compilar_y_ejecutar(&archivos, &args, nivel) {
                 eprintln!("[ERROR] {}", e);
                 std::process::exit(1);
             }
@@ -456,6 +480,7 @@ fn compilar(
     release: bool,
     emit_clif: bool,
     json: bool,
+    nivel_memoria: u8,
 ) -> Result<(), String> {
     if archivos.is_empty() {
         return Err("No se especificaron archivos fuente.".to_string());
@@ -465,7 +490,7 @@ fn compilar(
     // El resolver multi-archivo se usa solo cuando se pasan múltiples archivos explícitamente.
     if archivos.len() == 1 {
         let archivo = &archivos[0];
-        return compilar_individual(archivo, output, target, release, emit_clif, json);
+        return compilar_individual(archivo, output, target, release, emit_clif, json, nivel_memoria);
     }
 
     // Ruta multi-archivo con Resolver
@@ -513,6 +538,7 @@ fn compilar_individual(
     _release: bool,
     emit_clif: bool,
     _json: bool,
+    nivel_memoria: u8,
 ) -> Result<(), String> {
     println!("[Falcato] Compilando '{}'...", archivo);
 
@@ -552,6 +578,7 @@ fn compilar_individual(
     let mut codegen = Codegen::nuevo("main")
         .map_err(|e| format!("Error inicializando codegen: {}", e))?;
     codegen.con_emit_clif(emit_clif);
+    codegen.con_nivel_memoria(nivel_memoria);
     codegen.compilar_programa(&programa)
         .map_err(|e| format!("Errores de compilación:\n{:?}", e))?;
 
@@ -573,7 +600,7 @@ fn compilar_individual(
     Ok(())
 }
 
-fn compilar_y_ejecutar(archivos: &[String], args: &[String]) -> Result<(), String> {
+fn compilar_y_ejecutar(archivos: &[String], args: &[String], nivel_memoria: u8) -> Result<(), String> {
     if archivos.is_empty() {
         return Err("No se especificaron archivos fuente.".to_string());
     }
@@ -581,7 +608,7 @@ fn compilar_y_ejecutar(archivos: &[String], args: &[String]) -> Result<(), Strin
     let primer = &archivos[0];
     let binario = format!("{}.exe", primer.strip_suffix(".fc").unwrap_or(primer));
     
-    compilar(archivos, Some(&binario), None, false, false, false)?;
+    compilar(archivos, Some(&binario), None, false, false, false, nivel_memoria)?;
 
     println!("[Falcato] Ejecutando '{}'...", binario);
     

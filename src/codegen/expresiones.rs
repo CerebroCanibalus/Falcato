@@ -357,7 +357,15 @@ impl Codegen {
                             }
                         }
                         // Si no es un identificador o acceso a campo, compilar la expresi├│n y retornar su direcci├│n
-                        // (esto es una simplificaci├│n, no funciona para expresiones complejas)
+                        if *op == OperadorUnario::ReferenciaMut {
+                            self.errores.agregar(ErrorCompilador::nuevo(
+                                CategoriaError::Interno,
+                                99,
+                                span.clone(),
+                                "borrow mutable de campo/expresion no soportado: solo se puede prestar &mut de variable o de campo directo `&mut s.campo`".to_string(),
+                            ));
+                            return Err(());
+                        }
                         let val = self.compilar_expresion(expr, builder, variables)?;
                         Ok(val)
                     }
@@ -486,8 +494,28 @@ impl Codegen {
                 let struct_ptr = self.compilar_expresion(expr, builder, variables)?;
                 let tipo_expr = self.inferir_tipo(expr, variables);
 
-                let nombre_struct = match tipo_expr {
-                    Tipo::Nombre(n) => n,
+                // S003 fix: acceso a campo a través de referencia (&T / &mut T).
+                // El identificador de tipo referencia ya carga el PUNTERO (stack_load),
+                // que es exactamente lo que necesitamos como base — solo hay que
+                // resolver el tipo interno para encontrar el layout del struct.
+                let nombre_struct = match &tipo_expr {
+                    Tipo::Nombre(n) => n.clone(),
+                    Tipo::Referencia(inner) | Tipo::ReferenciaMut(inner) |
+                    Tipo::ReferenciaConLifetime(_, inner) | Tipo::ReferenciaMutConLifetime(_, inner) |
+                    Tipo::ReferenciaSelf(inner) | Tipo::ReferenciaMutSelf(inner) => {
+                        match self.resolver_alias(inner) {
+                            Tipo::Nombre(n) => n,
+                            otro => {
+                                self.errores.agregar(ErrorCompilador::nuevo(
+                                    CategoriaError::Interno,
+                                    32,
+                                    span.clone(),
+                                    format!("Acceso a campo en tipo no-struct '{:?}'", otro),
+                                ));
+                                return Err(());
+                            }
+                        }
+                    }
                     _ => {
                         self.errores.agregar(ErrorCompilador::nuevo(
                             CategoriaError::Interno,
@@ -1287,6 +1315,7 @@ impl Codegen {
             "argumentos" |
             "fecha_unix" | "fecha_ms" |
             "dht_nuevo" | "dht_publicar" | "dht_consultar" | "dht_bootstrap" | "dht_cerrar" |
+            "memoria_usada" | "memoria_volcar" | "memoria_rastrear" | "memoria_canario_verificar" |
             "cancelar" |
             "texto_a_puntero" |
             "como_entero64" | "como_entero32" |
@@ -1429,6 +1458,10 @@ impl Codegen {
             "dht_consultar" => self.builtin_dht_consultar(builder, variables, &llamada.argumentos),
             "dht_bootstrap" => self.builtin_dht_bootstrap(builder, variables, &llamada.argumentos),
             "dht_cerrar" => self.builtin_dht_cerrar(builder, variables, &llamada.argumentos),
+            "memoria_usada" => self.builtin_memoria_usada(builder, variables, &llamada.argumentos),
+            "memoria_volcar" => self.builtin_memoria_volcar(builder, variables, &llamada.argumentos),
+            "memoria_rastrear" => self.builtin_memoria_rastrear(builder, variables, &llamada.argumentos),
+            "memoria_canario_verificar" => self.builtin_memoria_canario_verificar(builder, variables, &llamada.argumentos),
             "diccionario_nuevo" => self.builtin_diccionario_nuevo(builder, &llamada.tipo_args),
             "diccionario_insertar" => self.builtin_diccionario_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "diccionario_obtener" => self.builtin_diccionario_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),

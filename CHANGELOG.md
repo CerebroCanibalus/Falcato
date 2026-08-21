@@ -1,5 +1,71 @@
 # Changelog de Falcato
 
+## [0.7.4] - 2026-08-21
+
+### ➕ ADICIONES
+
+- **`sino pues` / `sino po` — else-if en español natural (firma chilena)**:
+  cadenas de condicionales sin anidar. `sino pues` es la forma canónica,
+  `sino po` el guiño chileno, y `sino si` se mantiene como alias de
+  migración. Todas desugarean al mismo AST (`sino { si ... }`) — cero
+  costo en runtime, cadenas de cualquier profundidad soportadas.
+
+  ```falcato
+  si nota > 90 { imprimir_linea("A"); }
+  sino pues nota > 80 { imprimir_linea("B"); }
+  sino po nota > 70 { imprimir_linea("C"); }
+  sino si nota > 60 { imprimir_linea("D"); }
+  sino { imprimir_linea("F"); }
+  ```
+
+- **Aliases `estruct` y `&muta`/`&cambia`**: `estructural`/`estructura`
+  aceptan ahora `estruct` para quien teclea rápido; `&mut` acepta
+  `&muta` y `&cambia` — referencias mutables con nombre en español.
+  Las formas viejas siguen funcionando (aliases ocultos, cero ruptura).
+
+- **Builtins de memoria debug (`memoria_usada`, `memoria_volcar`,
+  `memoria_rastrear`, `memoria_canario_verificar`)**: lente graduable
+  sobre el heap. Con `--depurar-memoria=0..3` el binario instrumenta
+  allocs/frees por niveles: 1 Guardián (doble-free/free inválido/leaks),
+  2 Cirujano (canarios + cuarentena), 3 Enfermizo (hexdump + timeline).
+  Sin flag = cero costo.
+
+- **Depuración de crashes (3.1)**: los prints ya no se pierden cuando el
+  programa crashea (flush tras cada `imprimir_linea`); panic handler
+  auto-instalado que imprime `[FALCATO PANIC]` con código de excepción;
+  si el codegen salta una función, error duro `[C009]` con archivo:línea
+  en vez de LNK2019 mudo del linker.
+
+### 🔧 ARREGLOS
+
+- **3.4 — API unificada `Texto`** (F-002/F-003): `archivo_leer/escribir/
+  existe`, `tcp_conectar` y `dns_resolver` aceptan ahora `Texto` dinámico
+  además del literal `Palabra`. Fin de la inconsistencia donde la mitad
+  de los builtins pedía un tipo y la otra mitad otro. Coerción implícita:
+  el código viejo con literales compila sin cambios.
+
+- **3.8 — `retornar Struct { ... }`**: el parser de `retornar` acepta
+  struct literals igual que una declaración. Antes solo `el x: T = T{}`
+  funcionaba y `retornar T{}` daba error de sintaxis.
+
+- **F-010/S003 — escritura a través de referencia mutable**: `r.x = 99`
+  con `r: &muta Punto` ahora funciona (lectura y escritura), tanto con
+  refs locales como pasando `&muta T` a funciones. Antes era error
+  "tipo no-struct" o función silenciosamente ausente del binario.
+
+- **F-012 — escapes desconocidos en literales**: `"D:\Cid\build"` ahora
+  produce `[S008] escape desconocido en literal de texto (ej: \C). Usa
+  \\ para barra invertida` con archivo:línea en compile-time. Antes
+  generaba basura silenciosa en runtime lejos del origen.
+
+### ✅ VERIFICACIÓN
+
+- `cargo test --release`: 47 lib + 54 bin verde
+- `pruebas/unitest/`: 12/12 ejecutan + 6/6 negativos fallan como deben
+- Cadena `sino pues/po/si` de 4 niveles: compila, corre, rama correcta
+- Escritura vía `&muta` (local + parámetro de función): verificada
+- `archivo_io.fc` con ruta `Palabra` (viejo) y `Texto` (nuevo): ambos OK
+
 ## [0.7.3] - 2026-08-19
 
 ### ➕ ADICIONES

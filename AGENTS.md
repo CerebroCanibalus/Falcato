@@ -340,7 +340,7 @@ pruebas/unitest/
 - ✅ **Aritmética flotante COMPLETA FIXED 2026-08-11**: `compilar_operacion_binaria` usaba sdiv/srem/icmp (enteros) con F64 → Verifier error en TODA operación flotante. Fix: dispatch por tipo — fadd/fsub/fmul/fdiv/fcmp para F32/F64; módulo emulado `a - floor(a/b)*b` (Cranelift 0.112 sin frem nativo). IEEE 754 verificado: 1.0/0.0=inf, 0.0/0.0=nan. Test: `unitest_flotantes.fc`
 - 🟢 **División por cero entera** = UB documentado estilo C (crash 0xC0000095) — decisión 2026-08-11; crash controlado N2 = tarea futura
 - 🟢 **Doble free** = UB documentado estilo C (crash 0xC0000005) — decisión 2026-08-11; detección N2 = tarea futura (R6 mitiga)
-- 🟢 **Escritura vía `*ref_mut = x`** = limitación documentada (S003) — decisión 2026-08-11; feature futura N2
+- ✅ **Escritura a través de referencia** (`r.campo = x` con `r: &muta T`) RESUELTA 2026-08-20 — semantic desreferencia `Tipo::Referencia*` en AccesoCampo, codegen resuelve layout del inner; el identificador de tipo ref ya carga el puntero base. La escritura directa `*ref = x` (sin campo) sigue siendo S003
 - 🟢 **`falcato prueba -` (stdin)** no soportado — solo archivos
 
 **Cobertura por categorías:**
@@ -655,16 +655,61 @@ Ecosistema estilo crates.io pero **sin registry central**: contenido por hash, �
 ### Calidad
 - [ ] Azure Trusted Signing (~$10/mes) para eliminar falsos positivos · Publicar en winget + Scoop · Fix interpolación (`{var}` en strings, roto desde antes de migración)
 
+### 📋 Grandes Mejoras — Roadmap Priorizado (sesión 2026-08-20)
+> 12 mejorías ordenadas por **impacto × urgencia × deuda acumulada**. F1/F2 = speculative decoding (idea de esta sesión). 3.1–3.10 = dolor reportado por el trabajador de Cid.
+
+| # | ID | Mejora | Por qué aquí | Esfuerzo | Estado |
+|---|----|--------|--------------|----------|--------|
+| 1 | 3.1 | **Depuración de crashes: imposible localizar** — (a) ✅ `fflush(NULL)` tras cada `imprimir_linea` (preserva prints), (b) ✅ `panic_handler.rs` (SEH 0xC0000005/0xC0000374 + POSIX) auto-instalado + call en `principal`, (c) ✅ `[C009]` hard error si codegen salta función (lista archivo:línea) | Sin esto no se puede trabajar en NADA. Fundación absoluta | 🟡 Medio | ✅ 2026-08-20 |
+| 2 | 3.2 | **Errores que no dicen dónde** — LNK2019 sin mapeo a `.fc`. Cuando linker falle, listar funciones declaradas no emitidas con `archivo:línea` | ✅ Cubierto por 3.1c: `[C009]` anticipa LNK2019 en codegen con archivo:línea | 🟡 Medio | ✅ 2026-08-20 |
+| 3 | 3.4 | **Palabra vs Texto unificado** — `archivo_*`/`tcp_conectar`/`dns_resolver` unificados a `Texto`; `Palabra`→`Texto` coerción + `preparar_ruta` (malloc+memcpy si Texto, directo si Palabra). Bloqueó HTTP plano entero | Deuda sistemática que se copia en cada builtin nuevo. Romper en alpha = barato | 🟡 Medio | ✅ 2026-08-20 |
+| 4 | 3.5 | **Falta `texto_a_palabra` / coerción** — no hay `Texto→Palabra`, obligó a FFI manual | Depende de 3.4 (si unificamos a Texto, gran parte desaparece) | 🟢 Bajo | ⏳ |
+| 5 | 3.9 | **Structs dentro de `módulo { }` invisibles** — T020 ni para funciones del mismo módulo. Solo top-level funciona | Modularidad rota — bloquea librerías estructuradas | 🟡 Medio | ⏳ |
+| 6 | 3.8 | **`retornar Struct { ... }` no parsea** — ✅ parser de `retornar` acepta struct literal (mismo camino que declaración) | Muerde en código real de librerías | 🟢 Bajo | ✅ 2026-08-20 |
+| 7 | 3.6 | **`entero_a_texto` exige `Entero64` (F-004)** — todo `Entero32` requiere `como_entero64()` manual. Pedido: promoción entera automática (widening safe) en args | Ruido constante. F-004 resuelto solo para ese builtin; falta widening general | 🟡 Medio | ⏳ |
+| 8 | 3.7 | **Sin else-if** — ✅ `sino pues`/`sino po` (canónicos, firma chilena) + `sino si` (alias) con desugar a anidamiento; cadenas completas soportadas | Legibilidad | 🟢 Bajo | ✅ 2026-08-20 |
+| 9 | 3.3 | **Unidad de verificación ambigua** — `verifica archivo.fc` pasa pero el programa crashea; solo el amalgama es verdad. Advertir "símbolos externos no verificables" o `verifica` multi-archivo | Transitorio (muere con F-008) pero la advertencia es barata ya | 🟢 Bajo | ⏳ |
+| 10 | 3.10 | **Sin sanitizer/debug de memoria** — `memoria_debug/` modular (log apilado + nivel1 Guardián + nivel2 Cirujano + nivel3 Enfermizo), `--depurar-memoria=0..3` + builtins `memoria_usada/volcar/rastrear/canario_verificar`. Wiring de Text/Vector a tracker pendiente | Inversión grande — después de 3.1 | 🔴 Alto | 🟡 2026-08-20 (esqueleto) |
+| 11 | F1 | **Compilación especulativa en background** — LSP pre-compila versiones intermedias mientras el LLM escribe; `falcato corre` → cache hit instantáneo. Ya existe `--incremental` (23 ms) | La visión — requiere pipeline estable primero | 🟡 Medio | ⏳ |
+| 12 | F2 | **N0 draft / N2 target en paralelo** — `falcato corre` compila N0 y ejecuta inmediato, verifica N2 en paralelo, reporta diferido. Es el speculative decoding materializado | La visión — N0/N2 ya existen, falta orquestación | 🟡 Medio | ⏳ |
+
+> **Lógica del orden:** 1–2 fundación (sin debuggear no hay nada) → 3–4 deuda de diseño (lo que se acumula) → 5–6 modularidad/consistencia → 7–8 ergonomía → 9–10 verificación/confianza → 11–12 visión (requieren pipeline estable).
+
 ### 🔧 Bugs conocidos del runtime (mejorar a futuro)
 > Problemas del lenguaje/runtime que NO se arreglan aquí. Se registran para seguimiento. **Bloquean piezas de Cid hasta su fix.**
 
 | ID | Bug | Pieza bloqueada | Estado |
 |----|-----|-----------------|--------|
 | F-001 | `archivo_listar` CRASHEA (0xC0000005) al asignar `Vector<Texto>` | `fs.fc` (MCP) | ✅ **RESUELTO** — (1) `inferir_tipo` en codegen/tipos.rs reconoce `archivo_listar` → `Vector<Texto>`; (2) runtime usa array de punteros a descriptores (no inline) |
-| F-002 | Inconsistencia de API: `archivo_escribir/leer/existe` esperan `Palabra` (ruta literal) mientras `archivo_agregar/renombrar/borrar` esperan `Texto` | ergonomía | ⏳ sugerencia |
-| F-003 | Inconsistencia de API: `tcp_conectar` espera `Palabra` (host literal) mientras `tls_conectar` espera `Texto` | ergonomía | ⏳ sugerencia |
-| F-004 | `entero_a_texto` espera `Entero64` — un `Entero32` da T001; requiere `como_entero64()` manual | ergonomía | ✅ **RESUELTO** — `sextend` automático a I64 en `builtins.rs` |
+| F-002 | Inconsistencia de API: `archivo_escribir/leer/existe` esperan `Palabra` (ruta literal) mientras `archivo_agregar/renombrar/borrar` esperan `Texto` | ergonomía | ✅ **RESUELTO** — unificado a `Texto` con coerción `Palabra`→`Texto` (3.4) |
+| F-003 | Inconsistencia de API: `tcp_conectar` espera `Palabra` (host literal) mientras `tls_conectar` espera `Texto` | ergonomía | ✅ **RESUELTO** — unificado a `Texto` con coerción (3.4) |
+| F-004 | `entero_a_texto` espera `Entero64` — un `Entero32` da T001; requiere `como_entero64()` manual | ergonomía | ✅ **RESUELTO** — `sextend` automático a I64 en `builtins.rs` · pendiente widening general (3.6) |
 | F-005 | `flotante_a_texto(3.14159)` → "3.1415899999999999" (precisión float64 cruda, sin formateo) | JSON serializer (números feos) | ✅ **RESUELTO** — runtime usa `%.15g` (precisión razonable, notación científica si necesario) |
+
+### 📋 Reporte para el trabajador de Falcato — sesión 2026-08-20 (Cid)
+
+#### 1. Arreglos que hicimos del lado de Cid (contexto — no son bugs del compiler, sino workarounds)
+| Problema | Workaround aplicado en Cid |
+|----------|---------------------------|
+| HTTP plano no implementado en `http.fc` | Implementado en Cid con parsing manual |
+| `_http_puerto_de_url` ignoraba `:puerto` | Fix: parsear `:puerto` explícito |
+| Host incluía `:puerto` → `getaddrinfo` fallaba | Fix: separar host y puerto antes de `tcp_conectar` |
+| Lectura colgaba (keep-alive sin fin) | Fix: timeout + `Connection: close` |
+| Body vacío | Fix: buscar `\r\n\r\n` correctamente |
+| Heap corruption en headers | Fix: evitar `Texto` temporales compartidos |
+
+#### 2. Bugs del compilador/runtime — con repro y criterio de fix
+
+| ID | Bug | Repro mínimo | Criterio de fix | Estado |
+|----|-----|--------------|-----------------|--------|
+| F-007 | **Referencia adelantada no resuelve firmas** — `es_par(4)` infiere `Entero32` si la función está definida después | `función principal() -> Entero32 { el ok: Booleano = es_par(4); retornar 0; }` `función es_par(el n: Entero32) -> Booleano { retornar n % 2 == 0; }` → `[T001] infiere Entero32` | Dos pasadas en el typechecker: pre-registro de firmas antes de resolver cuerpos. Es el bug que más dolor causa: obliga a orden estilo C y complica la amalgama. | ⏳ ver 3.1/3.2 (two-pass ya existe en 0.7.2 — verificar si cubre este caso) |
+| F-008 | **Sin resolución cross-file** — cada `.fc` se analiza en aislamiento; `usar mod::*` solo resuelve bloques `módulo` inline | `falcato compila a.fc b.fc` donde `a.fc` usa símbolos de `b.fc` → T020 | Análisis semántico sobre el conjunto de archivos pasados al CLI, no por archivo. Alternativa aceptable: documentar oficialmente el patrón amalgama como soportado. | ⏳ ver 3.3 |
+| F-009 | **`-> Vacio` panic en codegen** — semántica lo acepta, codegen panica `No se puede compilar tipo Nombre 'Vacio' sin resolver` | `función foo() -> Vacio { }` → panic | Mapear `Vacio` a `()/void` en codegen, o rechazarlo en semántica con error claro. Hoy es trampa silenciosa. | ⏳ |
+| F-010 | **`&mut struct.campo` rompe codegen EN SILENCIO** — la función no se emite al `.o` → linker LNK2019 sin diagnóstico | `&mut s.campo` en función → compila OK pero la función desaparece del `.o` | ✅ **RESUELTO** — (a) `[C009]`+error 99 explícito para borrow complejo (3.1c), (b) acceso/escritura a campo A TRAVÉS de ref (`r.x = 99` con `r: &muta T`) soportado: semantic desreferencia el tipo, codegen resuelve layout interno |
+| F-011 | **Semántica de `Vector<Texto>` rota (el más grave)** — `vector_agregar` NO copia (mueve descriptor); `vector_obtener` no copia; interpolar `{h}` crashea; `vector_liberar` con buffers reallocados crashea | `vector_agregar<Texto>(v, t); texto_liberar(t)` → doble free. `texto_liberar(vector_obtener(v,0))` → doble free | Decidir UNA semántica y hacerla consistente. Recomendación: valor-semántica (agregar/obtener COPIAN profundo para `Texto`) — es lo que cualquier usuario espera. El estado actual ni es move ni es borrow: es indefinido. | ⏳ ver 3.10 |
+| F-012 | **Escapes desconocidos en literales** — `"\C"` o `"D:\Cid\build"` produce basura o crash en runtime, no error de compile | `"D:\Cid\build"` → `\C` y `\b` interpretados | ✅ **RESUELTO** — `[S008] escape desconocido en literal de texto (ej: \C). Usa \\ para barra invertida` con archivo:línea en compile-time |
+
+> **Nota:** F-007 ya tiene two-pass en 0.7.2 (forward refs de funciones/structs). Si el repro aún falla, es regresión del two-pass — reabrir. F-010 es el que causa el LNK2019 de 3.2. F-011 es el más grave para Cid (bloquea `fs.fc` y JSON). F-012 es el que causó la corrupción de rutas Windows (`D:\Falcato`).
 
 ## Estado de distribución (v0.5.0 — Alpha)
 | Aspecto | Estado |

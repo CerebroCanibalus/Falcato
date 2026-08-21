@@ -481,12 +481,29 @@ impl Codegen {
                     crate::ast::Lugar::Campo(base_expr, nombre_campo) => {
                         let struct_ptr = self.compilar_expresion(base_expr, builder, variables)?;
                         let tipo_base = self.inferir_tipo(base_expr, variables);
-                        let nombre_struct = match tipo_base {
-                            Tipo::Nombre(n) => n,
+                        // S003 fix: asignación a campo a través de referencia (&mut T).
+                        // El identificador de tipo referencia ya carga el PUNTERO —
+                        // resolver el tipo interno para el layout.
+                        let nombre_struct = match &tipo_base {
+                            Tipo::Nombre(n) => n.clone(),
+                            Tipo::Referencia(inner) | Tipo::ReferenciaMut(inner) |
+                            Tipo::ReferenciaConLifetime(_, inner) | Tipo::ReferenciaMutConLifetime(_, inner) |
+                            Tipo::ReferenciaSelf(inner) | Tipo::ReferenciaMutSelf(inner) => {
+                                match self.resolver_alias(inner) {
+                                    Tipo::Nombre(n) => n,
+                                    otro => {
+                                        self.errores.agregar(ErrorCompilador::nuevo(
+                                            CategoriaError::Interno, 32, asig.span.clone(),
+                                            format!("Asignación a campo en tipo no-struct '{:?}'", otro),
+                                        ));
+                                        return Err(());
+                                    }
+                                }
+                            }
                             _ => {
                                 self.errores.agregar(ErrorCompilador::nuevo(
                                     CategoriaError::Interno, 32, asig.span.clone(),
-                                    format!("Asignaci├│n a campo en tipo no-struct '{:?}'", tipo_base),
+                                    format!("Asignación a campo en tipo no-struct '{:?}'", tipo_base),
                                 ));
                                 return Err(());
                             }

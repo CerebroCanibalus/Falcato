@@ -329,5 +329,70 @@ impl Codegen {
         Ok(builder.ins().iconst(types::I32, 0))
     }
 
+    // ============================================================
+    // Memoria debug — lente graduable (niveles 0-3)
+    // ============================================================
+
+    /// memoria_usada() -> Entero64 — bytes vivos en heap (nivel 1+)
+    pub(crate) fn builtin_memoria_usada(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let fn_id = self.asegurar_funcion_c("falcato_memoria_usada", &[], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// memoria_volcar(ptr: Entero64, n: Entero32) — hexdump con ASCII
+    pub(crate) fn builtin_memoria_volcar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let n = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let n_i32 = if builder.func.dfg.value_type(n) == types::I64 {
+            builder.ins().ireduce(types::I32, n)
+        } else { n };
+        let fn_id = self.asegurar_funcion_c("falcato_memoria_volcar", &[types::I64, types::I32], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[ptr, n_i32]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// memoria_rastrear(ptr: Entero64) — ficha completa (alloc site, canario, timeline)
+    pub(crate) fn builtin_memoria_rastrear(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let fn_id = self.asegurar_funcion_c("falcato_memoria_rastrear", &[types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[ptr]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// memoria_canario_verificar(ptr: Entero64) -> Booleano (1=OK, 0=corrupto, 0 si nivel<2)
+    pub(crate) fn builtin_memoria_canario_verificar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let ptr = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let fn_id = self.asegurar_funcion_c("falcato_memoria_canario_verificar", &[types::I64], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[ptr]);
+        let res_i32 = builder.inst_results(call)[0];
+        // Convertir I32 -> I8 Booleano (0/1)
+        let res_i8 = builder.ins().ireduce(types::I8, res_i32);
+        Ok(res_i8)
+    }
 
 }
