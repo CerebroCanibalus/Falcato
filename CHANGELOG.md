@@ -1,5 +1,26 @@
 # Changelog de Falcato
 
+## [0.7.6] - 2026-08-22
+
+### 🔧 ARREGLOS
+
+- **F-013 profundo — literales grandes en structs/binarias (truncamiento I32)**: `compilar_expresion_con_tipo_esperado` promueve literales al `tipo_esperado` antes de `iconst`. Fin del `123456789012345 → 2249056121` en `G {id: 123...}`, `g.id = 987...`, `el d: Entero64 = 123... + 456...`. Verificado `test_F013_struct.fc` 3/3 OK. `conversion.rs` `como_entero64` ya emitía `I64` directo para literales.
+- **F-014 sub-caso campo→campo `Caja {t: p.t}`**: `InicializacionStruct` expresión y `Asignacion Campo` ahora deep-copy `Texto` también cuando el origen es `p.t` (field→field), no solo literales. `test_f014_completo.fc` 6/6 OK sin double-free.
+- **F-019 `archivo_listar(\"literal\")` ruta larga**: `archivo_listar` con `Palabra` literal ahora `strlen+malloc+memcpy` + `free` del temporal tras la llamada (igual que `archivo_leer` F-016). Fin del descriptor fantasma en rutas largas.
+- **F-020 `"{f(x)}"` vacío silencioso**: `imprimir_linea("{presupuesto_restante(p)}")` ya no imprime `restante=` vacío. Ahora diagnostica `[S080] Interpolación con llamada no soportada. Usa variable temporal: el tmp = f(x) ; "{tmp}"` y falla con `[C009]` en vez de `LNK2019` mudo.
+- **F-021 `a > 0` infiere `Booleano`**: `Binaria` con `> < >= <= == != Y O` siempre retorna `Tipo::Booleano` en `codegen/tipos.rs` y `semantic/tipos.rs`. Fin del `T011 disconcordancia` espurio en `si a > 0` con `a: Entero32`. `test_F021.fc` → `F-021 OK`.
+- **`perfil_marca(\"literal\")` Palabra→Texto**: verificación `Tipo::Texto` else conversión `Palabra` igual que otros builtins. `test_perfil_literal.fc` 3 marcas OK.
+
+### 🧹 MANTENIMIENTO
+
+- **`AGENTS.md` comprimido** (~23554 tokens → ~1/3): fases 100% eliminadas, Roadmap real (R7.7/R9/R8) + `Mejoras 0.7.6` + `Gotchas operativos` (exe zombie, `build.bat` VsDevCmd, BOM `.ps1`).
+
+### 🧪 VERIFICACIÓN
+
+- `cargo test --lib`: 47 passed
+- `build.bat` 01:15 release+debug OK, `cargo check` sin `E0599`
+- `test_F013_struct.fc` / `test_f014_completo.fc` / `test_F019b.fc` / `test_F021.fc` OK; `test_F020.fc` diagnostica `[S080]` como diseñado
+
 ## [0.7.5] - 2026-08-21
 
 ### ➕ ADICIONES

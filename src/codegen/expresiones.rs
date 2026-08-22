@@ -465,7 +465,12 @@ impl Codegen {
 
                 // Struct normal: almacenar cada campo
                 for (nombre_campo, valor) in campos {
-                    let val = self.compilar_expresion(valor, builder, variables)?;
+                    let tipo_campo = layout.tipos.get(nombre_campo).cloned().unwrap_or(Tipo::Entero32);
+                    let val = if self.es_tipo_numerico(&tipo_campo) {
+                        self.compilar_expresion_con_tipo_esperado(valor, &tipo_campo, builder, variables)?
+                    } else {
+                        self.compilar_expresion(valor, builder, variables)?
+                    };
                     let offset = match layout.offsets.get(nombre_campo) {
                         Some(o) => *o as i64,
                         None => {
@@ -480,12 +485,30 @@ impl Codegen {
                     };
 
                     let campo_ptr = builder.ins().iadd_imm(base_ptr, offset);
-                    builder.ins().store(
-                        cranelift_codegen::ir::MemFlags::new(),
-                        val,
-                        campo_ptr,
-                        0,
-                    );
+                    // F-014 — Texto: deep copy para evitar alias y double-free (incluye p.t campo→campo)
+                    if tipo_campo == Tipo::Texto {
+                        let src_desc = val;
+                        let src_ptr = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 0);
+                        let src_len = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 8);
+                        let src_len_i32 = builder.ins().ireduce(types::I32, src_len);
+                        let new_desc = self.descriptor_nuevo(builder);
+                        let fn_id = self.asegurar_funcion_c("falcato_texto_desde_bytes", &[types::I64, types::I32, types::I64], None);
+                        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+                        builder.ins().call(fn_ref, &[src_ptr, src_len_i32, new_desc]);
+                        builder.ins().store(
+                            cranelift_codegen::ir::MemFlags::new(),
+                            new_desc,
+                            campo_ptr,
+                            0,
+                        );
+                    } else {
+                        builder.ins().store(
+                            cranelift_codegen::ir::MemFlags::new(),
+                            val,
+                            campo_ptr,
+                            0,
+                        );
+                    }
                 }
 
                 Ok(base_ptr)
@@ -1106,6 +1129,69 @@ impl Codegen {
                 }
             }
             _ => self.compilar_literal(lit, builder),
+        }
+    }
+
+    /// Compila una expresión respetando un tipo esperado (para literales grandes en contexto Entero64).
+    /// Maneja Literal, Unaria(Literal) y Binaria donde algún operando es literal.
+    pub(crate) fn compilar_expresion_con_tipo_esperado(
+        &mut self,
+        expr: &Expresion,
+        tipo_esperado: &Tipo,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        if self.es_tipo_numerico(tipo_esperado) {
+            match expr {
+                Expresion::Literal(lit) => {
+                    return self.compilar_literal_con_tipo(lit, tipo_esperado, builder);
+                }
+                Expresion::Unaria(op, inner, span) => {
+                    if let Expresion::Literal(lit) = inner.as_ref() {
+                        let val = self.compilar_literal_con_tipo(lit, tipo_esperado, builder)?;
+                        return self.compilar_operacion_unaria(*op, val, builder, span);
+                    }
+                }
+                Expresion::Binaria(izq, op, der, _) => {
+                    // Si algún lado es literal (o unaria literal), compilarlo con el tipo esperado
+                    let izq_es_lit = matches!(izq.as_ref(), Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _)))
+                        || matches!(izq.as_ref(), Expresion::Unaria(OperadorUnario::Negacion, inner, _) if matches!(inner.as_ref(), Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _))));
+                    let der_es_lit = matches!(der.as_ref(), Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _)))
+                        || matches!(der.as_ref(), Expresion::Unaria(OperadorUnario::Negacion, inner, _) if matches!(inner.as_ref(), Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _))));
+                    if izq_es_lit || der_es_lit {
+                        let val_izq = if izq_es_lit {
+                            self.compilar_expresion_con_tipo_esperado(izq, tipo_esperado, builder, variables)?
+                        } else {
+                            self.compilar_expresion(izq, builder, variables)?
+                        };
+                        let val_der = if der_es_lit {
+                            self.compilar_expresion_con_tipo_esperado(der, tipo_esperado, builder, variables)?
+                        } else {
+                            self.compilar_expresion(der, builder, variables)?
+                        };
+                        // Si los vals tienen anchos distintos, extender al esperado
+                        let ct = self.tipo_a_cranelift(tipo_esperado);
+                        let vi = if builder.func.dfg.value_type(val_izq) != ct {
+                            let t_izq = self.inferir_tipo(izq, variables);
+                            self.adaptar_valor_widening(val_izq, &t_izq, tipo_esperado, builder)
+                        } else { val_izq };
+                        let vd = if builder.func.dfg.value_type(val_der) != ct {
+                            let t_der = self.inferir_tipo(der, variables);
+                            self.adaptar_valor_widening(val_der, &t_der, tipo_esperado, builder)
+                        } else { val_der };
+                        return self.compilar_operacion_binaria(*op, vi, vd, builder);
+                    }
+                }
+                _ => {}
+            }
+        }
+        // Fallback: compilación normal + widening si hace falta
+        let val = self.compilar_expresion(expr, builder, variables)?;
+        let t_src = self.inferir_tipo(expr, variables);
+        if self.es_widening_codegen(tipo_esperado, &t_src) {
+            Ok(self.adaptar_valor_widening(val, &t_src, tipo_esperado, builder))
+        } else {
+            Ok(val)
         }
     }
     pub(crate) fn indice_variante_enum(&self, enum_nombre: &str, variante: &str) -> Option<u32> {

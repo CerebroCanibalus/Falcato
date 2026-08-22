@@ -274,8 +274,12 @@ impl Codegen {
                     Tipo::Entero32
                 }
             }
-            Expresion::Binaria(izq, _, der, _) => {
-                // Inferir tipo real para Binaria (no siempre Entero32) — crucial para Entero8
+            Expresion::Binaria(izq, op, der, _) => {
+                // Comparaciones y lógicas siempre devuelven Booleano (convención Rust/Python/JS)
+                if matches!(op, OperadorBinario::Igual | OperadorBinario::Distinto | OperadorBinario::Menor | OperadorBinario::Mayor | OperadorBinario::MenorIgual | OperadorBinario::MayorIgual | OperadorBinario::Y | OperadorBinario::O) {
+                    return Tipo::Booleano;
+                }
+                // Inferir tipo real para Binaria aritmética (no siempre Entero32) — crucial para Entero8
                 let t_izq = self.inferir_tipo(izq, variables);
                 let t_der = self.inferir_tipo(der, variables);
                 let es_lit = |e: &Expresion| matches!(e, Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _)));

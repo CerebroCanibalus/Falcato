@@ -425,14 +425,32 @@ impl Codegen {
         Ok(builder.ins().iconst(types::I32, 0))
     }
 
-    /// perfil_marca(etiqueta: Texto) — guarda timestamp con etiqueta
+    /// perfil_marca(etiqueta: Texto|Palabra) — guarda timestamp con etiqueta
     pub(crate) fn builtin_perfil_marca(
         &mut self,
         builder: &mut FunctionBuilder,
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
         argumentos: &[Expresion],
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let etiqueta = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let etiqueta_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let tipo_etiqueta = self.inferir_tipo(&argumentos[0], variables);
+        // Acepta Texto (descriptor I64) y Palabra (ptr C). Si es Palabra/literal, convierte a Texto descriptor.
+        let etiqueta = if tipo_etiqueta == Tipo::Texto {
+            etiqueta_val
+        } else {
+            // Palabra -> Texto: strlen + malloc + memcpy -> descriptor
+            let ptr = etiqueta_val;
+            let len = self.llamar_strlen(builder, ptr);
+            let uno = builder.ins().iconst(types::I64, 1);
+            let cap = builder.ins().iadd(len, uno);
+            let data = self.llamar_malloc(builder, cap);
+            self.llamar_memcpy(builder, data, ptr, cap);
+            let desc = self.descriptor_nuevo(builder);
+            self.guardar_campo_descriptor(builder, desc, Self::OFFSET_PTR, data);
+            self.guardar_campo_descriptor(builder, desc, Self::OFFSET_LEN, len);
+            self.guardar_campo_descriptor(builder, desc, Self::OFFSET_CAP, cap);
+            desc
+        };
         let fn_id = self.asegurar_funcion_c("falcato_perfil_marca", &[types::I64], None);
         let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
         builder.ins().call(fn_ref, &[etiqueta]);

@@ -287,6 +287,16 @@ impl Codegen {
         // Imprimir cada segmento
         for (es_var, contenido) in &segmentos {
             if *es_var {
+                // F-020 — interpolación con llamada "{f(x)}" no soportada; diagnosticar en lugar de vacío silencioso
+                if contenido.contains('(') {
+                    self.errores.agregar(ErrorCompilador::nuevo(
+                        CategoriaError::Sintaxis,
+                        80,
+                        Span::vacio(),
+                        format!("Interpolación '{{{}}}' con llamada a función no soportada. Usa variable temporal: el tmp = {} ; \"{{tmp}}\"", contenido, contenido),
+                    ));
+                    return Err(());
+                }
                 // Variable (o acceso a campo args.nombre): imprimir según su tipo
                 if contenido.contains('.') {
                     // Acceso a campo: compilar la expresión AccesoCampo real.
@@ -304,6 +314,14 @@ impl Codegen {
                         let val = self.compilar_expresion(&expr_campo, builder, variables)?;
                         let tipo = self.inferir_tipo(&expr_campo, variables);
                         self.imprimir_valor_interpolado(builder, variables, val, &tipo, contenido)?;
+                    } else {
+                        self.errores.agregar(ErrorCompilador::nuevo(
+                            CategoriaError::Sintaxis,
+                            80,
+                            Span::vacio(),
+                            format!("Interpolación '{{{}}}' con acceso a campo complejo no soportado", contenido),
+                        ));
+                        return Err(());
                     }
                 } else if let Some((slot, tipo, _)) = variables.get(contenido) {
                     let slot = *slot;
@@ -389,6 +407,14 @@ impl Codegen {
                     let func_id = self.asegurar_funcion_c("printf", &[types::I64, types::I64], Some(types::I32));
                     let func_ref = self.module.declare_func_in_func(func_id, builder.func);
                     builder.ins().call(func_ref, &[fmt_ptr, val]);
+                } else {
+                    self.errores.agregar(ErrorCompilador::nuevo(
+                        CategoriaError::Sintaxis,
+                        80,
+                        Span::vacio(),
+                        format!("Variable '{{{}}}' no encontrada para interpolación", contenido),
+                    ));
+                    return Err(());
                 }
             } else {
                 // Literal: imprimir con printf("%s", literal)

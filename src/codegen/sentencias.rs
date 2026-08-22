@@ -180,7 +180,12 @@ impl Codegen {
                                     }
                                 } else {
                                     for (nombre_campo, valor) in campos {
-                                        let val = self.compilar_expresion(valor, builder, variables)?;
+                                        let tipo_campo = layout.tipos.get(nombre_campo).cloned().unwrap_or(Tipo::Entero32);
+                                        let val = if self.es_tipo_numerico(&tipo_campo) {
+                                            self.compilar_expresion_con_tipo_esperado(valor, &tipo_campo, builder, variables)?
+                                        } else {
+                                            self.compilar_expresion(valor, builder, variables)?
+                                        };
                                         let offset = match layout.offsets.get(nombre_campo) {
                                             Some(o) => *o as i64,
                                             None => {
@@ -194,7 +199,6 @@ impl Codegen {
                                             }
                                         };
                                         let campo_ptr = builder.ins().iadd_imm(base_ptr, offset);
-                                        let tipo_campo = layout.tipos.get(nombre_campo).cloned().unwrap_or(Tipo::Entero32);
                                         // F-014 — Texto desde variable: deep copy para evitar alias y double-free
                                         if tipo_campo == Tipo::Texto {
                                             let src_desc = val;
@@ -433,6 +437,9 @@ impl Codegen {
                                     self.compilar_expresion(&decl.valor, builder, variables)?
                                 }
                             }
+                            (Expresion::Binaria(_, _, _, _), t) if self.es_tipo_numerico(t) => {
+                                self.compilar_expresion_con_tipo_esperado(&decl.valor, t, builder, variables)?
+                            }
                             _ => self.compilar_expresion(&decl.valor, builder, variables)?,
                         };
                         // F-013 — widening en declaración: Natural8(200) → Entero16 debe extenderse
@@ -612,9 +619,15 @@ impl Codegen {
                             if let Some(offset) = layout.offsets.get(nombre_campo) {
                                 let campo_ptr = builder.ins().iadd_imm(struct_ptr, *offset as i64);
                                 let tipo_campo = self.buscar_tipo_campo(&nombre_struct, nombre_campo);
+                                // F-013 — si el campo es numérico y el valor es literal/binaria grande, recompilar con tipo esperado
+                                let valor_ok = if self.es_tipo_numerico(&tipo_campo) {
+                                    self.compilar_expresion_con_tipo_esperado(&asig.valor, &tipo_campo, builder, variables)?
+                                } else {
+                                    valor
+                                };
                                 // F-014 — Texto a campo desde variable: deep copy para evitar alias
                                 if tipo_campo == Tipo::Texto {
-                                    let src_desc = valor;
+                                    let src_desc = valor_ok;
                                     let src_ptr = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 0);
                                     let src_len = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 8);
                                     let src_len_i32 = builder.ins().ireduce(types::I32, src_len);
@@ -625,7 +638,7 @@ impl Codegen {
                                     builder.ins().store(cranelift_codegen::ir::MemFlags::new(), new_desc, campo_ptr, 0);
                                 } else {
                                     let _cranelift_type = self.tipo_a_cranelift(&tipo_campo);
-                                    builder.ins().store(cranelift_codegen::ir::MemFlags::new(), valor, campo_ptr, 0);
+                                    builder.ins().store(cranelift_codegen::ir::MemFlags::new(), valor_ok, campo_ptr, 0);
                                 }
                             }
                         }

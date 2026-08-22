@@ -340,7 +340,8 @@ impl Codegen {
     ) -> Result<cranelift_codegen::ir::Value, ()> {
         let tipo_dir = self.inferir_tipo(&argumentos[0], variables);
         let dir_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
-        // F-016 — Palabra literal → Texto: convertir Palabra (ptr C) a Texto descriptor
+        // F-016/F-019 — Palabra literal → Texto: convertir Palabra (ptr C) a Texto descriptor
+        let mut data_a_liberar: Option<cranelift_codegen::ir::Value> = None;
         let dir = if tipo_dir == crate::ast::Tipo::Texto {
             dir_val
         } else {
@@ -355,12 +356,17 @@ impl Codegen {
             self.guardar_campo_descriptor(builder, desc, Self::OFFSET_PTR, data);
             self.guardar_campo_descriptor(builder, desc, Self::OFFSET_LEN, len);
             self.guardar_campo_descriptor(builder, desc, Self::OFFSET_CAP, cap);
+            data_a_liberar = Some(data);
             desc
         };
         let desc_out = self.descriptor_nuevo(builder);
         let fn_id = self.asegurar_funcion_c("falcato_archivo_listar", &[types::I64, types::I64], None);
         let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
         builder.ins().call(fn_ref, &[dir, desc_out]);
+        // Liberar buffer temporal de la ruta literal (no el descriptor de salida)
+        if let Some(data) = data_a_liberar {
+            self.llamar_free(builder, data);
+        }
         Ok(desc_out)
     }
 

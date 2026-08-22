@@ -35,7 +35,26 @@ impl Codegen {
         destino: Tipo,
         builder: &mut FunctionBuilder,
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
-    ) -> Result<cranelift_codegen::ir::Value, ()> {        let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // F-013 fix: `5000000000 largo` → como_entero64(literal grande). El literal 5000000000 no cabe en I32,
+        // pero compilar_expresion lo trunca a I32 antes de sextend. Detectar literal y emitir I64 directo.
+        if let Expresion::Literal(Literal::Entero(n, _)) = &argumentos[0] {
+            let ir_destino = self.tipo_a_cranelift(&destino);
+            // Solo para destinos enteros — flotantes usan fcvt
+            if !matches!(ir_destino, types::F32 | types::F64) {
+                return Ok(builder.ins().iconst(ir_destino, *n as i64));
+            }
+        }
+        // También `como_entero64(-5000000000)` → Unaria Negación de literal grande
+        if let Expresion::Unaria(OperadorUnario::Negacion, inner, _) = &argumentos[0] {
+            if let Expresion::Literal(Literal::Entero(n, _)) = inner.as_ref() {
+                let ir_destino = self.tipo_a_cranelift(&destino);
+                if !matches!(ir_destino, types::F32 | types::F64) {
+                    return Ok(builder.ins().iconst(ir_destino, -(*n as i64)));
+                }
+            }
+        }
+        let val = self.compilar_expresion(&argumentos[0], builder, variables)?;
         let tipo_fuente = self.resolver_alias(&self.inferir_tipo(&argumentos[0], variables));
         let ir_destino = self.tipo_a_cranelift(&destino);
 

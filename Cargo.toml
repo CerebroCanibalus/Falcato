@@ -1,6 +1,6 @@
 [package]
 name = "falcato"
-version = "0.7.5"
+version = "0.7.6"
 edition = "2021"
 authors = ["Falcato Team"]
 description = "Lenguaje de programación de sistemas iberohablante sobre Cranelift"
