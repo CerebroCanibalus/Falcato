@@ -194,12 +194,31 @@ impl Codegen {
                                             }
                                         };
                                         let campo_ptr = builder.ins().iadd_imm(base_ptr, offset);
-                                        builder.ins().store(
-                                            cranelift_codegen::ir::MemFlags::new(),
-                                            val,
-                                            campo_ptr,
-                                            0,
-                                        );
+                                        let tipo_campo = layout.tipos.get(nombre_campo).cloned().unwrap_or(Tipo::Entero32);
+                                        // F-014 — Texto desde variable: deep copy para evitar alias y double-free
+                                        if tipo_campo == Tipo::Texto {
+                                            let src_desc = val;
+                                            let src_ptr = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 0);
+                                            let src_len = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 8);
+                                            let src_len_i32 = builder.ins().ireduce(types::I32, src_len);
+                                            let new_desc = self.descriptor_nuevo(builder);
+                                            let fn_id = self.asegurar_funcion_c("falcato_texto_desde_bytes", &[types::I64, types::I32, types::I64], None);
+                                            let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+                                            builder.ins().call(fn_ref, &[src_ptr, src_len_i32, new_desc]);
+                                            builder.ins().store(
+                                                cranelift_codegen::ir::MemFlags::new(),
+                                                new_desc,
+                                                campo_ptr,
+                                                0,
+                                            );
+                                        } else {
+                                            builder.ins().store(
+                                                cranelift_codegen::ir::MemFlags::new(),
+                                                val,
+                                                campo_ptr,
+                                                0,
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -402,7 +421,7 @@ impl Codegen {
                         // Si el valor es un literal numérico y hay tipo declarado, emitir
                         // con el ancho correcto (ej: el x: Entero64 = 5, o apodo ID = Entero64)
                         let tipo_resuelto = self.resolver_alias(&tipo);
-                        let valor = match (&decl.valor, &tipo_resuelto) {
+                        let valor_raw = match (&decl.valor, &tipo_resuelto) {
                             (Expresion::Literal(lit), t) if self.es_tipo_numerico(t) => {
                                 self.compilar_literal_con_tipo(lit, t, builder)?
                             }
@@ -415,6 +434,13 @@ impl Codegen {
                                 }
                             }
                             _ => self.compilar_expresion(&decl.valor, builder, variables)?,
+                        };
+                        // F-013 — widening en declaración: Natural8(200) → Entero16 debe extenderse
+                        let tipo_src = self.inferir_tipo(&decl.valor, variables);
+                        let valor = if self.es_widening_codegen(&tipo_resuelto, &tipo_src) {
+                            self.adaptar_valor_widening(valor_raw, &tipo_src, &tipo_resuelto, builder)
+                        } else {
+                            valor_raw
                         };
                         builder.ins().stack_store(valor, slot, 0);
                         (slot, tamano)
@@ -429,7 +455,41 @@ impl Codegen {
                 variables.insert(decl.nombre.clone(), (slot, tipo, decl.articulo));
             }
             Sentencia::Asignacion(asig) => {
-                let valor = self.compilar_expresion(&asig.valor, builder, variables)?;
+                // F-013 — compilar valor respetando tipo destino si es identificador
+                let valor = match &asig.lugar {
+                    crate::ast::Lugar::Identificador(nombre) => {
+                        if let Some((_, tipo_dest, _)) = variables.get(nombre) {
+                            let tipo_dest = tipo_dest.clone();
+                            match &asig.valor {
+                                Expresion::Literal(lit) if self.es_tipo_numerico(&tipo_dest) => {
+                                    self.compilar_literal_con_tipo(lit, &tipo_dest, builder)?
+                                }
+                                Expresion::Unaria(OperadorUnario::Negacion, inner, span) if self.es_tipo_numerico(&tipo_dest) => {
+                                    if let Expresion::Literal(lit) = inner.as_ref() {
+                                        let v = self.compilar_literal_con_tipo(lit, &tipo_dest, builder)?;
+                                        self.compilar_operacion_unaria(OperadorUnario::Negacion, v, builder, span)?
+                                    } else {
+                                        let v = self.compilar_expresion(&asig.valor, builder, variables)?;
+                                        let tipo_src = self.inferir_tipo(&asig.valor, variables);
+                                        if self.es_widening_codegen(&tipo_dest, &tipo_src) {
+                                            self.adaptar_valor_widening(v, &tipo_src, &tipo_dest, builder)
+                                        } else { v }
+                                    }
+                                }
+                                _ => {
+                                    let v = self.compilar_expresion(&asig.valor, builder, variables)?;
+                                    let tipo_src = self.inferir_tipo(&asig.valor, variables);
+                                    if self.es_widening_codegen(&tipo_dest, &tipo_src) {
+                                        self.adaptar_valor_widening(v, &tipo_src, &tipo_dest, builder)
+                                    } else { v }
+                                }
+                            }
+                        } else {
+                            self.compilar_expresion(&asig.valor, builder, variables)?
+                        }
+                    }
+                    _ => self.compilar_expresion(&asig.valor, builder, variables)?,
+                };
                 
                 match &asig.lugar {
                     crate::ast::Lugar::Identificador(nombre) => {
@@ -552,8 +612,21 @@ impl Codegen {
                             if let Some(offset) = layout.offsets.get(nombre_campo) {
                                 let campo_ptr = builder.ins().iadd_imm(struct_ptr, *offset as i64);
                                 let tipo_campo = self.buscar_tipo_campo(&nombre_struct, nombre_campo);
-                                let _cranelift_type = self.tipo_a_cranelift(&tipo_campo);
-                                builder.ins().store(cranelift_codegen::ir::MemFlags::new(), valor, campo_ptr, 0);
+                                // F-014 — Texto a campo desde variable: deep copy para evitar alias
+                                if tipo_campo == Tipo::Texto {
+                                    let src_desc = valor;
+                                    let src_ptr = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 0);
+                                    let src_len = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 8);
+                                    let src_len_i32 = builder.ins().ireduce(types::I32, src_len);
+                                    let new_desc = self.descriptor_nuevo(builder);
+                                    let fn_id = self.asegurar_funcion_c("falcato_texto_desde_bytes", &[types::I64, types::I32, types::I64], None);
+                                    let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+                                    builder.ins().call(fn_ref, &[src_ptr, src_len_i32, new_desc]);
+                                    builder.ins().store(cranelift_codegen::ir::MemFlags::new(), new_desc, campo_ptr, 0);
+                                } else {
+                                    let _cranelift_type = self.tipo_a_cranelift(&tipo_campo);
+                                    builder.ins().store(cranelift_codegen::ir::MemFlags::new(), valor, campo_ptr, 0);
+                                }
                             }
                         }
                     }
@@ -570,7 +643,39 @@ impl Codegen {
                 // R6: liberar el resto de variables heap vivas ANTES del return
                 self.liberar_scope(0, builder, variables)?;
                 if let Some(expr) = expr {
-                    let val = self.compilar_expresion(expr, builder, variables)?;
+                    // F-013 — literal polimórfico / widening en retorno
+                    let val = if let Some(ref tipo_ret) = self.retorno_actual.clone() {
+                        if !self.tipo_es_struct(tipo_ret).is_some() {
+                            match expr {
+                                Expresion::Literal(lit) if self.es_tipo_numerico(tipo_ret) => {
+                                    self.compilar_literal_con_tipo(lit, tipo_ret, builder)?
+                                }
+                                Expresion::Unaria(OperadorUnario::Negacion, inner, span) if self.es_tipo_numerico(tipo_ret) => {
+                                    if let Expresion::Literal(lit) = inner.as_ref() {
+                                        let v = self.compilar_literal_con_tipo(lit, tipo_ret, builder)?;
+                                        self.compilar_operacion_unaria(OperadorUnario::Negacion, v, builder, span)?
+                                    } else {
+                                        let v = self.compilar_expresion(expr, builder, variables)?;
+                                        let tipo_src = self.inferir_tipo(expr, variables);
+                                        if self.es_widening_codegen(tipo_ret, &tipo_src) {
+                                            self.adaptar_valor_widening(v, &tipo_src, tipo_ret, builder)
+                                        } else { v }
+                                    }
+                                }
+                                _ => {
+                                    let v = self.compilar_expresion(expr, builder, variables)?;
+                                    let tipo_src = self.inferir_tipo(expr, variables);
+                                    if self.es_widening_codegen(tipo_ret, &tipo_src) {
+                                        self.adaptar_valor_widening(v, &tipo_src, tipo_ret, builder)
+                                    } else { v }
+                                }
+                            }
+                        } else {
+                            self.compilar_expresion(expr, builder, variables)?
+                        }
+                    } else {
+                        self.compilar_expresion(expr, builder, variables)?
+                    };
                     // R9.0.1 — retorno de struct: copiar el struct (apuntado por val)
                     // al sret ptr y retornar void
                     if let Some(dest) = self.sret_destino {

@@ -640,6 +640,75 @@ fn verificar(archivos: &[String], json: bool, stdin: bool, incremental: bool) ->
         return Err("No se especificaron archivos fuente.".to_string());
     }
 
+    // F-008 — cross-file: si hay múltiples archivos, compartir símbolos públicos
+    if archivos.len() > 1 {
+        let base_dir = Path::new(&archivos[0]).parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
+        let mut resolver = Resolver::nuevo(&base_dir);
+        for archivo in archivos {
+            resolver.agregar_archivo(Path::new(archivo))?;
+        }
+        resolver.calcular_orden()?;
+        // Colectar símbolos públicos de todos los módulos (como en compilar_todo)
+        let mut programas: Vec<(String, crate::ast::Programa)> = Vec::new();
+        for nombre_modulo in &resolver.orden.clone() {
+            let unidad = resolver.modulos.get(nombre_modulo).unwrap();
+            let ruta_str = unidad.ruta.to_string_lossy().to_string();
+            let lexer = LexerFalcato::nuevo(&unidad.fuente, &ruta_str);
+            let tokens = lexer.tokenizar();
+            let programa = ParserFalcato::parse(tokens)
+                .map_err(|errs| {
+                    let msgs: Vec<String> = errs.iter().map(|e| e.error.to_string()).collect();
+                    format!("Errores de parseo en '{}':\n{}", unidad.ruta.display(), msgs.join("\n"))
+                })?;
+            programas.push((nombre_modulo.clone(), programa));
+        }
+        let mut simbolos_publicos: std::collections::HashMap<String, crate::semantic::FirmaFuncion> = std::collections::HashMap::new();
+        let mut structs_publicos: std::collections::HashMap<String, crate::semantic::InfoStruct> = std::collections::HashMap::new();
+        let mut enums_publicos: std::collections::HashMap<String, crate::semantic::InfoEnum> = std::collections::HashMap::new();
+        for (nombre_modulo, programa) in &programas {
+            for decl in &programa.declaraciones {
+                Resolver::colectar_simbolos_publicos_decl(
+                    decl, nombre_modulo, "",
+                    &mut simbolos_publicos, &mut structs_publicos, &mut enums_publicos,
+                );
+            }
+        }
+        for (nombre_modulo, programa) in &programas {
+            let mut semantica = AnalizadorSemantico::con_simbolos_publicos_completo(
+                simbolos_publicos.clone(),
+                structs_publicos.clone(),
+                enums_publicos.clone(),
+            );
+            // Verificar con símbolos compartidos
+            let mut prog_clone = programa.clone();
+            // R7.5 Fase 2: transformar principal(args: Struct)
+            if let Err(msg) = crate::args_tipados::preprocesar(&mut prog_clone) {
+                return Err(format!("Error en argumentos tipados ({}): {}", nombre_modulo, msg));
+            }
+            match semantica.analizar(&prog_clone) {
+                Ok(_) => {
+                    if !json {
+                        println!("[Falcato] '{}' verificado: sin errores", nombre_modulo);
+                    } else {
+                        println!("{{\"ok\":true,\"archivo\":\"{}\"}}", nombre_modulo);
+                    }
+                }
+                Err(errores) => {
+                    if json {
+                        println!("{{\"ok\":false,\"archivo\":\"{}\",\"errores\":[{}]}}",
+                            nombre_modulo,
+                            errores.errores.iter().map(|e| format!("{{\"codigo\":\"{}\",\"mensaje\":\"{}\"}}", e.codigo_str(), e.mensaje)).collect::<Vec<_>>().join(","));
+                        return Err(JSON_YA_IMPRESO.to_string());
+                    }
+                    return Err(format!("Errores semánticos en '{}':\n{}", nombre_modulo, errores));
+                }
+            }
+        }
+        return Ok(());
+    }
+
     for archivo in archivos {
         let fuente = fs::read_to_string(archivo)
             .map_err(|e| format!("No se pudo leer '{}': {}", archivo, e))?;

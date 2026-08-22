@@ -1164,6 +1164,10 @@ impl AnalizadorSemantico {
             ("como_entero16", Tipo::Entero16),
             ("como_entero32", Tipo::Entero32),
             ("como_entero64", Tipo::Entero64),
+            ("como_natural8", Tipo::Natural8),
+            ("como_natural16", Tipo::Natural16),
+            ("como_natural32", Tipo::Natural32),
+            ("como_natural64", Tipo::Natural64),
             ("como_flotante32", Tipo::Flotante32),
             ("como_flotante64", Tipo::Flotante64),
         ] {
@@ -1625,6 +1629,40 @@ impl AnalizadorSemantico {
             parametros_genericos: vec![],
             parametros: vec![("ptr".to_string(), Tipo::Entero64)],
             retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // Perfil — reloj monotónico + marcas (nivel 0/1 nativo)
+        self.funciones.insert("reloj_mono_ns".to_string(), FirmaFuncion {
+            nombre: "reloj_mono_ns".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("perfil_inicio".to_string(), FirmaFuncion {
+            nombre: "perfil_inicio".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("perfil_marca".to_string(), FirmaFuncion {
+            nombre: "perfil_marca".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("etiqueta".to_string(), Tipo::Texto)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("perfil_reporte".to_string(), FirmaFuncion {
+            nombre: "perfil_reporte".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(vacio.clone()),
             span: span_vacio.clone(),
             es_publica: true,
         });

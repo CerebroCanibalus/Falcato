@@ -338,7 +338,25 @@ impl Codegen {
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
         argumentos: &[Expresion],
     ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let dir = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let tipo_dir = self.inferir_tipo(&argumentos[0], variables);
+        let dir_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        // F-016 — Palabra literal → Texto: convertir Palabra (ptr C) a Texto descriptor
+        let dir = if tipo_dir == crate::ast::Tipo::Texto {
+            dir_val
+        } else {
+            // Palabra (I64 ptr a string null-terminada) → Texto descriptor
+            let len = self.llamar_strlen(builder, dir_val);
+            let uno = builder.ins().iconst(types::I64, 1);
+            let cap = builder.ins().iadd(len, uno);
+            let data = self.llamar_malloc(builder, cap);
+            self.llamar_memcpy(builder, data, dir_val, cap);
+            // data ya tiene null-terminator por memcpy de cap (incluye \0)
+            let desc = self.descriptor_nuevo(builder);
+            self.guardar_campo_descriptor(builder, desc, Self::OFFSET_PTR, data);
+            self.guardar_campo_descriptor(builder, desc, Self::OFFSET_LEN, len);
+            self.guardar_campo_descriptor(builder, desc, Self::OFFSET_CAP, cap);
+            desc
+        };
         let desc_out = self.descriptor_nuevo(builder);
         let fn_id = self.asegurar_funcion_c("falcato_archivo_listar", &[types::I64, types::I64], None);
         let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);

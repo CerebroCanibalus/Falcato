@@ -28,7 +28,9 @@ impl Codegen {
             None => false,
         };
         if let Some(ref ret) = func.retorno {
-            if !ret_es_struct {
+            if *ret == Tipo::Vacio {
+                // Vacío → void, sin retorno
+            } else if !ret_es_struct {
                 sig.returns.push(AbiParam::new(self.tipo_a_cranelift(ret)));
             }
         }
@@ -86,6 +88,8 @@ impl Codegen {
         } else {
             None
         };
+        // F-013 — guardar retorno actual para literales polimórficos
+        self.retorno_actual = func.retorno.clone();
 
         // 3.1b — instalar manejador de panics si es principal (auto-flush + stack trace)
         if func.nombre == "principal" {
@@ -143,11 +147,12 @@ impl Codegen {
         self.liberar_scope(0, &mut builder, &variables)?;
 
         // Si no hay retorno explÃ­cito, aÃ±adir retorno void
-        if func.retorno.is_none() {
+        if func.retorno.is_none() || matches!(func.retorno, Some(Tipo::Vacio)) {
             builder.ins().return_(&[]);
         }
 
         builder.finalize();
+        self.retorno_actual = None;
 
         // Definir funciÃ³n en el mÃ³dulo (usar func_id existente o declarar nueva)
         let func_id = match self.funciones.get(&func.nombre).copied() {
@@ -806,7 +811,7 @@ impl Codegen {
             self.compilar_sentencia(sentencia, &mut builder, &mut variables, &func.span)?;
         }
 
-        if func.retorno.is_none() {
+        if func.retorno.is_none() || matches!(func.retorno, Some(Tipo::Vacio)) {
             builder.ins().return_(&[]);
         }
 

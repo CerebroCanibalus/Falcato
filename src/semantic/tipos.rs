@@ -325,6 +325,7 @@ impl AnalizadorSemantico {
                             let es_polimorfica = llamada.funcion == "imprimir" || llamada.funcion == "imprimir_linea" || llamada.funcion == "decir";
                             let es_conversion_numerica = matches!(llamada.funcion.as_str(),
                                 "como_entero8" | "como_entero16" | "como_entero32" | "como_entero64" |
+                                "como_natural8" | "como_natural16" | "como_natural32" | "como_natural64" |
                                 "como_flotante32" | "como_flotante64");
                             if !es_polimorfica {
                                 for (i, (arg, (nombre_param, tipo_param))) in 
@@ -335,6 +336,23 @@ impl AnalizadorSemantico {
                                             Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64 |
                                             Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64 |
                                             Tipo::Flotante32 | Tipo::Flotante64)
+                                    } else if self.es_literal_entero(arg) || matches!(arg, Expresion::Literal(Literal::Flotante(_, _))) {
+                                        // F-013 — literal polimórfico: cabe en destino? (genérico siempre cabe)
+                                        if matches!(self.resolver_alias(tipo_param), Tipo::Generico(_)) {
+                                            true
+                                        } else if self.literal_cabe_en_tipo(arg, tipo_param) {
+                                            true
+                                        } else {
+                                            let val_str = self.valor_literal_entero(arg).map(|v| v.to_string()).unwrap_or("?".to_string());
+                                            self.reportar_error(
+                                                CategoriaError::Tipo,
+                                                DISCONCORDANCIA_TIPO,
+                                                &llamada.span,
+                                                format!("Literal '{}' no cabe en '{:?}' (arg {} '{}' de '{}')", val_str, tipo_param, i+1, nombre_param, llamada.funcion),
+                                                Some(format!("Usa un valor entre {:?} o cambia el tipo a uno más ancho", self.rango_tipo_entero(tipo_param))),
+                                            );
+                                            true // ya reportado, no duplicar
+                                        }
                                     } else {
                                         self.tipos_compatibles(tipo_param, &tipo_arg)
                                     };
@@ -1119,6 +1137,11 @@ impl AnalizadorSemantico {
             return true;
         }
 
+        // F-013 — widening seguro: ensanchar sin pérdida es implícito, estrechar requiere `como_`
+        if self.es_widening_seguro(&tipo_param, &tipo_arg) {
+            return true;
+        }
+
         match (&tipo_param, &tipo_arg) {
             (Tipo::Generico(_), _) | (_, Tipo::Generico(_)) => true,
             (Tipo::Entero64, Tipo::Array(_, _)) => true,
@@ -1149,6 +1172,91 @@ impl AnalizadorSemantico {
             (Tipo::Entero64, Tipo::ReferenciaSelf(_)) |
             (Tipo::Entero64, Tipo::ReferenciaMutSelf(_)) => true,
             (Tipo::Texto, Tipo::Palabra) => true, // 3.4: Palabra literal → Texto (fopen, tcp, etc.)
+            _ => false,
+        }
+    }
+
+    // ── F-013 — literales polimórficas + widening ──────────────────────────
+
+    pub(crate) fn es_literal_entero(&self, expr: &Expresion) -> bool {
+        matches!(expr, Expresion::Literal(Literal::Entero(_, _)))
+            || matches!(expr, Expresion::Unaria(OperadorUnario::Negacion, inner, _) if matches!(inner.as_ref(), Expresion::Literal(Literal::Entero(_, _))))
+    }
+
+    pub(crate) fn valor_literal_entero(&self, expr: &Expresion) -> Option<i128> {
+        match expr {
+            Expresion::Literal(Literal::Entero(n, _)) => Some(*n as i128),
+            Expresion::Unaria(OperadorUnario::Negacion, inner, _) => {
+                if let Expresion::Literal(Literal::Entero(n, _)) = inner.as_ref() {
+                    Some(-(*n as i128))
+                } else { None }
+            }
+            _ => None,
+        }
+    }
+
+    pub(crate) fn rango_tipo_entero(&self, tipo: &Tipo) -> Option<(i128, i128)> {
+        let t = self.resolver_alias(tipo);
+        match t {
+            Tipo::Entero8 => Some((-128, 127)),
+            Tipo::Entero16 => Some((-32768, 32767)),
+            Tipo::Entero32 => Some((-2147483648, 2147483647)),
+            Tipo::Entero64 => Some((i64::MIN as i128, i64::MAX as i128)),
+            Tipo::Natural8 => Some((0, 255)),
+            Tipo::Natural16 => Some((0, 65535)),
+            Tipo::Natural32 => Some((0, 4294967295)),
+            Tipo::Natural64 => Some((0, u64::MAX as i128)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn literal_cabe_en_tipo(&self, expr: &Expresion, tipo_dest: &Tipo) -> bool {
+        // Entero literal → destino entero o flotante
+        if let Some(val) = self.valor_literal_entero(expr) {
+            if self.es_entero(tipo_dest) {
+                if let Some((min, max)) = self.rango_tipo_entero(tipo_dest) {
+                    return val >= min && val <= max;
+                }
+            }
+            if self.es_flotante(tipo_dest) {
+                return true; // entero cabe en flotante (pérdida de precisión tolerada para literales)
+            }
+        }
+        // Flotante literal → destino flotante
+        if let Expresion::Literal(Literal::Flotante(_, _)) = expr {
+            if self.es_flotante(tipo_dest) { return true; }
+        }
+        false
+    }
+
+    pub(crate) fn es_widening_seguro(&self, dest: &Tipo, src: &Tipo) -> bool {
+        let d = self.resolver_alias(dest);
+        let s = self.resolver_alias(src);
+        if d == s { return true; }
+        match (&d, &s) {
+            // Entero con signo → entero con signo más ancho (sextend)
+            (Tipo::Entero16, Tipo::Entero8) => true,
+            (Tipo::Entero32, Tipo::Entero8) => true,
+            (Tipo::Entero32, Tipo::Entero16) => true,
+            (Tipo::Entero64, Tipo::Entero8) => true,
+            (Tipo::Entero64, Tipo::Entero16) => true,
+            (Tipo::Entero64, Tipo::Entero32) => true,
+            // Natural → natural más ancho (uextend)
+            (Tipo::Natural16, Tipo::Natural8) => true,
+            (Tipo::Natural32, Tipo::Natural8) => true,
+            (Tipo::Natural32, Tipo::Natural16) => true,
+            (Tipo::Natural64, Tipo::Natural8) => true,
+            (Tipo::Natural64, Tipo::Natural16) => true,
+            (Tipo::Natural64, Tipo::Natural32) => true,
+            // Natural → Entero más ancho (cabe seguro: max NaturalX < max EnteroY si Y>X)
+            (Tipo::Entero16, Tipo::Natural8) => true,
+            (Tipo::Entero32, Tipo::Natural8) => true,
+            (Tipo::Entero32, Tipo::Natural16) => true,
+            (Tipo::Entero64, Tipo::Natural8) => true,
+            (Tipo::Entero64, Tipo::Natural16) => true,
+            (Tipo::Entero64, Tipo::Natural32) => true,
+            // Flotante: F32 → F64 (fpromote)
+            (Tipo::Flotante64, Tipo::Flotante32) => true,
             _ => false,
         }
     }

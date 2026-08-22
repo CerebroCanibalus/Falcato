@@ -406,22 +406,122 @@ fn parse_atom(cursor: &mut ParserCursor) -> Result<Expresion, ErrorSintaxis> {
     match cursor.actual() {
         Some(Token::EnteroLiteral(Some(n))) => {
             let val = *n;
-            let span = cursor.span_actual();
+            let span_lit = cursor.span_actual();
             cursor.avanzar();
-            Ok(Expresion::Literal(Literal::Entero(val, span)))
+            // Azúcar adjetivo: `42 largo` → `como_entero64(42)`, `42 corto` → `como_entero16(42)`, `42 minimo` → `como_entero8(42)`
+            // + `42 natural` / `42 natural largo` → Natural*
+            if let Some(Token::Identificador(adj1)) = cursor.actual().cloned() {
+                let low1 = adj1.to_lowercase();
+                if low1 == "natural" {
+                    // Dos palabras: `natural largo` / `natural corto` / `natural minimo`
+                    if let Some(Token::Identificador(adj2)) = cursor.peek(1).cloned() {
+                        let low2 = adj2.to_lowercase();
+                        let conv2 = match low2.as_str() {
+                            "largo" => Some("como_natural64"),
+                            "corto" => Some("como_natural16"),
+                            "minimo" | "mínimo" => Some("como_natural8"),
+                            _ => None,
+                        };
+                        if let Some(func) = conv2 {
+                            let span_adj1 = cursor.span_actual();
+                            // peek span for second word: need to get span of peek(1)
+                            // Avanzar dos veces y combinar
+                            cursor.avanzar(); // natural
+                            let span_adj2 = cursor.span_actual();
+                            let span = Span::combinar(&span_lit, &span_adj2);
+                            cursor.avanzar(); // largo/corto/minimo
+                            return Ok(Expresion::Llamada(Llamada {
+                                funcion: func.to_string(),
+                                tipo_args: vec![],
+                                argumentos: vec![Expresion::Literal(Literal::Entero(val, span_lit))],
+                                span,
+                            }));
+                        }
+                    }
+                    // `42 natural` solo → Natural32
+                    let span_adj = cursor.span_actual();
+                    let span = Span::combinar(&span_lit, &span_adj);
+                    cursor.avanzar();
+                    return Ok(Expresion::Llamada(Llamada {
+                        funcion: "como_natural32".to_string(),
+                        tipo_args: vec![],
+                        argumentos: vec![Expresion::Literal(Literal::Entero(val, span_lit))],
+                        span,
+                    }));
+                }
+                let conv = match low1.as_str() {
+                    "largo" => Some("como_entero64"),
+                    "corto" => Some("como_entero16"),
+                    "minimo" | "mínimo" => Some("como_entero8"),
+                    _ => None,
+                };
+                if let Some(func) = conv {
+                    let span_adj = cursor.span_actual();
+                    let span = Span::combinar(&span_lit, &span_adj);
+                    cursor.avanzar();
+                    return Ok(Expresion::Llamada(Llamada {
+                        funcion: func.to_string(),
+                        tipo_args: vec![],
+                        argumentos: vec![Expresion::Literal(Literal::Entero(val, span_lit))],
+                        span,
+                    }));
+                }
+            }
+            Ok(Expresion::Literal(Literal::Entero(val, span_lit)))
         }
         Some(Token::FlotanteLiteral(Some(f))) => {
-            let val = f.clone();
-            let span = cursor.span_actual();
+            let val_str = f.clone();
+            let val: f64 = val_str.parse().unwrap_or(0.0);
+            let span_lit = cursor.span_actual();
             cursor.avanzar();
-            Ok(Expresion::Literal(Literal::Flotante(val.parse().unwrap_or(0.0), span)))
+            // Azúcar adjetivo flotante: `3.14 corto` → `como_flotante32(3.14)`, `3.14 largo`/`preciso` → `como_flotante64(3.14)`
+            if let Some(Token::Identificador(adj)) = cursor.actual().cloned() {
+                let adj_low = adj.to_lowercase();
+                let conv = match adj_low.as_str() {
+                    "corto" | "rapido" | "rápido" | "aprox" => Some("como_flotante32"),
+                    "largo" | "preciso" => Some("como_flotante64"),
+                    _ => None,
+                };
+                if let Some(func) = conv {
+                    let span_adj = cursor.span_actual();
+                    let span = Span::combinar(&span_lit, &span_adj);
+                    cursor.avanzar();
+                    return Ok(Expresion::Llamada(Llamada {
+                        funcion: func.to_string(),
+                        tipo_args: vec![],
+                        argumentos: vec![Expresion::Literal(Literal::Flotante(val, span_lit))],
+                        span,
+                    }));
+                }
+            }
+            Ok(Expresion::Literal(Literal::Flotante(val, span_lit)))
         }
         Some(Token::FlotanteExponente(Some(f))) => {
             // Notación científica sin punto: 1e3, 5E-2 → Flotante64
-            let val = f.clone();
-            let span = cursor.span_actual();
+            let val_str = f.clone();
+            let val: f64 = val_str.parse().unwrap_or(0.0);
+            let span_lit = cursor.span_actual();
             cursor.avanzar();
-            Ok(Expresion::Literal(Literal::Flotante(val.parse().unwrap_or(0.0), span)))
+            if let Some(Token::Identificador(adj)) = cursor.actual().cloned() {
+                let adj_low = adj.to_lowercase();
+                let conv = match adj_low.as_str() {
+                    "corto" | "rapido" | "rápido" | "aprox" => Some("como_flotante32"),
+                    "largo" | "preciso" => Some("como_flotante64"),
+                    _ => None,
+                };
+                if let Some(func) = conv {
+                    let span_adj = cursor.span_actual();
+                    let span = Span::combinar(&span_lit, &span_adj);
+                    cursor.avanzar();
+                    return Ok(Expresion::Llamada(Llamada {
+                        funcion: func.to_string(),
+                        tipo_args: vec![],
+                        argumentos: vec![Expresion::Literal(Literal::Flotante(val, span_lit))],
+                        span,
+                    }));
+                }
+            }
+            Ok(Expresion::Literal(Literal::Flotante(val, span_lit)))
         }
         Some(Token::PalabraLiteral(Some(s))) => {
             let val = s.clone();

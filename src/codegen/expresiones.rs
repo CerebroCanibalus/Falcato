@@ -1259,8 +1259,42 @@ impl Codegen {
             slot_sret = Some(slot);
             args.push(builder.ins().stack_addr(types::I64, slot, 0));
         }
-        for arg in &llamada.argumentos {
-            let val = self.compilar_expresion(arg, builder, variables)?;
+        // F-013 — literales polimórficas + widening: compilar cada arg respetando el tipo del parámetro
+        let param_tipos: Vec<Tipo> = self.declaraciones.get(&llamada.funcion)
+            .map(|d| d.parametros.iter().map(|p| p.tipo.clone()).collect())
+            .unwrap_or_default();
+        for (idx, arg) in llamada.argumentos.iter().enumerate() {
+            let tipo_dest_opt = param_tipos.get(idx);
+            let val = if let Some(tipo_dest) = tipo_dest_opt {
+                let tipo_dest_res = self.resolver_alias(tipo_dest);
+                // Literal → emitir con ancho del destino
+                match arg {
+                    Expresion::Literal(lit) if self.es_tipo_numerico(&tipo_dest_res) => {
+                        self.compilar_literal_con_tipo(lit, &tipo_dest_res, builder)?
+                    }
+                    Expresion::Unaria(OperadorUnario::Negacion, inner, span) if self.es_tipo_numerico(&tipo_dest_res) => {
+                        if let Expresion::Literal(lit) = inner.as_ref() {
+                            let v = self.compilar_literal_con_tipo(lit, &tipo_dest_res, builder)?;
+                            self.compilar_operacion_unaria(OperadorUnario::Negacion, v, builder, span)?
+                        } else {
+                            let v = self.compilar_expresion(arg, builder, variables)?;
+                            let tipo_src = self.inferir_tipo(arg, variables);
+                            if self.es_widening_codegen(&tipo_dest_res, &tipo_src) {
+                                self.adaptar_valor_widening(v, &tipo_src, &tipo_dest_res, builder)
+                            } else { v }
+                        }
+                    }
+                    _ => {
+                        let v = self.compilar_expresion(arg, builder, variables)?;
+                        let tipo_src = self.inferir_tipo(arg, variables);
+                        if self.es_widening_codegen(&tipo_dest_res, &tipo_src) {
+                            self.adaptar_valor_widening(v, &tipo_src, &tipo_dest_res, builder)
+                        } else { v }
+                    }
+                }
+            } else {
+                self.compilar_expresion(arg, builder, variables)?
+            };
             args.push(val);
         }
 
@@ -1316,10 +1350,12 @@ impl Codegen {
             "fecha_unix" | "fecha_ms" |
             "dht_nuevo" | "dht_publicar" | "dht_consultar" | "dht_bootstrap" | "dht_cerrar" |
             "memoria_usada" | "memoria_volcar" | "memoria_rastrear" | "memoria_canario_verificar" |
+            "reloj_mono_ns" | "perfil_inicio" | "perfil_marca" | "perfil_reporte" |
             "cancelar" |
             "texto_a_puntero" |
             "como_entero64" | "como_entero32" |
             "como_entero8" | "como_entero16" |
+            "como_natural8" | "como_natural16" | "como_natural32" | "como_natural64" |
             "como_flotante32" | "como_flotante64"
         )
     }
@@ -1352,6 +1388,10 @@ impl Codegen {
             "como_entero32" => self.builtin_como_entero32(builder, variables, &llamada.argumentos),
             "como_entero8" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Entero8, builder, variables),
             "como_entero16" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Entero16, builder, variables),
+            "como_natural8" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Natural8, builder, variables),
+            "como_natural16" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Natural16, builder, variables),
+            "como_natural32" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Natural32, builder, variables),
+            "como_natural64" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Natural64, builder, variables),
             "como_flotante32" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Flotante32, builder, variables),
             "como_flotante64" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Flotante64, builder, variables),
             "archivo_leer" => self.builtin_archivo_leer(builder, variables, &llamada.argumentos),
@@ -1462,6 +1502,10 @@ impl Codegen {
             "memoria_volcar" => self.builtin_memoria_volcar(builder, variables, &llamada.argumentos),
             "memoria_rastrear" => self.builtin_memoria_rastrear(builder, variables, &llamada.argumentos),
             "memoria_canario_verificar" => self.builtin_memoria_canario_verificar(builder, variables, &llamada.argumentos),
+            "reloj_mono_ns" => self.builtin_reloj_mono_ns(builder, variables, &llamada.argumentos),
+            "perfil_inicio" => self.builtin_perfil_inicio(builder, variables, &llamada.argumentos),
+            "perfil_marca" => self.builtin_perfil_marca(builder, variables, &llamada.argumentos),
+            "perfil_reporte" => self.builtin_perfil_reporte(builder, variables, &llamada.argumentos),
             "diccionario_nuevo" => self.builtin_diccionario_nuevo(builder, &llamada.tipo_args),
             "diccionario_insertar" => self.builtin_diccionario_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "diccionario_obtener" => self.builtin_diccionario_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),

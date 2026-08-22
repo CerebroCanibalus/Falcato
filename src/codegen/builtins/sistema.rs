@@ -395,4 +395,61 @@ impl Codegen {
         Ok(res_i8)
     }
 
+    // ============================================================
+    // Perfil — reloj monotónico + marcas (nivel 0/1 nativo)
+    // ============================================================
+
+    /// reloj_mono_ns() -> Entero64 — ns desde arranque, monotónico
+    pub(crate) fn builtin_reloj_mono_ns(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let fn_id = self.asegurar_funcion_c("falcato_reloj_mono_ns", &[], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// perfil_inicio() — resetea tabla y guarda t0
+    pub(crate) fn builtin_perfil_inicio(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let fn_id = self.asegurar_funcion_c("falcato_perfil_inicio", &[], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// perfil_marca(etiqueta: Texto) — guarda timestamp con etiqueta
+    pub(crate) fn builtin_perfil_marca(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let etiqueta = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let fn_id = self.asegurar_funcion_c("falcato_perfil_marca", &[types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[etiqueta]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// perfil_reporte() — vuelca tabla ordenada a stderr
+    pub(crate) fn builtin_perfil_reporte(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        _variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        _argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let fn_id = self.asegurar_funcion_c("falcato_perfil_reporte", &[], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[]);
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
 }

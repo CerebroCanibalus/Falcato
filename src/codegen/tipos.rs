@@ -274,7 +274,18 @@ impl Codegen {
                     Tipo::Entero32
                 }
             }
-            Expresion::Binaria(_, _, _, _) => Tipo::Entero32, // Simplificado
+            Expresion::Binaria(izq, _, der, _) => {
+                // Inferir tipo real para Binaria (no siempre Entero32) — crucial para Entero8
+                let t_izq = self.inferir_tipo(izq, variables);
+                let t_der = self.inferir_tipo(der, variables);
+                let es_lit = |e: &Expresion| matches!(e, Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _)));
+                // Si un lado es literal y el otro es numérico, el literal adopta el tipo del otro (como en semantic)
+                if es_lit(izq) && self.es_tipo_numerico(&t_der) { t_der }
+                else if es_lit(der) && self.es_tipo_numerico(&t_izq) { t_izq }
+                else if t_izq == t_der { t_izq }
+                else { Tipo::Entero32 }
+            }
+            Expresion::InicializacionStruct(nombre, _, _) => Tipo::Nombre(nombre.clone()),
             Expresion::ConstructorEnum(enum_nombre, _, _, _) => {
                 // Para enums genÃƒÂ©ricos como Resultado, necesitamos inferir los tipos
                 if enum_nombre == "Resultado" {
@@ -295,9 +306,14 @@ impl Codegen {
                     "como_entero8" => Tipo::Entero8,
                     "como_entero16" => Tipo::Entero16,
                     "como_entero32" => Tipo::Entero32,
+                    "como_natural8" => Tipo::Natural8,
+                    "como_natural16" => Tipo::Natural16,
+                    "como_natural32" => Tipo::Natural32,
+                    "como_natural64" => Tipo::Natural64,
                     "como_flotante32" => Tipo::Flotante32,
                     "como_flotante64" => Tipo::Flotante64,
-                    "texto_nuevo" | "texto_desde" | "texto_concatenar" | "texto_subtexto" => {
+                    "texto_nuevo" | "texto_desde" | "texto_concatenar" | "texto_subtexto" 
+                    | "entero_a_texto" | "flotante_a_texto" | "booleano_a_texto" => {
                         Tipo::Texto
                     }
                       "archivo_leer" => Tipo::Texto,
@@ -354,6 +370,87 @@ impl Codegen {
             Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64 |
             Tipo::Flotante32 | Tipo::Flotante64
         )
+    }
+
+    pub(crate) fn es_entero_codegen(&self, tipo: &Tipo) -> bool {
+        matches!(self.resolver_alias(tipo),
+            Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64 |
+            Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64)
+    }
+
+    pub(crate) fn es_flotante_codegen(&self, tipo: &Tipo) -> bool {
+        matches!(self.resolver_alias(tipo), Tipo::Flotante32 | Tipo::Flotante64)
+    }
+
+    pub(crate) fn es_widening_codegen(&self, dest: &Tipo, src: &Tipo) -> bool {
+        let d = self.resolver_alias(dest);
+        let s = self.resolver_alias(src);
+        if d == s { return false; }
+        matches!((&d, &s),
+            (Tipo::Entero16, Tipo::Entero8) |
+            (Tipo::Entero32, Tipo::Entero8) |
+            (Tipo::Entero32, Tipo::Entero16) |
+            (Tipo::Entero64, Tipo::Entero8) |
+            (Tipo::Entero64, Tipo::Entero16) |
+            (Tipo::Entero64, Tipo::Entero32) |
+            (Tipo::Natural16, Tipo::Natural8) |
+            (Tipo::Natural32, Tipo::Natural8) |
+            (Tipo::Natural32, Tipo::Natural16) |
+            (Tipo::Natural64, Tipo::Natural8) |
+            (Tipo::Natural64, Tipo::Natural16) |
+            (Tipo::Natural64, Tipo::Natural32) |
+            (Tipo::Entero16, Tipo::Natural8) |
+            (Tipo::Entero32, Tipo::Natural8) |
+            (Tipo::Entero32, Tipo::Natural16) |
+            (Tipo::Entero64, Tipo::Natural8) |
+            (Tipo::Entero64, Tipo::Natural16) |
+            (Tipo::Entero64, Tipo::Natural32) |
+            (Tipo::Flotante64, Tipo::Flotante32)
+        )
+    }
+
+    pub(crate) fn adaptar_valor_widening(
+        &self,
+        val: cranelift_codegen::ir::Value,
+        tipo_src: &Tipo,
+        tipo_dest: &Tipo,
+        builder: &mut FunctionBuilder,
+    ) -> cranelift_codegen::ir::Value {
+        let dest_ir = self.tipo_a_cranelift(tipo_dest);
+        let actual_ir = builder.func.dfg.value_type(val);
+        if dest_ir == actual_ir { return val; }
+        let src_ir = self.tipo_a_cranelift(tipo_src);
+        let src_is_float = matches!(src_ir, types::F32 | types::F64);
+        let dest_is_float = matches!(dest_ir, types::F32 | types::F64);
+        // Si el tipo inferido no coincide con el IR real (ej: Binaria devuelve Entero32 pero el valor es I64),
+        // usar el IR real para decidir si hace falta extensión.
+        let src_bits = actual_ir.bits();
+        let dest_bits = dest_ir.bits();
+        if !src_is_float && !dest_is_float {
+            // entero → entero: sextend si src es con signo, uextend si es natural
+            let src_signed = matches!(self.resolver_alias(tipo_src), Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64);
+            // Natural → Entero se hace con uextend (cero-extend, valor positivo)
+            if dest_bits > src_bits {
+                if src_signed {
+                    builder.ins().sextend(dest_ir, val)
+                } else {
+                    builder.ins().uextend(dest_ir, val)
+                }
+            } else if dest_bits < src_bits {
+                builder.ins().ireduce(dest_ir, val)
+            } else { val }
+        } else if !src_is_float && dest_is_float {
+            builder.ins().fcvt_from_sint(dest_ir, val)
+        } else if src_is_float && dest_is_float {
+            if dest_ir == types::F64 && src_ir == types::F32 {
+                builder.ins().fpromote(types::F64, val)
+            } else if dest_ir == types::F32 && src_ir == types::F64 {
+                builder.ins().fdemote(types::F32, val)
+            } else { val }
+        } else {
+            // flotante → entero no es widening, no tocar aquí
+            val
+        }
     }
 
     /// R9.0.1 — Si el tipo es un struct conocido (Tipo::Nombre resuelto en self.structs),

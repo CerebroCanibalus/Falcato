@@ -1,5 +1,35 @@
 # Changelog de Falcato
 
+## [0.7.5] - 2026-08-21
+
+### ➕ ADICIONES
+
+- **Coerción entera y literales polimórficos (F-013)**: los literales como `42` ahora adoptan el tipo esperado por el contexto — `Entero64`, `Natural32`, etc. — sin necesidad de `como_*` cuando hay widening seguro. `42 largo` / `42 natural largo` / `42 corto` / `3.14 preciso` son azúcar: desugarean a `como_entero64(42)` etc. Widening seguro (`Entero8→16→32→64`, `Natural→Entero` ancho, `F32→F64`) es implícito; narrowing sigue exigiendo `como_*` explícito con check de rango en compile-time.
+
+- **Profiling nativo agnóstico al idioma**: `reloj_mono_ns() -> Entero64` (monotónico, `QueryPerformanceCounter` / `clock_gettime`) + `perfil_inicio()`, `perfil_marca(Palabra)`, `perfil_reporte()` para medir sin FFI manual. Nivel 0 mide tiempo, Nivel 1 reporta tabla de deltas ordenada.
+
+- **Verificación cross-file (F-008)**: `falcato verifica ops.fc main.fc` y `falcato compila a.fc b.fc` comparten símbolos públicos entre archivos. Fin del falso `[M002] no encontrada` cuando la función existe en otro archivo del mismo build.
+
+### 🔧 ARREGLOS
+
+- **F-009 `-> Vacio` ya no panica**: `Vacio` en retorno de función mapea a `void` en Cranelift. Antes el codegen paniqueaba `No se puede compilar tipo Nombre 'Vacio'`.
+
+- **F-014 heap `Texto` en structs**: `el c: Caja = Caja { hola: \"hola\" }` y `r.campo = \"x\"` ahora copian profundo el descriptor (malloc+memcpy) en vez de aliasing. Fix para `test_caja_texto` y `vector_agregar<Texto>` con realloc.
+
+- **F-016 `archivo_listar` con `Palabra`**: `archivo_listar(\"dir\")` literal `Palabra` se convierte a `Texto` descriptor (strlen+malloc+memcpy) antes del runtime. Fin del crash por descriptor inválido.
+
+- **F-017 aritmética `Entero8`**: `b - 48` donde `b: Entero8` ya no emite `isub I8` inválido; promociona a `I32` (widening) y usa `isub I32`. Incluye fix `entero_a_texto`/`flotante_a_texto` genéricos (sextend/uextend/fpromote por signo/ancho).
+
+- **Bloqueo `msvcrt.lib` (LNK1104)**: build con `build.bat` (VsDevCmd) y fix de `target/release/falcato.exe` bloqueado por proceso zombie (`taskkill`). Documentado en `AGENTS.md` como Gotcha.
+
+### 🧪 VERIFICACIÓN
+
+- `cargo test`: 54/54 verde (lib+bin), 47 lib verde
+- `falcato verifica ops.fc main_test.fc`: ambos `verificado: sin errores` (F-008)
+- `falcato compila ops.fc main_test.fc --salida prueba_f008.exe && ./prueba_f008.exe` → `42`
+- `test_caja_texto`, `test_clonar`, `test_vacio`, `test_archivo_listar`, `test_f017` todos OK
+- `build.bat` release+debug sin `Verifier errors`
+
 ## [0.7.4] - 2026-08-21
 
 ### ➕ ADICIONES

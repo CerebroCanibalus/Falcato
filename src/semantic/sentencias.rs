@@ -94,6 +94,17 @@ impl AnalizadorSemantico {
                         _ => false,
                     };
                     let es_literal_flotante = |e: &Expresion| matches!(e, Expresion::Literal(Literal::Flotante(_, _)));
+                    // F-013 — literal polimórfico con check de rango (genérico siempre cabe)
+                    if !matches!(tipo_declarado_resuelto, Tipo::Generico(_)) && (es_literal_entero(&decl.valor) || es_literal_flotante(&decl.valor)) && !self.literal_cabe_en_tipo(&decl.valor, &tipo_declarado_resuelto) {
+                        let val_str = self.valor_literal_entero(&decl.valor).map(|v| v.to_string()).unwrap_or("?".to_string());
+                        self.reportar_error(
+                            CategoriaError::Tipo,
+                            DISCONCORDANCIA_TIPO,
+                            &decl.span,
+                            format!("Literal '{}' no cabe en '{:?}' para '{}'", val_str, tipo_declarado_resuelto, decl.nombre),
+                            Some(format!("Rango de {:?}: {:?} — usa `como_` o tipo más ancho", tipo_declarado_resuelto, self.rango_tipo_entero(&tipo_declarado_resuelto))),
+                        );
+                    }
                     let tipo_valor_adaptado = match &decl.valor {
                         e if es_literal_entero(e) && self.es_entero(&tipo_declarado_resuelto) => {
                             tipo_declarado_resuelto.clone()
@@ -157,7 +168,24 @@ impl AnalizadorSemantico {
                         
                         match info_opt {
                             Some(info) => {
-                                if !self.tipos_compatibles(&info.tipo, &tipo_valor) {
+                                let compatible = if self.es_literal_entero(&asig.valor) || matches!(&asig.valor, Expresion::Literal(Literal::Flotante(_, _))) {
+                                    if matches!(self.resolver_alias(&info.tipo), Tipo::Generico(_)) {
+                                        true
+                                    } else if self.literal_cabe_en_tipo(&asig.valor, &info.tipo) { true } else {
+                                        let val_str = self.valor_literal_entero(&asig.valor).map(|v| v.to_string()).unwrap_or("?".to_string());
+                                        self.reportar_error(
+                                            CategoriaError::Tipo,
+                                            ASIGNACION_INCOMPATIBLE,
+                                            &asig.span,
+                                            format!("Literal '{}' no cabe en '{:?}' para '{}'", val_str, info.tipo, nombre),
+                                            Some(format!("Valor fuera de rango {:?} — usa `como_` o tipo más ancho", self.rango_tipo_entero(&info.tipo))),
+                                        );
+                                        true
+                                    }
+                                } else {
+                                    self.tipos_compatibles(&info.tipo, &tipo_valor)
+                                };
+                                if !compatible {
                                     self.reportar_error(
                                         CategoriaError::Tipo,
                                         ASIGNACION_INCOMPATIBLE,
@@ -242,7 +270,24 @@ No puedes modificar algo que no es 'tuyo'.",
                     if let Some(ref tipo_retorno) = func.retorno {
                         if let Some(expr) = expr {
                             let tipo_expr = self.inferir_tipo(expr);
-                            if !self.tipos_compatibles(tipo_retorno, &tipo_expr) {
+                            let compatible = if self.es_literal_entero(expr) || matches!(expr, Expresion::Literal(Literal::Flotante(_, _))) {
+                                if matches!(self.resolver_alias(tipo_retorno), Tipo::Generico(_)) {
+                                    true
+                                } else if self.literal_cabe_en_tipo(expr, tipo_retorno) { true } else {
+                                    let val_str = self.valor_literal_entero(expr).map(|v| v.to_string()).unwrap_or("?".to_string());
+                                    self.reportar_error(
+                                        CategoriaError::Tipo,
+                                        DISCONCORDANCIA_RETORNO,
+                                        span,
+                                        format!("Literal '{}' no cabe en retorno '{:?}' de '{}'", val_str, tipo_retorno, func.nombre),
+                                        Some(format!("Valor fuera de rango {:?} — usa `como_` o tipo más ancho", self.rango_tipo_entero(tipo_retorno))),
+                                    );
+                                    true
+                                }
+                            } else {
+                                self.tipos_compatibles(tipo_retorno, &tipo_expr)
+                            };
+                            if !compatible {
                                 self.reportar_error(
                                     CategoriaError::Tipo,
                                     DISCONCORDANCIA_RETORNO,

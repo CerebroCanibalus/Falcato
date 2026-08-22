@@ -28,6 +28,7 @@ mod archivo_avanzado;
 mod tls;
 mod panic_handler;
 mod memoria_debug;
+mod perfil;
 
 use std::ffi::c_void;
 

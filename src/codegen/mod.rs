@@ -102,6 +102,8 @@ pub struct Codegen {
     /// R9.0.1 — sret: puntero destino del struct retornado por la función actual.
     /// Se setea en el prólogo (primer parámetro oculto) y se usa en `retornar struct`.
     pub(crate) sret_destino: Option<cranelift_codegen::ir::Value>,
+    /// F-013 — tipo de retorno de la función actual (para literales polimórficos en `retornar`).
+    pub(crate) retorno_actual: Option<Tipo>,
 }
 
 /// Info para compilar un closure diferidamente
@@ -173,6 +175,7 @@ impl Codegen {
             scope_marcas: Vec::new(),
             pila_bucles: Vec::new(),
             sret_destino: None,
+            retorno_actual: None,
         }.registrar_builtins_codegen())
     }
 

@@ -261,7 +261,7 @@ impl Resolver {
     /// funciones, structs y enums.
     /// - Top-level de archivo: `nombre_modulo::funcion` / `nombre_modulo::Struct`
     /// - Dentro de módulo inline: `prefijo::simbolo`
-    fn colectar_simbolos_publicos_decl(
+    pub fn colectar_simbolos_publicos_decl(
         decl: &crate::ast::Declaracion,
         nombre_modulo_archivo: &str,
         prefijo: &str,

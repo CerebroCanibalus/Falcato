@@ -156,7 +156,7 @@ impl Codegen {
     // Conversión numérica (R7.8 FASE 3): número → texto
     // ============================================================
 
-    /// entero_a_texto(n: Entero32|Entero64) -> Texto — convierte entero a texto decimal
+    /// entero_a_texto(n: Entero) -> Texto — convierte entero a texto decimal (polimórfico)
     pub(crate) fn builtin_entero_a_texto(
         &mut self,
         builder: &mut FunctionBuilder,
@@ -164,9 +164,16 @@ impl Codegen {
         argumentos: &[Expresion],
     ) -> Result<cranelift_codegen::ir::Value, ()> {
         let n = self.compilar_expresion(&argumentos[0], builder, variables)?;
-        // F-004: aceptar Entero32 (extender a I64) además de Entero64
-        let n_i64 = if builder.func.dfg.value_type(n) == types::I32 {
-            builder.ins().sextend(types::I64, n)
+        // F-013: aceptar cualquier ancho (I8/I16/I32 → I64). Elegir sextend/uextend según signo.
+        let n_type = builder.func.dfg.value_type(n);
+        let n_i64 = if n_type != types::I64 {
+            let tipo_src = self.inferir_tipo(&argumentos[0], variables);
+            let es_signed = matches!(self.resolver_alias(&tipo_src), Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64);
+            if es_signed {
+                builder.ins().sextend(types::I64, n)
+            } else {
+                builder.ins().uextend(types::I64, n)
+            }
         } else {
             n
         };
@@ -196,8 +203,15 @@ impl Codegen {
         
         // falcato_flotante_a_texto(f: f64, desc_out: i64) -> void
         // Nota: necesitamos convertir f64 a i64 (reinterpretación de bits) para pasar a la función C
+        // Si f es F32 (corto), promover a F64 primero, luego bitcast
         let flags = cranelift_codegen::ir::MemFlags::new();
-        let f_i64 = builder.ins().bitcast(types::I64, flags, f);
+        let f_tipo = builder.func.dfg.value_type(f);
+        let f_para_bitcast = if f_tipo == types::F32 {
+            builder.ins().fpromote(types::F64, f)
+        } else {
+            f
+        };
+        let f_i64 = builder.ins().bitcast(types::I64, flags, f_para_bitcast);
         let fn_id = self.asegurar_funcion_c("falcato_flotante_a_texto", &[types::I64, types::I64], None);
         let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
         builder.ins().call(fn_ref, &[f_i64, desc_out]);
