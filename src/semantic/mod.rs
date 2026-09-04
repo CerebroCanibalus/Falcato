@@ -1707,6 +1707,684 @@ impl AnalizadorSemantico {
             ],
             span: span_vacio.clone(),
         });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Texto avanzado
+        // ============================================================
+        self.funciones.insert("texto_contiene".to_string(), FirmaFuncion {
+            nombre: "texto_contiene".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("texto".to_string(), Tipo::Texto),
+                ("sub".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_empieza_con".to_string(), FirmaFuncion {
+            nombre: "texto_empieza_con".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("texto".to_string(), Tipo::Texto),
+                ("prefijo".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_termina_con".to_string(), FirmaFuncion {
+            nombre: "texto_termina_con".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("texto".to_string(), Tipo::Texto),
+                ("sufijo".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_esta_vacio".to_string(), FirmaFuncion {
+            nombre: "texto_esta_vacio".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_recortar".to_string(), FirmaFuncion {
+            nombre: "texto_recortar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_mayusculas".to_string(), FirmaFuncion {
+            nombre: "texto_mayusculas".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_minusculas".to_string(), FirmaFuncion {
+            nombre: "texto_minusculas".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_reemplazar".to_string(), FirmaFuncion {
+            nombre: "texto_reemplazar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("texto".to_string(), Tipo::Texto),
+                ("de".to_string(), Tipo::Texto),
+                ("a".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_dividir".to_string(), FirmaFuncion {
+            nombre: "texto_dividir".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("texto".to_string(), Tipo::Texto),
+                ("separador".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Vector(Box::new(Tipo::Texto))),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_a_bytes".to_string(), FirmaFuncion {
+            nombre: "texto_a_bytes".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Vector(Box::new(Tipo::Entero8))),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_codificar_base64".to_string(), FirmaFuncion {
+            nombre: "texto_codificar_base64".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_decodificar_base64".to_string(), FirmaFuncion {
+            nombre: "texto_decodificar_base64".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Vector avanzado
+        // ============================================================
+        self.funciones.insert("vector_poner".to_string(), FirmaFuncion {
+            nombre: "vector_poner".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+                ("indice".to_string(), Tipo::Entero32),
+                ("valor".to_string(), tipo_t.clone()),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("vector_intercambiar".to_string(), FirmaFuncion {
+            nombre: "vector_intercambiar".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+                ("i".to_string(), Tipo::Entero32),
+                ("j".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("vector_insertar".to_string(), FirmaFuncion {
+            nombre: "vector_insertar".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+                ("indice".to_string(), Tipo::Entero32),
+                ("valor".to_string(), tipo_t.clone()),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("vector_eliminar".to_string(), FirmaFuncion {
+            nombre: "vector_eliminar".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+                ("indice".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("vector_extender".to_string(), FirmaFuncion {
+            nombre: "vector_extender".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+                ("otro".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("vector_contiene".to_string(), FirmaFuncion {
+            nombre: "vector_contiene".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+                ("valor".to_string(), tipo_t.clone()),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("vector_indice_de".to_string(), FirmaFuncion {
+            nombre: "vector_indice_de".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+                ("valor".to_string(), tipo_t.clone()),
+            ],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("vector_clonar".to_string(), FirmaFuncion {
+            nombre: "vector_clonar".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+            ],
+            retorno: Some(Tipo::Vector(Box::new(tipo_t.clone()))),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("vector_invertir".to_string(), FirmaFuncion {
+            nombre: "vector_invertir".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("vector_limpiar".to_string(), FirmaFuncion {
+            nombre: "vector_limpiar".to_string(),
+            parametros_genericos: vec![t_generico.clone()],
+            parametros: vec![
+                ("vector".to_string(), Tipo::Vector(Box::new(tipo_t.clone()))),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Diccionario avanzado
+        // ============================================================
+        self.funciones.insert("diccionario_claves".to_string(), FirmaFuncion {
+            nombre: "diccionario_claves".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![
+                ("diccionario".to_string(), Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+            ],
+            retorno: Some(Tipo::Vector(Box::new(Tipo::Texto))),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("diccionario_valores".to_string(), FirmaFuncion {
+            nombre: "diccionario_valores".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![
+                ("diccionario".to_string(), Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+            ],
+            retorno: Some(Tipo::Vector(Box::new(Tipo::Texto))),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("diccionario_limpiar".to_string(), FirmaFuncion {
+            nombre: "diccionario_limpiar".to_string(),
+            parametros_genericos: vec![k_generico.clone(), v_generico.clone()],
+            parametros: vec![
+                ("diccionario".to_string(), Tipo::Diccionario(Box::new(tipo_k.clone()), Box::new(tipo_v.clone()))),
+            ],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Conjunto avanzado
+        // ============================================================
+        self.funciones.insert("conjunto_elementos".to_string(), FirmaFuncion {
+            nombre: "conjunto_elementos".to_string(),
+            parametros_genericos: vec![s_generico.clone()],
+            parametros: vec![
+                ("conjunto".to_string(), Tipo::Conjunto(Box::new(tipo_s.clone()))),
+            ],
+            retorno: Some(Tipo::Vector(Box::new(Tipo::Texto))),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Opción/Resultado
+        // ============================================================
+        self.funciones.insert("opcion_es_alguno".to_string(), FirmaFuncion {
+            nombre: "opcion_es_alguno".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("opcion".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("opcion_es_ninguno".to_string(), FirmaFuncion {
+            nombre: "opcion_es_ninguno".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("opcion".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("resultado_es_exito".to_string(), FirmaFuncion {
+            nombre: "resultado_es_exito".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("resultado".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("resultado_es_error".to_string(), FirmaFuncion {
+            nombre: "resultado_es_error".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("resultado".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — HTTP
+        // ============================================================
+        self.funciones.insert("http_get".to_string(), FirmaFuncion {
+            nombre: "http_get".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("host".to_string(), Tipo::Texto),
+                ("puerto".to_string(), Tipo::Entero32),
+                ("path".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("http_post".to_string(), FirmaFuncion {
+            nombre: "http_post".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("host".to_string(), Tipo::Texto),
+                ("puerto".to_string(), Tipo::Entero32),
+                ("path".to_string(), Tipo::Texto),
+                ("cuerpo".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — JSON
+        // ============================================================
+        self.funciones.insert("json_parsear".to_string(), FirmaFuncion {
+            nombre: "json_parsear".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("json".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("json_serializar".to_string(), FirmaFuncion {
+            nombre: "json_serializar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("valor".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("json_escapar".to_string(), FirmaFuncion {
+            nombre: "json_escapar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("json_obtener".to_string(), FirmaFuncion {
+            nombre: "json_obtener".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("json".to_string(), Tipo::Texto),
+                ("clave".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Tiempo
+        // ============================================================
+        self.funciones.insert("fecha_anio".to_string(), FirmaFuncion {
+            nombre: "fecha_anio".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("unix".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("fecha_mes".to_string(), FirmaFuncion {
+            nombre: "fecha_mes".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("unix".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("fecha_dia".to_string(), FirmaFuncion {
+            nombre: "fecha_dia".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("unix".to_string(), Tipo::Entero64)],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Archivo avanzado
+        // ============================================================
+        self.funciones.insert("archivo_tamano".to_string(), FirmaFuncion {
+            nombre: "archivo_tamano".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("ruta".to_string(), Tipo::Texto)],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — TCP avanzado
+        // ============================================================
+        self.funciones.insert("tcp_enviar".to_string(), FirmaFuncion {
+            nombre: "tcp_enviar".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("conn".to_string(), Tipo::Entero64),
+                ("datos".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("tcp_recibir".to_string(), FirmaFuncion {
+            nombre: "tcp_recibir".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("conn".to_string(), Tipo::Entero64),
+                ("tamano".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — TLS avanzado
+        // ============================================================
+        self.funciones.insert("tls_escribir_texto".to_string(), FirmaFuncion {
+            nombre: "tls_escribir_texto".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("conn".to_string(), Tipo::Entero64),
+                ("datos".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("tls_leer_texto".to_string(), FirmaFuncion {
+            nombre: "tls_leer_texto".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("conn".to_string(), Tipo::Entero64),
+                ("tamano".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Sistema
+        // ============================================================
+        self.funciones.insert("argumentos_cantidad".to_string(), FirmaFuncion {
+            nombre: "argumentos_cantidad".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero32),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("argumentos_obtener".to_string(), FirmaFuncion {
+            nombre: "argumentos_obtener".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("i".to_string(), Tipo::Entero32)],
+            retorno: Some(Tipo::Texto),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("consola_imprimir".to_string(), FirmaFuncion {
+            nombre: "consola_imprimir".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("consola_imprimir_linea".to_string(), FirmaFuncion {
+            nombre: "consola_imprimir_linea".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("texto".to_string(), Tipo::Texto)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("aleatorio_entero".to_string(), FirmaFuncion {
+            nombre: "aleatorio_entero".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("aleatorio_entero_entre".to_string(), FirmaFuncion {
+            nombre: "aleatorio_entero_entre".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("min".to_string(), Tipo::Entero64),
+                ("max".to_string(), Tipo::Entero64),
+            ],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("timestamp".to_string(), FirmaFuncion {
+            nombre: "timestamp".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Matemáticas avanzadas
+        // ============================================================
+        self.funciones.insert("mate_abs".to_string(), FirmaFuncion {
+            nombre: "mate_abs".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("x".to_string(), Tipo::Flotante64)],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("mate_maximo".to_string(), FirmaFuncion {
+            nombre: "mate_maximo".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("a".to_string(), Tipo::Flotante64),
+                ("b".to_string(), Tipo::Flotante64),
+            ],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("mate_minimo".to_string(), FirmaFuncion {
+            nombre: "mate_minimo".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("a".to_string(), Tipo::Flotante64),
+                ("b".to_string(), Tipo::Flotante64),
+            ],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("mate_piso".to_string(), FirmaFuncion {
+            nombre: "mate_piso".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("x".to_string(), Tipo::Flotante64)],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("mate_techo".to_string(), FirmaFuncion {
+            nombre: "mate_techo".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("x".to_string(), Tipo::Flotante64)],
+            retorno: Some(Tipo::Entero64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("mate_pi".to_string(), FirmaFuncion {
+            nombre: "mate_pi".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("mate_e".to_string(), FirmaFuncion {
+            nombre: "mate_e".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("mate_grados_a_radianes".to_string(), FirmaFuncion {
+            nombre: "mate_grados_a_radianes".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("grados".to_string(), Tipo::Flotante64)],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("mate_radianes_a_grados".to_string(), FirmaFuncion {
+            nombre: "mate_radianes_a_grados".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("radianes".to_string(), Tipo::Flotante64)],
+            retorno: Some(Tipo::Flotante64),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Visual (stubs)
+        // ============================================================
+        let tipos_visual = vec![
+            ("ventana_nuevo", vec![("titulo".to_string(), Tipo::Texto), ("ancho".to_string(), Tipo::Entero32), ("alto".to_string(), Tipo::Entero32)], Tipo::Entero64),
+            ("ventana_mostrar", vec![("ventana".to_string(), Tipo::Entero64)], Tipo::Vacio),
+            ("ventana_cerrar", vec![("ventana".to_string(), Tipo::Entero64)], Tipo::Vacio),
+            ("lienzo_nuevo", vec![("ancho".to_string(), Tipo::Entero32), ("alto".to_string(), Tipo::Entero32)], Tipo::Entero64),
+            ("lienzo_limpiar", vec![("lienzo".to_string(), Tipo::Entero64), ("color".to_string(), Tipo::Entero32)], Tipo::Vacio),
+            ("lienzo_linea", vec![("lienzo".to_string(), Tipo::Entero64), ("x1".to_string(), Tipo::Entero32), ("y1".to_string(), Tipo::Entero32), ("x2".to_string(), Tipo::Entero32), ("y2".to_string(), Tipo::Entero32)], Tipo::Vacio),
+            ("lienzo_rectangulo", vec![("lienzo".to_string(), Tipo::Entero64), ("x".to_string(), Tipo::Entero32), ("y".to_string(), Tipo::Entero32), ("w".to_string(), Tipo::Entero32), ("h".to_string(), Tipo::Entero32)], Tipo::Vacio),
+            ("lienzo_circulo", vec![("lienzo".to_string(), Tipo::Entero64), ("cx".to_string(), Tipo::Entero32), ("cy".to_string(), Tipo::Entero32), ("radio".to_string(), Tipo::Entero32)], Tipo::Vacio),
+            ("lienzo_texto", vec![("lienzo".to_string(), Tipo::Entero64), ("x".to_string(), Tipo::Entero32), ("y".to_string(), Tipo::Entero32), ("texto".to_string(), Tipo::Texto)], Tipo::Vacio),
+            ("lienzo_guardar_png", vec![("lienzo".to_string(), Tipo::Entero64), ("ruta".to_string(), Tipo::Texto)], Tipo::Entero32),
+            ("lienzo_liberar", vec![("lienzo".to_string(), Tipo::Entero64)], Tipo::Vacio),
+            ("imagen_desde_archivo", vec![("ruta".to_string(), Tipo::Texto)], Tipo::Entero64),
+            ("imagen_ancho", vec![("imagen".to_string(), Tipo::Entero64)], Tipo::Entero32),
+            ("imagen_alto", vec![("imagen".to_string(), Tipo::Entero64)], Tipo::Entero32),
+            ("imagen_liberar", vec![("imagen".to_string(), Tipo::Entero64)], Tipo::Vacio),
+            ("audio_nuevo", vec![("canales".to_string(), Tipo::Entero32), ("frecuencia".to_string(), Tipo::Entero32)], Tipo::Entero64),
+            ("audio_tono", vec![("frecuencia".to_string(), Tipo::Flotante64), ("duracion_ms".to_string(), Tipo::Entero32)], Tipo::Entero64),
+            ("audio_reproducir", vec![("audio".to_string(), Tipo::Entero64)], Tipo::Entero32),
+            ("audio_guardar_wav", vec![("audio".to_string(), Tipo::Entero64), ("ruta".to_string(), Tipo::Texto)], Tipo::Entero32),
+            ("audio_liberar", vec![("audio".to_string(), Tipo::Entero64)], Tipo::Vacio),
+        ];
+        for (nombre, params, ret) in tipos_visual {
+            self.funciones.insert(nombre.to_string(), FirmaFuncion {
+                nombre: nombre.to_string(),
+                parametros_genericos: vec![],
+                parametros: params,
+                retorno: Some(ret),
+                span: span_vacio.clone(),
+                es_publica: true,
+            });
+        }
+
+        // ============================================================
+        // BUILTINS NUEVOS (v0.8.0) — Proceso avanzado
+        // ============================================================
+        self.funciones.insert("proceso_listo_para_leer".to_string(), FirmaFuncion {
+            nombre: "proceso_listo_para_leer".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("handle".to_string(), Tipo::Entero64),
+                ("ms".to_string(), Tipo::Entero32),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("proceso_cerrar_bidireccional".to_string(), FirmaFuncion {
+            nombre: "proceso_cerrar_bidireccional".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![("handle".to_string(), Tipo::Entero64)],
+            retorno: Some(vacio.clone()),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
     }
 
     /// Analiza un programa completo en dos pasadas (F-006).
