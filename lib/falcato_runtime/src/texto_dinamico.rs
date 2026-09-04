@@ -40,6 +40,21 @@ unsafe fn escribir_campo(desc: i64, offset: isize, valor: i64) {
     *ptr = valor;
 }
 
+/// Construye un descriptor de Texto desde un buffer de bytes.
+unsafe fn texto_desde_buffer(data: &[u8], desc_out: i64) {
+    let len = data.len();
+    let cap = len + 1;
+    let ptr = malloc(cap);
+    if ptr.is_null() { return; }
+    if len > 0 {
+        memcpy(ptr, data.as_ptr() as *const c_void, len);
+    }
+    *(ptr as *mut u8).add(len) = 0;
+    escribir_campo(desc_out, OFFSET_PTR, ptr as i64);
+    escribir_campo(desc_out, OFFSET_LEN, len as i64);
+    escribir_campo(desc_out, OFFSET_CAP, cap as i64);
+}
+
 /// Agrega un fragmento de texto al final del texto base con realloc eficiente.
 /// Si la capacidad no es suficiente, realloc al doble o al tamaño necesario.
 ///

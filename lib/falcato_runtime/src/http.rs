@@ -141,7 +141,14 @@ pub unsafe extern "C" fn falcato_http_get(
                     let line = if line.ends_with(b"\r") { &line[..line.len()-1] } else { line };
                     if line.len() > 15 && line[..15].eq_ignore_ascii_case(b"Content-Length:") {
                         let val = &line[15..];
-                        let val = val.trim();
+                        // trim spaces/tabs manually for &[u8]
+                        let val = {
+                            let mut start = 0;
+                            while start < val.len() && (val[start] == b' ' || val[start] == b'\t') {
+                                start += 1;
+                            }
+                            &val[start..]
+                        };
                         let mut cl: usize = 0;
                         for &b in val {
                             if b >= b'0' && b <= b'9' {

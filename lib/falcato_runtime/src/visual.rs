@@ -185,6 +185,7 @@ mod win32 {
             fnWeight: i32, fdwItalic: DWORD, fdwUnderline: DWORD, fdwStrikeOut: DWORD,
             fdwCharSet: DWORD, fdwOutputPrecision: DWORD, fdwClipPrecision: DWORD,
             fdwQuality: DWORD, fdwPitchAndFamily: DWORD, lpszFace: *const u8) -> HFONT;
+        pub fn GetModuleHandleA(lpModuleName: *const u8) -> *mut c_void;
     }
 }
 

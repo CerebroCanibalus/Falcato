@@ -100,20 +100,20 @@ pub unsafe extern "C" fn falcato_diccionario_claves(
                     memcpy(new_buf, kptr as *const c_void, klen as usize);
                     *(new_buf as *mut u8).add(klen as usize) = 0;
                 }
-                escribir_campo(desc_key, OFFSET_PTR, new_buf as i64);
-                escribir_campo(desc_key, OFFSET_LEN, klen);
-                escribir_campo(desc_key, OFFSET_CAP, kcap);
+                escribir_campo(desc_key as i64, OFFSET_PTR, new_buf as i64);
+                escribir_campo(desc_key as i64, OFFSET_LEN, klen);
+                escribir_campo(desc_key as i64, OFFSET_CAP, kcap);
             }
         } else if key_size == 4 {
             // Clave es un Entero32
             let val = *(key_addr as *const i32);
             let text = format!("{}", val);
-            texto_desde_buffer(text.as_bytes(), desc_key);
+            texto_desde_buffer(text.as_bytes(), desc_key as i64);
         } else if key_size == 8 {
             // Clave es un Entero64
             let val = *(key_addr as *const i64);
             let text = format!("{}", val);
-            texto_desde_buffer(text.as_bytes(), desc_key);
+            texto_desde_buffer(text.as_bytes(), desc_key as i64);
         }
 
         *(array_ptr as *mut i64).add(count) = desc_key as i64;
@@ -179,18 +179,18 @@ pub unsafe extern "C" fn falcato_diccionario_valores(
                     memcpy(new_buf, vptr as *const c_void, vlen as usize);
                     *(new_buf as *mut u8).add(vlen as usize) = 0;
                 }
-                escribir_campo(desc_val, OFFSET_PTR, new_buf as i64);
-                escribir_campo(desc_val, OFFSET_LEN, vlen);
-                escribir_campo(desc_val, OFFSET_CAP, vcap);
+                escribir_campo(desc_val as i64, OFFSET_PTR, new_buf as i64);
+                escribir_campo(desc_val as i64, OFFSET_LEN, vlen);
+                escribir_campo(desc_val as i64, OFFSET_CAP, vcap);
             }
         } else if val_size == 4 {
             let val = *(val_addr as *const i32);
             let text = format!("{}", val);
-            texto_desde_buffer(text.as_bytes(), desc_val);
+            texto_desde_buffer(text.as_bytes(), desc_val as i64);
         } else {
             let val = *(val_addr as *const i64);
             let text = format!("{}", val);
-            texto_desde_buffer(text.as_bytes(), desc_val);
+            texto_desde_buffer(text.as_bytes(), desc_val as i64);
         }
 
         *(array_ptr as *mut i64).add(count) = desc_val as i64;
