@@ -1,0 +1,45 @@
+﻿// libEst::numeros — Operaciones numéricas
+// Stub base para 0.8.0
+
+el función numeros_minimo(a: Entero64, b: Entero64) -> Entero64 {
+    si a < b { retornar a; } sino { retornar b; }
+}
+
+el función numeros_maximo(a: Entero64, b: Entero64) -> Entero64 {
+    si a > b { retornar a; } sino { retornar b; }
+}
+
+el función numeros_abs(n: Entero64) -> Entero64 {
+    si n < 0 { retornar -n; } sino { retornar n; }
+}
+
+el función numeros_es_par(n: Entero64) -> Booleano {
+    retornar n % 2 == 0;
+}
+
+el función numeros_es_primo(n: Entero64) -> Booleano {
+    si n < 2 { retornar falso; }
+    el i: Entero64 = 2;
+    mientras i * i <= n {
+        si n % i == 0 { retornar falso; }
+        i = i + 1;
+    }
+    retornar cierto;
+}
+
+el función numeros_mcd(a: Entero64, b: Entero64) -> Entero64 {
+    mientras b != 0 {
+        el t: Entero64 = b;
+        b = a % b;
+        a = t;
+    }
+    retornar a;
+}
+
+el función numeros_potencia(base: Flotante64, exp: Flotante64) -> Flotante64 {
+    retornar 0.0; // TODO: implementar con pow()
+}
+
+el función numeros_raiz(n: Flotante64) -> Flotante64 {
+    retornar 0.0; // TODO: implementar con sqrt()
+}

@@ -1,0 +1,18 @@
+// libEst::proceso — Procesos, hilos, canales
+// Stub base para 0.8.0
+
+el función proceso_crear(comando: Texto) -> Entero32 {
+    retornar proceso_crear(comando); // builtin
+}
+
+el función proceso_esperar(pid: Entero32) -> Entero32 {
+    retornar 0; // TODO: implementar
+}
+
+el función hilo_crear(f: fn()) -> Entero32 {
+    retornar 0; // TODO: implementar
+}
+
+el función canal_nuevo<T>() -> Canal<T> {
+    retornar canal_nuevo<T>(); // builtin
+}

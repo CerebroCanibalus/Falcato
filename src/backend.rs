@@ -15,7 +15,7 @@ pub trait BackendFalcato {
         Self: Sized;
 
     /// Compila un programa completo (AST → código objeto).
-    fn compilar_programa(&mut self, programa: &Programa) -> Result<(), Errores>;
+    fn compilar_programa(&mut self, nombre_modulo: &str, programa: &Programa) -> Result<(), Errores>;
 
     /// Finaliza el módulo y escribe el código objeto a un archivo `.o`.
     fn escribir_objeto(&mut self, ruta: &str) -> Result<(), String>;

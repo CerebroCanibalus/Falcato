@@ -1,0 +1,34 @@
+// libEst::vector — Operaciones sobre Vector<T>
+// Stub base para 0.8.0
+
+el función vector_longitud<T>(v: Vector<T>) -> Entero32 {
+    retornar vector_longitud(v); // builtin
+}
+
+el función vector_esta_vacio<T>(v: Vector<T>) -> Booleano {
+    retornar vector_longitud(v) == 0;
+}
+
+el función vector_obtener<T>(v: Vector<T>, indice: Entero32) -> Option<T> {
+    retornar Nada; // TODO: implementar con bounds check
+}
+
+el función vector_contiene<T>(v: Vector<T>, item: T) -> Booleano {
+    retornar falso; // TODO: implementar
+}
+
+el función vector_indice_de<T>(v: Vector<T>, item: T) -> Option<Entero32> {
+    retornar Nada; // TODO: implementar
+}
+
+el función vector_clonar<T>(v: Vector<T>) -> Vector<T> {
+    retornar v; // TODO: implementar deep copy
+}
+
+el función vector_invertir<T>(v: Vector<T>) {
+    // TODO: implementar
+}
+
+el función vector_limpiar<T>(v: Vector<T>) {
+    // TODO: implementar
+}

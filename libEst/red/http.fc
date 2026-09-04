@@ -1,0 +1,7 @@
+// libEst::red::http - Cliente HTTP
+// Los builtins http_get/http_post se llaman directamente desde Falcato
+// No necesitan wrapper — el compiler los resuelve como builtins
+
+// Uso:
+//   el body: Texto = http_get(host, puerto, path);
+//   el body: Texto = http_post(host, puerto, path, cuerpo);

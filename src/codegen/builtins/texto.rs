@@ -310,6 +310,130 @@ impl Codegen {
         Ok(resultado)
     }
 
+
+    /// texto_igual(a: Texto, b: Texto) -> Booleano (I8: 1 true, 0 false)
+    /// Compara byte a byte (auto-contenido, no reutiliza texto_comparar).
+    /// Devuelve 1 si a == b, 0 si difieren.
+    /// Implementación:
+    ///   - si len_a != len_b Æ— falso
+    ///   - si no, comparar byte por byte; cualquier diferencia Æ— falso
+    ///   - si todos iguales Æ— verdadero
+    pub(crate) fn builtin_texto_igual(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_a = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_b = self.compilar_expresion(&argumentos[1], builder, variables)?;
+
+        let len_a = self.cargar_campo_descriptor(builder, desc_a, Self::OFFSET_LEN);
+        let len_b = self.cargar_campo_descriptor(builder, desc_b, Self::OFFSET_LEN);
+
+        // Si len_a != len_b Æ— falso (short-circuit)
+        let len_eq = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            len_a, len_b,
+        );
+        let check_bytes = builder.create_block();
+        let final_block = builder.create_block();
+        let merge = builder.create_block();
+        builder.append_block_param(merge, types::I8);
+        builder.ins().brif(len_eq, check_bytes, &[], final_block, &[]);
+        builder.seal_block(check_bytes);
+        builder.seal_block(final_block);
+
+        // Final: devolver 0 (falso)
+        builder.switch_to_block(final_block);
+        let cero = builder.ins().iconst(types::I8, 0);
+        builder.ins().jump(merge, &[cero]);
+
+        // Check bytes: loop byte por byte
+        builder.switch_to_block(check_bytes);
+        let ptr_a = self.cargar_campo_descriptor(builder, desc_a, Self::OFFSET_PTR);
+        let ptr_b = self.cargar_campo_descriptor(builder, desc_b, Self::OFFSET_PTR);
+
+        // min_len = min(len_a, len_b)
+        let a_menor = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::SignedLessThan,
+            len_a, len_b,
+        );
+        let min_len = builder.ins().select(a_menor, len_a, len_b);
+
+        // Loop: for i in 0..min_len { if a[i] != b[i] Æ— falso }
+        let header = builder.create_block();
+        let body = builder.create_block();
+        let next_block = builder.create_block();
+        let iguales_block = builder.create_block();
+
+        let var_i = self.nueva_variable();
+        builder.declare_var(var_i, types::I64);
+        let cero_i64 = builder.ins().iconst(types::I64, 0);
+        builder.def_var(var_i, cero_i64);
+        builder.ins().jump(header, &[]);
+
+        builder.switch_to_block(header);
+        let i = builder.use_var(var_i);
+        let cond = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::SignedLessThan,
+            i, min_len,
+        );
+        builder.ins().brif(cond, body, &[], iguales_block, &[]);
+        // NO sellar header (back-edge desde next_block)
+
+        builder.switch_to_block(body);
+        let i_body = builder.use_var(var_i);
+        let addr_a = builder.ins().iadd(ptr_a, i_body);
+        let addr_b = builder.ins().iadd(ptr_b, i_body);
+        let byte_a = builder.ins().load(types::I8, cranelift_codegen::ir::MemFlags::new(), addr_a, 0);
+        let byte_b = builder.ins().load(types::I8, cranelift_codegen::ir::MemFlags::new(), addr_b, 0);
+        let iguales = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            byte_a, byte_b,
+        );
+        builder.ins().brif(iguales, next_block, &[], final_block, &[]);
+        builder.seal_block(body);
+
+        builder.switch_to_block(next_block);
+        let i_next = builder.use_var(var_i);
+        let uno = builder.ins().iconst(types::I64, 1);
+        let i_mas = builder.ins().iadd(i_next, uno);
+        builder.def_var(var_i, i_mas);
+        builder.ins().jump(header, &[]);
+        builder.seal_block(next_block);
+
+        // AHORA sellar header (back-edge completo)
+        builder.seal_block(header);
+
+        // Iguales: devolver 1 (verdadero)
+        builder.switch_to_block(iguales_block);
+        let uno_i8 = builder.ins().iconst(types::I8, 1);
+        builder.ins().jump(merge, &[uno_i8]);
+        builder.seal_block(iguales_block);
+
+        builder.seal_block(merge);
+        builder.switch_to_block(merge);
+        Ok(builder.block_params(merge)[0])
+    }
+
+    /// texto_desigual(a: Texto, b: Texto) -> Booleano (I8: 1 true, 0 false)
+    /// Inverso de `texto_igual`. Devuelve 1 si a != b, 0 si son iguales.
+    /// Reutiliza texto_igual + negación Booleana (seguro porque texto_igual
+    /// termina en merge con Booleano, no reutiliza control flow externo).
+    pub(crate) fn builtin_texto_desigual(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &Vec<Expresion>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let eq = self.builtin_texto_igual(builder, variables, argumentos)?;
+        // eq es Booleano (I8: 1 true, 0 false). Negar.
+        let uno = builder.ins().iconst(types::I8, 1);
+        let ne = builder.ins().isub(uno, eq);
+        Ok(ne)
+    }
+
+
     /// Fase 15C: texto_obtener_byte(t: Texto, indice: Entero32) -> Entero8
     /// Retorna el byte en la posiciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n dada.
     pub(crate) fn builtin_texto_obtener_byte(
@@ -474,6 +598,218 @@ impl Codegen {
         builder.ins().call(fn_ref, &[ptr, longitud_i32, desc_out]);
         
         Ok(desc_out)
+    }
+
+    // === libEst builtins ===
+
+    /// texto_contiene(texto: Texto, sub: Texto) -> Booleano
+    /// Busca si `sub` aparece dentro de `texto`.
+    pub(crate) fn builtin_texto_contiene(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_sub = self.compilar_expresion(&argumentos[1], builder, variables)?;
+
+        // falcato_texto_contiene(desc_texto: i64, desc_sub: i64) -> i32
+        let fn_id = self.asegurar_funcion_c("falcato_texto_contiene", &[types::I64, types::I64], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[desc_texto, desc_sub]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// texto_reemplazar(texto: Texto, de: Texto, a: Texto) -> Texto
+    /// Reemplaza todas las ocurrencias de `de` por `a`.
+    pub(crate) fn builtin_texto_reemplazar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_de = self.compilar_expresion(&argumentos[1], builder, variables)?;
+        let desc_a = self.compilar_expresion(&argumentos[2], builder, variables)?;
+
+        let desc_out = self.descriptor_nuevo(builder);
+
+        // falcato_texto_reemplazar(desc_texto, desc_de, desc_a, desc_out) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_texto_reemplazar", &[types::I64, types::I64, types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_texto, desc_de, desc_a, desc_out]);
+
+        Ok(desc_out)
+    }
+
+    /// texto_mayusculas(texto: Texto) -> Texto
+    /// Convierte a mayúsculas (ASCII).
+    pub(crate) fn builtin_texto_mayusculas(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+
+        // falcato_texto_mayusculas(desc_texto, desc_out) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_texto_mayusculas", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_texto, desc_out]);
+
+        Ok(desc_out)
+    }
+
+    /// texto_minusculas(texto: Texto) -> Texto
+    /// Convierte a minúsculas (ASCII).
+    pub(crate) fn builtin_texto_minusculas(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+
+        // falcato_texto_minusculas(desc_texto, desc_out) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_texto_minusculas", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_texto, desc_out]);
+
+        Ok(desc_out)
+    }
+
+    /// texto_recortar(texto: Texto) -> Texto
+    /// Recorta espacios en blanco al inicio y final.
+    pub(crate) fn builtin_texto_recortar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+
+        // falcato_texto_recortar(desc_texto, desc_out) -> void
+        let fn_id = self.asegurar_funcion_c("falcato_texto_recortar", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_texto, desc_out]);
+
+        Ok(desc_out)
+    }
+
+    /// texto_empieza_con(texto: Texto, prefijo: Texto) -> Booleano
+    pub(crate) fn builtin_texto_empieza_con(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_prefijo = self.compilar_expresion(&argumentos[1], builder, variables)?;
+
+        let fn_id = self.asegurar_funcion_c("falcato_texto_empieza_con", &[types::I64, types::I64], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[desc_texto, desc_prefijo]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// texto_termina_con(texto: Texto, sufijo: Texto) -> Booleano
+    pub(crate) fn builtin_texto_termina_con(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_sufijo = self.compilar_expresion(&argumentos[1], builder, variables)?;
+
+        let fn_id = self.asegurar_funcion_c("falcato_texto_termina_con", &[types::I64, types::I64], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[desc_texto, desc_sufijo]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// texto_codificar_base64(texto: Texto) -> Texto
+    pub(crate) fn builtin_texto_codificar_base64(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+
+        let fn_id = self.asegurar_funcion_c("falcato_texto_codificar_base64", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_texto, desc_out]);
+
+        Ok(desc_out)
+    }
+
+    /// texto_decodificar_base64(texto: Texto) -> Texto
+    pub(crate) fn builtin_texto_decodificar_base64(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+
+        let fn_id = self.asegurar_funcion_c("falcato_texto_decodificar_base64", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_texto, desc_out]);
+
+        Ok(desc_out)
+    }
+
+    /// texto_a_bytes(texto: Texto) -> Vector<Entero8>
+    pub(crate) fn builtin_texto_a_bytes(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+
+        let fn_id = self.asegurar_funcion_c("falcato_texto_a_bytes", &[types::I64, types::I64], None);
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_texto, desc_out]);
+
+        Ok(desc_out)
+    }
+
+    /// texto_dividir(texto: Texto, sep: Texto) -> Vector<Texto>
+    /// Divide el texto por el separador.
+    pub(crate) fn builtin_texto_dividir(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_sep = self.compilar_expresion(&argumentos[1], builder, variables)?;
+
+        // Crear descriptor de Vector vacío
+        let desc_vector = self.descriptor_nuevo(builder);
+        let cero = builder.ins().iconst(types::I64, 0);
+        self.guardar_campo_descriptor(builder, desc_vector, Self::OFFSET_PTR, cero);
+        self.guardar_campo_descriptor(builder, desc_vector, Self::OFFSET_LEN, cero);
+        self.guardar_campo_descriptor(builder, desc_vector, Self::OFFSET_CAP, cero);
+
+        // falcato_texto_dividir(desc_texto, desc_sep, desc_vector) -> void
+        let fn_id = self.asegurar_funcion_c(
+            "falcato_texto_dividir",
+            &[types::I64, types::I64, types::I64],
+            None,
+        );
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_texto, desc_sep, desc_vector]);
+
+        Ok(desc_vector)
     }
 
 }

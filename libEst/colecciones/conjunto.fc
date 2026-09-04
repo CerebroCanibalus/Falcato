@@ -1,0 +1,16 @@
+// libEst::conjunto — Operaciones sobre Conjunto<T>
+// Delega a builtins Rust del runtime
+
+el función conjunto_longitud<T>(c: Conjunto<T>) -> Entero32 {
+    retornar conjunto_longitud(c);
+}
+
+el función conjunto_contiene<T>(c: Conjunto<T>, item: T) -> Booleano {
+    retornar conjunto_contiene(c, item);
+}
+
+el función conjunto_elementos<T>(c: Conjunto<T>) -> Vector<Texto> {
+    el resultado: Vector<Texto> = vector_nuevo<Texto>();
+    conjunto_elementos(c, resultado, 8);
+    retornar resultado;
+}

@@ -288,11 +288,12 @@ impl Codegen {
     }
 
     pub fn compilar_programa(&mut self,
+        nombre_modulo: &str,
         programa: &Programa,
     ) -> Result<(), Errores> {
         // Obtener todas las declaraciones con prefijo de mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³dulo
         let todas: Vec<(String, &Declaracion)> = programa.declaraciones.iter()
-            .flat_map(|d| self.aplanar_con_prefijo("", d))
+            .flat_map(|d| self.aplanar_con_prefijo(nombre_modulo, d))
 
             .collect();
 
@@ -479,7 +480,7 @@ impl Codegen {
         }
     }
 
-    fn registrar_struct(&mut self, s: &EstructuralDecl) {
+    pub(crate) fn registrar_struct(&mut self, s: &EstructuralDecl) {
         let mut offsets = HashMap::new();
         let mut tipos = HashMap::new();
         let mut bitfields = HashMap::new();
@@ -546,7 +547,7 @@ impl Codegen {
         });
     }
 
-    fn registrar_enum(&mut self, e: &EnumeracionDecl) {
+    pub(crate) fn registrar_enum(&mut self, e: &EnumeracionDecl) {
         let mut variantes = HashMap::new();
         let mut tipos_datos = HashMap::new();
         let mut max_tamano_datos = 0u32;
@@ -766,11 +767,22 @@ impl Codegen {
 
         // R9.0.1 — Retorno de struct → sret (puntero oculto como primer parámetro).
         // La función escribe el struct en esa memoria y retorna void.
-        let ret_es_struct = match &func.retorno {
+        // FIX: si func.retorno es None pero la última sentencia es `retornar <expr>;`,
+        // inferir el tipo de retorno de la expresión (mismo fix que en compilar_funcion).
+        let retorno_inferido: Option<Tipo> = if func.retorno.is_none() {
+            if let Some(crate::ast::Sentencia::Retornar(Some(expr), _)) = func.cuerpo.sentencias.last() {
+                Some(self.inferir_tipo_expr_retorno(expr))
+            } else {
+                None
+            }
+        } else {
+            func.retorno.clone()
+        };
+        let ret_es_struct = match &retorno_inferido {
             Some(ret) => self.tipo_es_struct(ret).is_some(),
             None => false,
         };
-        if let Some(ref ret) = func.retorno {
+        if let Some(ref ret) = retorno_inferido {
             if !ret_es_struct {
                 let tipo = self.tipo_a_cranelift(ret);
                 sig.returns.push(AbiParam::new(tipo));
@@ -977,8 +989,8 @@ impl BackendFalcato for Codegen {
         Codegen::nuevo(nombre_modulo)
     }
 
-    fn compilar_programa(&mut self, programa: &Programa) -> Result<(), Errores> {
-        self.compilar_programa(programa)
+    fn compilar_programa(&mut self, nombre_modulo: &str, programa: &Programa) -> Result<(), Errores> {
+        self.compilar_programa(nombre_modulo, programa)
     }
 
     fn escribir_objeto(&mut self, ruta: &str) -> Result<(), String> {

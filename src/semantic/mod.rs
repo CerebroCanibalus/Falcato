@@ -1100,6 +1100,29 @@ impl AnalizadorSemantico {
             span: span_vacio.clone(),
             es_publica: true,
         });
+        // R9.0.x Â BUG-003: texto_igual/desigual retornan Booleano, no Entero32
+        self.funciones.insert("texto_igual".to_string(), FirmaFuncion {
+            nombre: "texto_igual".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("a".to_string(), Tipo::Texto),
+                ("b".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
+        self.funciones.insert("texto_desigual".to_string(), FirmaFuncion {
+            nombre: "texto_desigual".to_string(),
+            parametros_genericos: vec![],
+            parametros: vec![
+                ("a".to_string(), Tipo::Texto),
+                ("b".to_string(), Tipo::Texto),
+            ],
+            retorno: Some(Tipo::Booleano),
+            span: span_vacio.clone(),
+            es_publica: true,
+        });
         self.funciones.insert("texto_obtener_byte".to_string(), FirmaFuncion {
             nombre: "texto_obtener_byte".to_string(),
             parametros_genericos: vec![],
@@ -2154,8 +2177,10 @@ mod tests {
 
     #[test]
     fn test_condicional_tipo_invalido() {
+        // MEJORA-002: enteros ahora son válidos en `si` (truthy).
+        // Para que el test siga detectando tipos inválidos, usamos Texto (no aceptable).
         let fuente = r#"función principal() -> Entero32 {
-    el x: Entero32 = 10;
+    el x: Texto = texto_nuevo();
     si x {
         retornar 100;
     }
@@ -2164,11 +2189,11 @@ mod tests {
         let lexer = LexerFalcato::nuevo(fuente, "test.fc");
         let tokens = lexer.tokenizar();
         let programa = ParserFalcato::parse(tokens).unwrap();
-        
+
         let mut semantica = AnalizadorSemantico::nuevo();
         let resultado = semantica.analizar(&programa);
         assert!(resultado.is_err());
-        
+
         let errores = resultado.unwrap_err();
         assert!(errores.errores.iter().any(|e| e.codigo == CONDICIONAL_NO_BOOLEANO));
     }

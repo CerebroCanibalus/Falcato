@@ -604,6 +604,21 @@ pub struct DocumentoLsp {
 pub struct Backend {
     client: Client,
     documentos: Arc<RwLock<HashMap<Url, DocumentoLsp>>>,
+    /// Índice global del workspace: todos los archivos .fc indexados
+    indice_global: Arc<RwLock<HashMap<String, IndiceSemantico>>>,
+    /// Raíz del workspace (directorio del proyecto)
+    workspace_root: Arc<RwLock<Option<String>>>,
+}
+
+impl Clone for Backend {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            documentos: Arc::clone(&self.documentos),
+            indice_global: Arc::clone(&self.indice_global),
+            workspace_root: Arc::clone(&self.workspace_root),
+        }
+    }
 }
 
 impl Backend {
@@ -611,7 +626,238 @@ impl Backend {
         Self {
             client,
             documentos: Arc::new(RwLock::new(HashMap::new())),
+            indice_global: Arc::new(RwLock::new(HashMap::new())),
+            workspace_root: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Escanea el workspace en busca de archivos .fc y construye el índice global
+    async fn escanear_workspace(&self, root: &str) {
+        use std::fs;
+        use std::path::Path;
+
+        let root_path = Path::new(root);
+        if !root_path.exists() {
+            return;
+        }
+
+        let mut archivos = Vec::new();
+        self.recopilar_fc(root_path, &mut archivos, 0);
+
+        let mut indice_global = self.indice_global.write().await;
+        indice_global.clear();
+
+        for archivo in &archivos {
+            if let Ok(contenido) = fs::read_to_string(archivo) {
+                let uri_path = archivo.to_string_lossy().replace('\\', "/");
+                let lexer = LexerFalcato::nuevo(&contenido, &uri_path);
+                let tokens = lexer.tokenizar();
+                if let Ok(programa) = ParserFalcato::parse(tokens) {
+                    let indice = IndiceSemantico::desde_ast(&programa);
+                    indice_global.insert(uri_path, indice);
+                }
+            }
+        }
+
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!("Workspace escaneado: {} archivos .fc", archivos.len()),
+            )
+            .await;
+    }
+
+    /// Recopila archivos .fc recursivamente (máx 3 niveles)
+    fn recopilar_fc(&self, dir: &std::path::Path, archivos: &mut Vec<std::path::PathBuf>, depth: u32) {
+        use std::fs;
+        if depth > 3 {
+            return;
+        }
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let name = path.file_name().unwrap_or_default().to_string_lossy();
+                    // Ignorar directorios especiales
+                    if name == ".git" || name == "target" || name == "node_modules" || name == ".falcato-cache" {
+                        continue;
+                    }
+                    self.recopilar_fc(&path, archivos, depth + 1);
+                } else if path.extension().map_or(false, |e| e == "fc") {
+                    archivos.push(path);
+                }
+            }
+        }
+    }
+
+    /// Resuelve imports de un AST usando el índice global
+    async fn resolver_imports(&self, ast: &Programa) -> IndiceSemantico {
+        let mut indice = IndiceSemantico::desde_ast(ast);
+        let global = self.indice_global.read().await;
+
+        // Buscar declaraciones Usar en el AST
+        for decl in &ast.declaraciones {
+            if let Declaracion::Usar(usar) = decl {
+                let es_glob = usar.ruta.last().map_or(false, |s| s == "*");
+
+                if es_glob {
+                    // `usar modulo::*` — importar todo del módulo
+                    let modulo = usar.ruta[..usar.ruta.len() - 1].join("::");
+                    if let Some(mod_indice) = global.get(&modulo) {
+                        for (nombre, func) in &mod_indice.funciones {
+                            if !indice.funciones.contains_key(nombre) {
+                                indice.funciones.insert(nombre.clone(), func.clone());
+                            }
+                        }
+                        for (nombre, s) in &mod_indice.structs {
+                            if !indice.structs.contains_key(nombre) {
+                                indice.structs.insert(nombre.clone(), s.clone());
+                            }
+                        }
+                        for (nombre, e) in &mod_indice.enums {
+                            if !indice.enums.contains_key(nombre) {
+                                indice.enums.insert(nombre.clone(), e.clone());
+                            }
+                        }
+                    }
+                } else if let Some(simbolo) = usar.ruta.last() {
+                    // `usar modulo::simbolo` — importar símbolo específico
+                    let ruta_completa = usar.ruta.join("::");
+                    if let Some(mod_indice) = global.get(&ruta_completa) {
+                        if let Some(func) = mod_indice.funciones.get(simbolo) {
+                            indice.funciones.insert(simbolo.clone(), func.clone());
+                        }
+                        if let Some(s) = mod_indice.structs.get(simbolo) {
+                            indice.structs.insert(simbolo.clone(), s.clone());
+                        }
+                        if let Some(e) = mod_indice.enums.get(simbolo) {
+                            indice.enums.insert(simbolo.clone(), e.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        indice
+    }
+
+    /// Busca llamadas a una función en un bloque AST
+    fn buscar_llamadas_en_bloque(
+        bloque: &Bloque,
+        nombre_funcion: &str,
+        llamadas: &mut HashMap<String, Vec<Range>>,
+    ) {
+        for sentencia in &bloque.sentencias {
+            match sentencia {
+                Sentencia::Expresion(expr) => {
+                    Self::buscar_llamadas_en_expresion(expr, nombre_funcion, llamadas);
+                }
+                Sentencia::Condicional(cond) => {
+                    Self::buscar_llamadas_en_expresion(&cond.condicion, nombre_funcion, llamadas);
+                    Self::buscar_llamadas_en_bloque(&cond.bloque_entonces, nombre_funcion, llamadas);
+                    if let Some(sino_bloque) = &cond.bloque_sino {
+                        Self::buscar_llamadas_en_bloque(sino_bloque, nombre_funcion, llamadas);
+                    }
+                }
+                Sentencia::BucleMientras(bucle) => {
+                    Self::buscar_llamadas_en_expresion(&bucle.condicion, nombre_funcion, llamadas);
+                    Self::buscar_llamadas_en_bloque(&bucle.bloque, nombre_funcion, llamadas);
+                }
+                Sentencia::BuclePara(para) => {
+                    Self::buscar_llamadas_en_bloque(&para.bloque, nombre_funcion, llamadas);
+                }
+                Sentencia::Retornar(Some(expr), _) => {
+                    Self::buscar_llamadas_en_expresion(expr, nombre_funcion, llamadas);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Busca llamadas a una función en una expresión
+    fn buscar_llamadas_en_expresion(
+        expr: &Expresion,
+        nombre_funcion: &str,
+        llamadas: &mut HashMap<String, Vec<Range>>,
+    ) {
+        match expr {
+            Expresion::Llamada(llamada) => {
+                // Si la expresión es una llamada a la función buscada
+                if llamada.funcion == nombre_funcion {
+                    // Encontramos una llamada
+                    let range = Range {
+                        start: Position { line: 0, character: 0 },
+                        end: Position { line: 0, character: 0 },
+                    };
+                    llamadas.entry(llamada.funcion.clone()).or_insert_with(Vec::new).push(range);
+                }
+                // Buscar en argumentos
+                for arg in &llamada.argumentos {
+                    Self::buscar_llamadas_en_expresion(arg, nombre_funcion, llamadas);
+                }
+            }
+            Expresion::Binaria(izquierda, _, derecha, _) => {
+                Self::buscar_llamadas_en_expresion(izquierda, nombre_funcion, llamadas);
+                Self::buscar_llamadas_en_expresion(derecha, nombre_funcion, llamadas);
+            }
+            Expresion::Unaria(_, operando, _) => {
+                Self::buscar_llamadas_en_expresion(operando, nombre_funcion, llamadas);
+            }
+            _ => {}
+        }
+    }
+
+    /// Formatea código Falcato: normaliza indentación, espacios, líneas vacías
+    fn formatear_falcato(contenido: &str) -> String {
+        let mut resultado = String::with_capacity(contenido.len());
+        let mut indentacion: usize = 0;
+        let mut lineas_vacias_consecutivas: u32 = 0;
+        let indent_str = "    "; // 4 espacios
+
+        for linea in contenido.lines() {
+            let recortada = linea.trim();
+
+            // Línea vacía
+            if recortada.is_empty() {
+                lineas_vacias_consecutivas += 1;
+                if lineas_vacias_consecutivas <= 1 {
+                    resultado.push('\n');
+                }
+                continue;
+            }
+
+            lineas_vacias_consecutivas = 0;
+
+            // Detectar si la línea cierra un bloque (empieza con } o ])
+            let cierra_bloque = recortada.starts_with('}') || recortada.starts_with(']');
+
+            if cierra_bloque && indentacion > 0 {
+                indentacion -= 1;
+            }
+
+            // Escribir indentación
+            for _ in 0..indentacion {
+                resultado.push_str(indent_str);
+            }
+
+            // Escribir la línea recortada
+            resultado.push_str(recortada);
+            resultado.push('\n');
+
+            // Detectar si la línea abre un bloque (termina con { o ])
+            let abre_bloque = recortada.ends_with('{') || recortada.ends_with('[');
+
+            if abre_bloque {
+                indentacion += 1;
+            }
+        }
+
+        // Asegurar que termine con newline
+        if !resultado.ends_with('\n') {
+            resultado.push('\n');
+        }
+
+        resultado
     }
 
     /// Analiza un documento y devuelve diagnósticos + índice
@@ -637,8 +883,8 @@ impl Backend {
             }
         };
 
-        // 3. Construir índice semántico
-        let indice = IndiceSemantico::desde_ast(&programa);
+        // 3. Construir índice semántico (con imports resueltos del workspace)
+        let indice = self.resolver_imports(&programa).await;
 
         // 4. Análisis semántico
         let mut semantica = AnalizadorSemantico::nuevo();
@@ -891,6 +1137,110 @@ impl Backend {
                     });
                 }
             }
+            // Métodos de Texto después de .
+            if type_name == "t" || type_name.contains("texto") || type_name.contains("Texto") {
+                let text_methods = vec![
+                    ("longitud", "() -> Entero32", "Cantidad de bytes"),
+                    ("esta_vacio", "() -> Booleano", "¿Longitud == 0?"),
+                    ("contiene", "(sub: Texto) -> Booleano", "Búsqueda subcadena"),
+                    ("empieza_con", "(prefijo: Texto) -> Booleano", "Prefix check"),
+                    ("termina_con", "(sufijo: Texto) -> Booleano", "Suffix check"),
+                    ("reemplazar", "(de: Texto, a: Texto) -> Texto", "Reemplazo global"),
+                    ("recortar", "() -> Texto", "Trim espacios"),
+                    ("mayusculas", "() -> Texto", "Uppercase"),
+                    ("minusculas", "() -> Texto", "Lowercase"),
+                    ("dividir", "(sep: Texto) -> Vector<Texto>", "Split"),
+                    ("subtexto", "(i: Entero32, f: Entero32) -> Texto", "Substring"),
+                    ("a_entero", "() -> Entero64", "Parsing entero"),
+                    ("a_flotante", "() -> Flotante64", "Parsing flotante"),
+                    ("a_bytes", "() -> Vector<Entero8>", "A bytes"),
+                    ("codificar_base64", "() -> Texto", "Encode Base64"),
+                    ("decodificar_base64", "() -> Texto", "Decode Base64"),
+                    ("concatenar", "(b: Texto) -> Texto", "Unir textos"),
+                ];
+                for (name, sig, doc) in text_methods {
+                    items.push(CompletionItem {
+                        label: name.to_string(),
+                        kind: Some(CompletionItemKind::METHOD),
+                        detail: Some(format!("{}{}", name, sig)),
+                        documentation: Some(Documentation::String(doc.to_string())),
+                        ..Default::default()
+                    });
+                }
+            }
+            // Métodos de Vector después de .
+            if type_name.contains("vector") || type_name.contains("Vector") || type_name.contains("v") {
+                let vec_methods = vec![
+                    ("longitud", "() -> Entero32", "Cantidad de elementos"),
+                    ("obtener", "(i: Entero32) -> Option<T>", "Acceso por índice"),
+                    ("contiene", "(item: T) -> Booleano", "Búsqueda lineal"),
+                    ("indice_de", "(item: T) -> Entero32", "Índice del item"),
+                    ("clonar", "() -> Vector<T>", "Deep copy"),
+                    ("invertir", "() -> Vacío", "Invertir orden"),
+                    ("limpiar", "() -> Vacío", "Vaciar"),
+                    ("insertar", "(i: Entero32, item: T) -> Vacío", "Insertar en posición"),
+                    ("eliminar", "(i: Entero32) -> Vacío", "Eliminar en posición"),
+                ];
+                for (name, sig, doc) in vec_methods {
+                    items.push(CompletionItem {
+                        label: name.to_string(),
+                        kind: Some(CompletionItemKind::METHOD),
+                        detail: Some(format!("{}{}", name, sig)),
+                        documentation: Some(Documentation::String(doc.to_string())),
+                        ..Default::default()
+                    });
+                }
+            }
+            // Métodos de Diccionario después de .
+            if type_name.contains("diccionario") || type_name.contains("Diccionario") || type_name.contains("d") {
+                let dict_methods = vec![
+                    ("obtener", "(k: K) -> Option<V>", "Buscar por clave"),
+                    ("existe", "(k: K) -> Booleano", "Verificar clave"),
+                    ("longitud", "() -> Entero32", "Cantidad de pares"),
+                    ("claves", "() -> Vector<Texto>", "Extraer claves"),
+                    ("valores", "() -> Vector<Texto>", "Extraer valores"),
+                ];
+                for (name, sig, doc) in dict_methods {
+                    items.push(CompletionItem {
+                        label: name.to_string(),
+                        kind: Some(CompletionItemKind::METHOD),
+                        detail: Some(format!("{}{}", name, sig)),
+                        documentation: Some(Documentation::String(doc.to_string())),
+                        ..Default::default()
+                    });
+                }
+            }
+            // Métodos de Resultado después de .
+            if type_name.contains("resultado") || type_name.contains("Resultado") || type_name.contains("r") {
+                let result_methods = vec![
+                    ("es_exito", "() -> Booleano", "¿Es Exito?"),
+                    ("es_error", "() -> Booleano", "¿Es Error?"),
+                ];
+                for (name, sig, doc) in result_methods {
+                    items.push(CompletionItem {
+                        label: name.to_string(),
+                        kind: Some(CompletionItemKind::METHOD),
+                        detail: Some(format!("{}{}", name, sig)),
+                        documentation: Some(Documentation::String(doc.to_string())),
+                        ..Default::default()
+                    });
+                }
+            }
+            // Variantes de enum después de .
+            if let Some(e) = indice.enums.get(type_name) {
+                for (variante, tipo_dato) in &e.variantes {
+                    let detail = match tipo_dato {
+                        Some(t) => format!("{}({})", variante, t),
+                        None => variante.clone(),
+                    };
+                    items.push(CompletionItem {
+                        label: variante.clone(),
+                        kind: Some(CompletionItemKind::ENUM_MEMBER),
+                        detail: Some(detail),
+                        ..Default::default()
+                    });
+                }
+            }
         }
 
         items
@@ -995,29 +1345,50 @@ impl Backend {
             });
         }
 
-        // Tipos — primitivos + compuestos
+        // Tipos — primitivos + compuestos + visuales
         let tipos = vec![
-            ("Entero8", "Entero de 8 bits con signo"),
+            // Numéricos
+            ("Entero8", "Entero de 8 bits con signo (-128..127)"),
             ("Entero16", "Entero de 16 bits con signo"),
             ("Entero32", "Entero de 32 bits con signo"),
             ("Entero64", "Entero de 64 bits con signo"),
-            ("Natural8", "Entero de 8 bits sin signo"),
+            ("Natural8", "Entero de 8 bits sin signo (0..255)"),
             ("Natural16", "Entero de 16 bits sin signo"),
             ("Natural32", "Entero de 32 bits sin signo"),
             ("Natural64", "Entero de 64 bits sin signo"),
             ("Flotante32", "Flotante de 32 bits (f32)"),
             ("Flotante64", "Flotante de 64 bits (f64)"),
+            ("Real", "Flotante64 — alias"),
+            // Booleano y caracteres
             ("Booleano", "Booleano: verdadero o falso"),
             ("Caracter", "Carácter Unicode de 32 bits"),
+            // Strings
             ("Palabra", "String literal inmutable (&str)"),
             ("Texto", "String heap-allocado growable (24 bytes, ¡liberar!)"),
-            ("Vacío", "Tipo unitario (sin valor)"),
+            // Colecciones
             ("Vector", "Vector dinámico genérico (heap, ¡liberar!)"),
+            ("Diccionario", "Mapa hash genérico<K,V> (heap, ¡liberar!)"),
+            ("Conjunto", "Set hash genérico<T> (heap, ¡liberar!)"),
+            // Option/Result
+            ("Option", "Option<T> — Algo(valor) o Nada"),
             ("Resultado", "Result<T,E> — Exito(valor) o Error(codigo)"),
-            ("Fase", "Estado de oscilador: { valor: Real, inc: Real } — librerias/math.fc"),
+            // Unit
+            ("Vacío", "Tipo unitario (sin valor)"),
+            // Visual
+            ("Ventana", "Ventana del sistema operativo"),
+            ("Lienzo", "Canvas de dibujo (GDI/bitmap)"),
+            ("Imagen", "Imagen rasterizada"),
+            ("Audio", "Buffer de audio (samples)"),
+            ("Punto", "Punto 2D: { x: Entero32, y: Entero32 }"),
+            ("Tamano", "Tamaño 2D: { w: Entero32, h: Entero32 }"),
+            ("Rect", "Rectángulo: { x, y, w, h }"),
+            // Red
+            ("Canal", "Canal MPSC para concurrencia"),
+            // Math aliases
+            ("Fase", "Estado de oscilador: { valor: Real, inc: Real }"),
             ("Real_preciso", "apodo de Real — libm (error < 1 ULP)"),
-            ("Real_rapido", "apodo de Real — polinomio grado 5 (error ~2^-16)"),
-            ("Real_aprox", "apodo de Real — tabla 256 + lerp (error ~2^-10)"),
+            ("Real_rapido", "apodo de Real — polinomio grado 5"),
+            ("Real_aprox", "apodo de Real — tabla 256 + lerp"),
         ];
 
         for (t, doc) in tipos {
@@ -1039,34 +1410,110 @@ impl Backend {
             });
         }
 
-        // Built-in functions (más comunes)
+        // Snippets de template — boilerplate del lenguaje
+        let snippets = vec![
+            ("si", "si ${1:condicion} {\n\t$0\n}", "Condicional si"),
+            ("sino", "si ${1:condicion} {\n\t$2\n} sino {\n\t$0\n}", "Si sino"),
+            ("si-es", "si ${1:variable} es ${2:Variante} {\n\t$0\n}", "Si es (pattern match)"),
+            ("mientras", "mientras ${1:condicion} {\n\t$0\n}", "Bucle mientras"),
+            ("para-en", "para ${1:item} en ${2:coleccion} {\n\t$0\n}", "Bucle para-in"),
+            ("para-rango", "para ${1:i} en 0..${2:10} {\n\t$0\n}", "Bucle para-rango"),
+            ("fn", "función ${1:nombre}(${2:la parametro: Tipo}) -> ${3:Tipo} {\n\t$0\n}", "Declarar función"),
+            ("fn-sin-retorno", "función ${1:nombre}(${2:la parametro: Tipo}) {\n\t$0\n}", "Función sin retorno"),
+            ("estructural", "estructural ${1:Nombre} {\n\t${2:campo}: ${3:Tipo},\n}", "Declarar struct"),
+            ("enumeracion", "enumeración ${1:Nombre} {\n\t${2:Variante},\n}", "Declarar enum"),
+            ("rasgo", "rasgo ${1:Nombre} {\n\t${2:método}(): ${3:Tipo};\n}", "Declarar trait"),
+            ("implementar", "implementar ${1:Trait} para ${2:Tipo} {\n\t$0\n}", "Implementar trait"),
+            ("resultado", "Resultado<${1:TipoExito}, ${2:TipoError}>", "Tipo Resultado"),
+            ("option", "Option<${1:Tipo}>", "Tipo Option"),
+            ("vector", "Vector<${1:Tipo}>", "Tipo Vector"),
+            ("diccionario", "Diccionario<${1:Clave}, ${2:Valor}>", "Tipo Diccionario"),
+            ("fut", "fut función ${1:nombre}(${2:la parametro: Tipo}) -> ${3:Tipo} {\n\t$0\n}", "Función async"),
+            ("lanzar", "lanzar ${1:funcion}(${2:args})", "Lanzar tarea"),
+            ("usar", "usar ${1:libEst}::${2:modulos}::*;", "Importar módulo"),
+            ("prueba", "prueba \"${1:nombre}\" {\n\t$0\n}", "Declarar test"),
+            ("afirmar", "afirmar(${1:condicion});", "Aserción"),
+            ("coincidir", "coincidir ${1:variable} {\n\t${2:Patron} => ${3:resultado},\n\t_ => ${4:default},\n}", "Pattern matching"),
+        ];
+        for (trigger, template, doc) in snippets {
+            items.push(CompletionItem {
+                label: trigger.to_string(),
+                kind: Some(CompletionItemKind::SNIPPET),
+                detail: Some(doc.to_string()),
+                insert_text: Some(template.to_string()),
+                insert_text_format: Some(InsertTextFormat::SNIPPET),
+                ..Default::default()
+            });
+        }
+
+        // Built-in functions — 153 builtins completos
         let builtins = vec![
+            // === I/O básico ===
             ("imprimir", "(mensaje: T) -> Vacío", CompletionItemKind::FUNCTION),
             ("imprimir_linea", "(mensaje: T) -> Vacío", CompletionItemKind::FUNCTION),
             ("decir", "(mensaje: T) -> Vacío — alias de imprimir_linea", CompletionItemKind::FUNCTION),
+            ("entrada_leer", "() -> Texto — lee stdin completo", CompletionItemKind::FUNCTION),
+            // === Sistema ===
             ("tamaño_de::<T>", "() -> Entero64 — sizeof comptime", CompletionItemKind::FUNCTION),
             ("dormir", "(ms: Entero32) -> Vacío — suspende hilo actual", CompletionItemKind::FUNCTION),
-            ("abs", "(x: Entero32) -> Entero32", CompletionItemKind::FUNCTION),
-            ("max", "(a: Entero32, b: Entero32) -> Entero32", CompletionItemKind::FUNCTION),
-            ("min", "(a: Entero32, b: Entero32) -> Entero32", CompletionItemKind::FUNCTION),
+            ("directorio_actual", "() -> Texto — CWD", CompletionItemKind::FUNCTION),
+            ("terminal_dimensiones", "() -> Entero64 — ancho/alto terminal", CompletionItemKind::FUNCTION),
+            ("terminal_modo_raw", "(habilitar: Booleano) -> Vacío", CompletionItemKind::FUNCTION),
+            ("terminal_leer_tecla", "() -> Entero32 — leer tecla sin echo", CompletionItemKind::FUNCTION),
+            ("entorno_obtener", "(nombre: Texto) -> Texto — variable de entorno", CompletionItemKind::FUNCTION),
+            ("argumentos_cantidad", "() -> Entero32 — argc", CompletionItemKind::FUNCTION),
+            ("argumentos_obtener", "(i: Entero32) -> Texto — argv[i]", CompletionItemKind::FUNCTION),
+            ("consola_imprimir", "(texto: Texto) -> Vacío — stdout sin newline", CompletionItemKind::FUNCTION),
+            ("consola_imprimir_linea", "(texto: Texto) -> Vacío — stdout con newline", CompletionItemKind::FUNCTION),
+            ("aleatorio_entero", "() -> Entero64 — número aleatorio", CompletionItemKind::FUNCTION),
+            ("aleatorio_entero_entre", "(min: Entero64, max: Entero64) -> Entero64 — aleatorio en rango", CompletionItemKind::FUNCTION),
+            ("aleatorio", "() -> Entero64 — alias de aleatorio_entero", CompletionItemKind::FUNCTION),
+            ("timestamp", "() -> Entero64 — timestamp Unix", CompletionItemKind::FUNCTION),
+            // === Texto (22) ===
+            ("texto_nuevo", "() -> Texto", CompletionItemKind::FUNCTION),
+            ("texto_desde", "(palabra: Palabra) -> Texto — literal → heap", CompletionItemKind::FUNCTION),
+            ("texto_longitud", "(t: Texto) -> Entero32 — bytes", CompletionItemKind::FUNCTION),
+            ("texto_esta_vacio", "(t: Texto) -> Booleano", CompletionItemKind::FUNCTION),
+            ("texto_contiene", "(t: Texto, sub: Texto) -> Booleano — búsqueda subcadena", CompletionItemKind::FUNCTION),
+            ("texto_empieza_con", "(t: Texto, prefijo: Texto) -> Booleano", CompletionItemKind::FUNCTION),
+            ("texto_termina_con", "(t: Texto, sufijo: Texto) -> Booleano", CompletionItemKind::FUNCTION),
+            ("texto_comparar", "(a: Texto, b: Texto) -> Entero32 — memcmp (-/0/+)", CompletionItemKind::FUNCTION),
+            ("texto_es_igual", "(a: Texto, b: Texto) -> Booleano", CompletionItemKind::FUNCTION),
+            ("texto_es_diferente", "(a: Texto, b: Texto) -> Booleano", CompletionItemKind::FUNCTION),
+            ("texto_concatenar", "(a: Texto, b: Texto) -> Texto", CompletionItemKind::FUNCTION),
+            ("texto_reemplazar", "(t: Texto, de: Texto, a: Texto) -> Texto — reemplazo global", CompletionItemKind::FUNCTION),
+            ("texto_recortar", "(t: Texto) -> Texto — trim espacios", CompletionItemKind::FUNCTION),
+            ("texto_mayusculas", "(t: Texto) -> Texto — uppercase ASCII", CompletionItemKind::FUNCTION),
+            ("texto_minusculas", "(t: Texto) -> Texto — lowercase ASCII", CompletionItemKind::FUNCTION),
+            ("texto_dividir", "(t: Texto, sep: Texto) -> Vector<Texto> — split", CompletionItemKind::FUNCTION),
+            ("texto_subtexto", "(t: Texto, i: Entero32, f: Entero32) -> Texto — substring [i,f)", CompletionItemKind::FUNCTION),
+            ("texto_a_entero", "(t: Texto) -> Entero64 — parsing entero", CompletionItemKind::FUNCTION),
+            ("texto_a_natural", "(t: Texto) -> Natural64 — parsing natural", CompletionItemKind::FUNCTION),
+            ("texto_a_flotante", "(t: Texto) -> Flotante64 — parsing flotante", CompletionItemKind::FUNCTION),
+            ("texto_a_booleano", "(t: Texto) -> Booleano — parsing booleano", CompletionItemKind::FUNCTION),
+            ("texto_a_bytes", "(t: Texto) -> Vector<Entero8> — conversión a bytes", CompletionItemKind::FUNCTION),
+            ("texto_codificar_base64", "(t: Texto) -> Texto — encode Base64", CompletionItemKind::FUNCTION),
+            ("texto_decodificar_base64", "(t: Texto) -> Texto — decode Base64", CompletionItemKind::FUNCTION),
+            ("texto_agregar", "(texto: Texto, fragmento: Palabra) -> Vacío — append literal", CompletionItemKind::FUNCTION),
+            ("texto_liberar", "(texto: Texto) -> Vacío", CompletionItemKind::FUNCTION),
+            // === Matemáticas (14) ===
+            ("abs", "(x: Entero32) -> Entero32 — valor absoluto", CompletionItemKind::FUNCTION),
+            ("max", "(a: Entero32, b: Entero32) -> Entero32 — máximo", CompletionItemKind::FUNCTION),
+            ("min", "(a: Entero32, b: Entero32) -> Entero32 — mínimo", CompletionItemKind::FUNCTION),
             ("raiz", "(x: Flotante64) -> Flotante64 — sqrt()", CompletionItemKind::FUNCTION),
             ("potencia", "(base: Flotante64, exp: Flotante64) -> Flotante64 — pow()", CompletionItemKind::FUNCTION),
-            ("texto_nuevo", "() -> Texto", CompletionItemKind::FUNCTION),
-            ("texto_desde", "(s: Palabra) -> Texto", CompletionItemKind::FUNCTION),
-            ("texto_agregar", "(texto: Texto, fragmento: Palabra) -> Vacío", CompletionItemKind::FUNCTION),
-            ("texto_concatenar", "(a: Texto, b: Texto) -> Texto", CompletionItemKind::FUNCTION),
-            ("texto_liberar", "(texto: Texto) -> Vacío", CompletionItemKind::FUNCTION),
-            ("vector_nuevo", "<T>() -> Vector<T>", CompletionItemKind::FUNCTION),
-            ("vector_agregar", "<T>(v: Vector<T>, val: T) -> Vacío", CompletionItemKind::FUNCTION),
-            ("vector_liberar", "<T>(v: Vector<T>) -> Vacío", CompletionItemKind::FUNCTION),
-            ("diccionario_nuevo", "<K,V>() -> Diccionario<K,V>", CompletionItemKind::FUNCTION),
-            ("diccionario_insertar", "<K,V>(d: Diccionario<K,V>, k: K, v: V) -> Vacío", CompletionItemKind::FUNCTION),
-            ("archivo_leer", "(ruta: Palabra) -> Texto", CompletionItemKind::FUNCTION),
-            ("archivo_escribir", "(ruta: Palabra, contenido: Texto) -> Entero32", CompletionItemKind::FUNCTION),
-            ("canal_nuevo", "(capacidad: Entero32) -> Canal", CompletionItemKind::FUNCTION),
-            ("canal_enviar", "(canal: Canal, valor: Entero32) -> Vacío", CompletionItemKind::FUNCTION),
-            ("canal_recibir", "(canal: Canal) -> Entero32", CompletionItemKind::FUNCTION),
-            // Trigonometría — F1: libm (preciso)
+            ("mate_abs", "(x: Flotante64) -> Flotante64 — abs flotante", CompletionItemKind::FUNCTION),
+            ("mate_maximo", "(a: Flotante64, b: Flotante64) -> Flotante64 — máximo", CompletionItemKind::FUNCTION),
+            ("mate_minimo", "(a: Flotante64, b: Flotante64) -> Flotante64 — mínimo", CompletionItemKind::FUNCTION),
+            ("mate_raiz", "(x: Flotante64) -> Flotante64 — raíz cuadrada", CompletionItemKind::FUNCTION),
+            ("mate_potencia", "(base: Flotante64, exp: Flotante64) -> Flotante64 — potencia", CompletionItemKind::FUNCTION),
+            ("mate_piso", "(x: Flotante64) -> Entero64 — floor", CompletionItemKind::FUNCTION),
+            ("mate_techo", "(x: Flotante64) -> Entero64 — ceil", CompletionItemKind::FUNCTION),
+            ("mate_pi", "() -> Flotante64 — π", CompletionItemKind::FUNCTION),
+            ("mate_e", "() -> Flotante64 — e", CompletionItemKind::FUNCTION),
+            ("mate_grados_a_radianes", "(g: Flotante64) -> Flotante64", CompletionItemKind::FUNCTION),
+            ("mate_radianes_a_grados", "(r: Flotante64) -> Flotante64", CompletionItemKind::FUNCTION),
+            // === Trig (libm) ===
             ("seno", "(x: Real) -> Real — seno via libm", CompletionItemKind::FUNCTION),
             ("coseno", "(x: Real) -> Real — coseno via libm", CompletionItemKind::FUNCTION),
             ("tangente", "(x: Real) -> Real — tangente via libm", CompletionItemKind::FUNCTION),
@@ -1084,13 +1531,11 @@ impl Backend {
             ("techo", "(x: Real) -> Real — ceil", CompletionItemKind::FUNCTION),
             ("fabs", "(x: Real) -> Real — valor absoluto flotante", CompletionItemKind::FUNCTION),
             ("fmod", "(a: Real, b: Real) -> Real — módulo flotante", CompletionItemKind::FUNCTION),
-            // Trigonometría — F4: precisión
             ("seno_preciso", "(x: Real) -> Real — seno preciso (libm)", CompletionItemKind::FUNCTION),
             ("coseno_preciso", "(x: Real) -> Real — coseno preciso (libm)", CompletionItemKind::FUNCTION),
             ("tangente_preciso", "(x: Real) -> Real — tangente precisa (libm)", CompletionItemKind::FUNCTION),
             ("exp_preciso", "(x: Real) -> Real — exp preciso (libm)", CompletionItemKind::FUNCTION),
             ("log_preciso", "(x: Real) -> Real — log preciso (libm)", CompletionItemKind::FUNCTION),
-            // Trigonometría — F7: polinomios minimax
             ("seno_rapido", "(x: Real) -> Real — seno rápido (polinomio)", CompletionItemKind::FUNCTION),
             ("coseno_rapido", "(x: Real) -> Real — coseno rápido (polinomio)", CompletionItemKind::FUNCTION),
             ("seno_2pi", "(fase: Real) -> Real — seno(2π×fase), fase ∈ [0,1)", CompletionItemKind::FUNCTION),
@@ -1098,6 +1543,135 @@ impl Backend {
             ("exp_rapido", "(x: Real) -> Real — exp rápido (libm)", CompletionItemKind::FUNCTION),
             ("log_rapido", "(x: Real) -> Real — log rápido (libm)", CompletionItemKind::FUNCTION),
             ("seno_aprox", "(x: Real) -> Real — seno aproximado (placeholder)", CompletionItemKind::FUNCTION),
+            // === Archivo (8) ===
+            ("archivo_leer", "(ruta: Texto) -> Texto — leer contenido completo", CompletionItemKind::FUNCTION),
+            ("archivo_escribir", "(ruta: Texto, contenido: Texto) -> Entero32 — escribir (sobrescribe)", CompletionItemKind::FUNCTION),
+            ("archivo_agregar", "(ruta: Texto, contenido: Texto) -> Entero32 — append", CompletionItemKind::FUNCTION),
+            ("archivo_existe", "(ruta: Texto) -> Booleano — verificar existencia", CompletionItemKind::FUNCTION),
+            ("archivo_borrar", "(ruta: Texto) -> Entero32 — eliminar archivo", CompletionItemKind::FUNCTION),
+            ("archivo_renombrar", "(de: Texto, a: Texto) -> Entero32 — mover/renombrar", CompletionItemKind::FUNCTION),
+            ("archivo_listar", "(ruta: Texto) -> Vector<Texto> — listar directorio", CompletionItemKind::FUNCTION),
+            ("archivo_tamano", "(ruta: Texto) -> Entero64 — tamaño en bytes", CompletionItemKind::FUNCTION),
+            // === TCP (10) ===
+            ("tcp_conectar", "(host: Texto, puerto: Entero32) -> Entero32 — conexión TCP", CompletionItemKind::FUNCTION),
+            ("tcp_enviar", "(conn: Entero32, datos: Texto) -> Entero32 — enviar datos", CompletionItemKind::FUNCTION),
+            ("tcp_recibir", "(conn: Entero32, tamano: Entero32) -> Texto — recibir datos", CompletionItemKind::FUNCTION),
+            ("tcp_cerrar", "(conn: Entero32) -> Vacío — cerrar conexión", CompletionItemKind::FUNCTION),
+            ("tcp_establecer_timeout", "(conn: Entero32, ms: Entero32) -> Vacío — timeout", CompletionItemKind::FUNCTION),
+            ("tcp_datos_disponibles", "(conn: Entero32) -> Entero32 — bytes pendientes", CompletionItemKind::FUNCTION),
+            ("dns_resolver", "(host: Texto) -> Texto — DNS lookup", CompletionItemKind::FUNCTION),
+            ("tcp_vincular", "(host: Texto, puerto: Entero32) -> Entero32 — bind", CompletionItemKind::FUNCTION),
+            ("tcp_escuchar", "(fd: Entero32, backlog: Entero32) -> Entero32 — listen", CompletionItemKind::FUNCTION),
+            ("tcp_aceptar", "(fd: Entero32) -> Entero32 — accept", CompletionItemKind::FUNCTION),
+            // === HTTP (2) ===
+            ("http_get", "(host: Texto, puerto: Entero32, path: Texto) -> Texto — HTTP GET", CompletionItemKind::FUNCTION),
+            ("http_post", "(host: Texto, puerto: Entero32, path: Texto, cuerpo: Texto) -> Texto — HTTP POST", CompletionItemKind::FUNCTION),
+            // === TLS (5) ===
+            ("tls_conectar", "(host: Texto, puerto: Entero32) -> Entero32 — conexión TLS", CompletionItemKind::FUNCTION),
+            ("tls_escribir", "(conn: Entero32, datos: Texto, len: Entero32) -> Entero32 — escribir TLS", CompletionItemKind::FUNCTION),
+            ("tls_leer", "(conn: Entero32, buf: Texto, len: Entero32) -> Entero32 — leer TLS", CompletionItemKind::FUNCTION),
+            ("tls_datos_disponibles", "(conn: Entero32) -> Entero32 — bytes pendientes TLS", CompletionItemKind::FUNCTION),
+            ("tls_cerrar", "(conn: Entero32) -> Vacío — cerrar TLS", CompletionItemKind::FUNCTION),
+            // === JSON (4) ===
+            ("json_parsear", "(json: Texto) -> Texto — parser JSON recursivo", CompletionItemKind::FUNCTION),
+            ("json_serializar", "(valor: Texto) -> Texto — serializar a JSON", CompletionItemKind::FUNCTION),
+            ("json_escapar", "(texto: Texto) -> Texto — escape de strings", CompletionItemKind::FUNCTION),
+            ("json_obtener", "(json: Texto, clave: Texto) -> Texto — extraer campo", CompletionItemKind::FUNCTION),
+            // === Tiempo (5) ===
+            ("fecha_unix", "() -> Entero64 — timestamp Unix actual", CompletionItemKind::FUNCTION),
+            ("fecha_ms", "() -> Entero64 — milisegundos actuales", CompletionItemKind::FUNCTION),
+            ("fecha_anio", "(unix: Entero64) -> Entero32 — año", CompletionItemKind::FUNCTION),
+            ("fecha_mes", "(unix: Entero64) -> Entero32 — mes (1-12)", CompletionItemKind::FUNCTION),
+            ("fecha_dia", "(unix: Entero64) -> Entero32 — día (1-31)", CompletionItemKind::FUNCTION),
+            // === Vector (15) ===
+            ("vector_nuevo", "<T>() -> Vector<T> — vector vacío", CompletionItemKind::FUNCTION),
+            ("vector_agregar", "<T>(v: &mut Vector<T>, item: T) -> Vacío — agregar elemento", CompletionItemKind::FUNCTION),
+            ("vector_obtener", "<T>(v: Vector<T>, i: Entero32) -> Option<T> — acceso por índice", CompletionItemKind::FUNCTION),
+            ("vector_poner", "<T>(v: &mut Vector<T>, i: Entero32, item: T) -> Vacío — asignar por índice", CompletionItemKind::FUNCTION),
+            ("vector_longitud", "<T>(v: Vector<T>) -> Entero32 — cantidad de elementos", CompletionItemKind::FUNCTION),
+            ("vector_liberar", "<T>(v: Vector<T>) -> Vacío — liberar memoria", CompletionItemKind::FUNCTION),
+            ("vector_intercambiar", "<T>(v: &mut Vector<T>, i: Entero32, j: Entero32) -> Vacío — swap", CompletionItemKind::FUNCTION),
+            ("vector_insertar", "<T>(v: &mut Vector<T>, i: Entero32, item: T) -> Vacío — insertar en posición", CompletionItemKind::FUNCTION),
+            ("vector_eliminar", "<T>(v: &mut Vector<T>, i: Entero32) -> Vacío — eliminar en posición", CompletionItemKind::FUNCTION),
+            ("vector_extender", "<T>(v: &mut Vector<T>, otro: Vector<T>) -> Vacío — extender", CompletionItemKind::FUNCTION),
+            ("vector_contiene", "<T>(v: Vector<T>, item: T) -> Booleano — búsqueda lineal", CompletionItemKind::FUNCTION),
+            ("vector_indice_de", "<T>(v: Vector<T>, item: T) -> Entero32 — índice del item (-1 si no)", CompletionItemKind::FUNCTION),
+            ("vector_clonar", "<T>(v: Vector<T>) -> Vector<T> — deep copy", CompletionItemKind::FUNCTION),
+            ("vector_invertir", "<T>(v: &mut Vector<T>) -> Vacío — invertir orden", CompletionItemKind::FUNCTION),
+            ("vector_limpiar", "<T>(v: &mut Vector<T>) -> Vacío — vaciar sin deallocar", CompletionItemKind::FUNCTION),
+            // === Diccionario (10) ===
+            ("diccionario_nuevo", "<K,V>() -> Diccionario<K,V> — diccionario vacío", CompletionItemKind::FUNCTION),
+            ("diccionario_insertar", "<K,V>(d: &mut Diccionario<K,V>, k: K, v: V) -> Vacío — insertar/actualizar", CompletionItemKind::FUNCTION),
+            ("diccionario_obtener", "<K,V>(d: Diccionario<K,V>, k: K) -> Option<V> — buscar por clave", CompletionItemKind::FUNCTION),
+            ("diccionario_existe", "<K,V>(d: Diccionario<K,V>, k: K) -> Booleano — verificar clave", CompletionItemKind::FUNCTION),
+            ("diccionario_eliminar", "<K,V>(d: &mut Diccionario<K,V>, k: K) -> Vacío — eliminar clave", CompletionItemKind::FUNCTION),
+            ("diccionario_longitud", "<K,V>(d: Diccionario<K,V>) -> Entero32 — cantidad de pares", CompletionItemKind::FUNCTION),
+            ("diccionario_liberar", "<K,V>(d: Diccionario<K,V>) -> Vacío — liberar memoria", CompletionItemKind::FUNCTION),
+            ("diccionario_claves", "<K,V>(d: Diccionario<K,V>) -> Vector<Texto> — extraer claves", CompletionItemKind::FUNCTION),
+            ("diccionario_valores", "<K,V>(d: Diccionario<K,V>) -> Vector<Texto> — extraer valores", CompletionItemKind::FUNCTION),
+            ("diccionario_limpiar", "<K,V>(d: &mut Diccionario<K,V>) -> Vacío — vaciar", CompletionItemKind::FUNCTION),
+            // === Conjunto (7) ===
+            ("conjunto_nuevo", "<T>() -> Conjunto<T> — conjunto vacío", CompletionItemKind::FUNCTION),
+            ("conjunto_insertar", "<T>(c: &mut Conjunto<T>, item: T) -> Vacío — agregar", CompletionItemKind::FUNCTION),
+            ("conjunto_contiene", "<T>(c: Conjunto<T>, item: T) -> Booleano — pertenencia", CompletionItemKind::FUNCTION),
+            ("conjunto_eliminar", "<T>(c: &mut Conjunto<T>, item: T) -> Vacío — eliminar", CompletionItemKind::FUNCTION),
+            ("conjunto_longitud", "<T>(c: Conjunto<T>) -> Entero32 — cantidad", CompletionItemKind::FUNCTION),
+            ("conjunto_liberar", "<T>(c: Conjunto<T>) -> Vacío — liberar", CompletionItemKind::FUNCTION),
+            ("conjunto_elementos", "<T>(c: Conjunto<T>) -> Vector<Texto> — extraer a vector", CompletionItemKind::FUNCTION),
+            // === Opción/Resultado (4) ===
+            ("opcion_es_alguno", "<T>(o: Option<T>) -> Booleano — ¿Es Algo?", CompletionItemKind::FUNCTION),
+            ("opcion_es_ninguno", "<T>(o: Option<T>) -> Booleano — ¿Es Nada?", CompletionItemKind::FUNCTION),
+            ("resultado_es_exito", "<T,E>(r: Resultado<T,E>) -> Booleano — ¿Es Exito?", CompletionItemKind::FUNCTION),
+            ("resultado_es_error", "<T,E>(r: Resultado<T,E>) -> Booleano — ¿Es Error?", CompletionItemKind::FUNCTION),
+            // === Proceso (8) ===
+            ("proceso_crear", "(comando: Texto) -> Entero32 — ejecutar proceso", CompletionItemKind::FUNCTION),
+            ("proceso_esperar", "(pid: Entero32) -> Entero32 — esperar proceso", CompletionItemKind::FUNCTION),
+            ("proceso_cerrar", "(pid: Entero32) -> Vacío — cerrar proceso", CompletionItemKind::FUNCTION),
+            ("proceso_crear_con_pipes", "(cmd: Texto) -> Entero32 — crear con pipes", CompletionItemKind::FUNCTION),
+            ("proceso_escribir", "(pid: Entero32, datos: Texto) -> Vacío — escribir a stdin", CompletionItemKind::FUNCTION),
+            ("proceso_leer_salida_completa", "(pid: Entero32) -> Texto — leer stdout", CompletionItemKind::FUNCTION),
+            ("proceso_leer_error_chunk", "(pid: Entero32) -> Texto — leer stderr", CompletionItemKind::FUNCTION),
+            ("proceso_cerrar_bidireccional", "(pid: Entero32) -> Vacío — cerrar pipes", CompletionItemKind::FUNCTION),
+            // === Canales (5) ===
+            ("canal_nuevo", "(capacidad: Entero32) -> Canal — crear canal", CompletionItemKind::FUNCTION),
+            ("canal_enviar", "(canal: Canal, valor: Entero32) -> Vacío — enviar", CompletionItemKind::FUNCTION),
+            ("canal_recibir", "(canal: Canal) -> Entero32 — recibir", CompletionItemKind::FUNCTION),
+            ("canal_cerrar", "(canal: Canal) -> Vacío — cerrar canal", CompletionItemKind::FUNCTION),
+            ("canal_intentar", "(canal: Canal) -> Option<Entero32> — recibir sin bloquear", CompletionItemKind::FUNCTION),
+            // === Visual: Ventana (8) ===
+            ("ventana_nueva", "(titulo: Texto, ancho: Entero32, alto: Entero32) -> Ventana — crear ventana", CompletionItemKind::FUNCTION),
+            ("ventana_mostrar", "(v: Ventana) -> Vacío — mostrar", CompletionItemKind::FUNCTION),
+            ("ventana_cerrar", "(v: Ventana) -> Vacío — cerrar", CompletionItemKind::FUNCTION),
+            ("ventana_bucle_mensajes", "(v: Ventana) -> Entero32 — message loop", CompletionItemKind::FUNCTION),
+            ("ventana_titulo", "(v: Ventana) -> Texto — obtener título", CompletionItemKind::FUNCTION),
+            ("ventana_establecer_titulo", "(v: Ventana, titulo: Texto) -> Vacío — establecer título", CompletionItemKind::FUNCTION),
+            ("ventana_posicion", "(v: Ventana) -> Punto — posición (x,y)", CompletionItemKind::FUNCTION),
+            ("ventana_tamano", "(v: Ventana) -> Tamano — tamaño (w,h)", CompletionItemKind::FUNCTION),
+            // === Visual: Lienzo (8) ===
+            ("lienzo_nuevo", "(ancho: Entero32, alto: Entero32) -> Lienzo — crear canvas", CompletionItemKind::FUNCTION),
+            ("lienzo_limpiar", "(l: Lienzo, color: Entero32) -> Vacío — fill rect", CompletionItemKind::FUNCTION),
+            ("lienzo_linea", "(l: Lienzo, x1: Entero32, y1: Entero32, x2: Entero32, y2: Entero32) -> Vacío — dibujar línea", CompletionItemKind::FUNCTION),
+            ("lienzo_rectangulo", "(l: Lienzo, x: Entero32, y: Entero32, w: Entero32, h: Entero32) -> Vacío — rectángulo", CompletionItemKind::FUNCTION),
+            ("lienzo_circulo", "(l: Lienzo, cx: Entero32, cy: Entero32, radio: Entero32) -> Vacío — círculo", CompletionItemKind::FUNCTION),
+            ("lienzo_texto", "(l: Lienzo, x: Entero32, y: Entero32, texto: Texto) -> Vacío — texto", CompletionItemKind::FUNCTION),
+            ("lienzo_guardar_png", "(l: Lienzo, ruta: Texto) -> Entero32 — guardar PNG", CompletionItemKind::FUNCTION),
+            ("lienzo_liberar", "(l: Lienzo) -> Vacío — liberar", CompletionItemKind::FUNCTION),
+            // === Visual: Imagen (6) ===
+            ("imagen_desde_archivo", "(ruta: Texto) -> Imagen — cargar imagen", CompletionItemKind::FUNCTION),
+            ("imagen_ancho", "(img: Imagen) -> Entero32 — ancho", CompletionItemKind::FUNCTION),
+            ("imagen_alto", "(img: Imagen) -> Entero32 — alto", CompletionItemKind::FUNCTION),
+            ("imagen_redimensionar", "(img: Imagen, w: Entero32, h: Entero32) -> Imagen — redimensionar", CompletionItemKind::FUNCTION),
+            ("imagen_guardar_png", "(img: Imagen, ruta: Texto) -> Entero32 — guardar PNG", CompletionItemKind::FUNCTION),
+            ("imagen_liberar", "(img: Imagen) -> Vacío — liberar", CompletionItemKind::FUNCTION),
+            // === Visual: Sonido (8) ===
+            ("audio_nuevo", "(canales: Entero32, freq: Entero32) -> Audio — buffer vacío", CompletionItemKind::FUNCTION),
+            ("audio_desde_archivo", "(ruta: Texto) -> Audio — cargar WAV", CompletionItemKind::FUNCTION),
+            ("audio_tono", "(freq: Flotante64, dur_ms: Entero32, canales: Entero32, freq_m: Entero32) -> Audio — tono puro", CompletionItemKind::FUNCTION),
+            ("audio_mezclar", "(a: Audio, b: Audio) -> Audio — mezclar", CompletionItemKind::FUNCTION),
+            ("audio_fade_in", "(audio: Audio, dur_ms: Entero32) -> Vacío — fade in", CompletionItemKind::FUNCTION),
+            ("audio_fade_out", "(audio: Audio, dur_ms: Entero32) -> Vacío — fade out", CompletionItemKind::FUNCTION),
+            ("audio_guardar_wav", "(audio: Audio, ruta: Texto) -> Entero32 — guardar WAV", CompletionItemKind::FUNCTION),
+            ("audio_reproducir", "(audio: Audio) -> Entero32 — reproducir", CompletionItemKind::FUNCTION),
         ];
 
         for (name, sig, kind) in builtins {
@@ -1147,8 +1721,24 @@ impl Backend {
 impl LanguageServer for Backend {
     async fn initialize(
         &self,
-        _: InitializeParams,
+        params: InitializeParams,
     ) -> Result<InitializeResult> {
+        // Extraer workspace root para escaneo de archivos
+        if let Some(folder) = params.workspace_folders.and_then(|f| f.into_iter().next()) {
+            let root = folder.uri.to_file_path()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+            {
+                let mut ws = self.workspace_root.write().await;
+                *ws = Some(root.clone());
+            }
+            // Escanear workspace en background
+            let root_clone = root;
+            let this = self.clone();
+            tokio::spawn(async move {
+                this.escanear_workspace(&root_clone).await;
+            });
+        }
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -1180,7 +1770,13 @@ impl LanguageServer for Backend {
                     ..Default::default()
                 }),
                 document_symbol_provider: Some(OneOf::Left(true)),
+                document_formatting_provider: Some(OneOf::Left(true)),
+                inlay_hint_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                rename_provider: Some(OneOf::Left(true)),
+                code_lens_provider: Some(CodeLensOptions {
+                    resolve_provider: Some(false),
+                }),
                 diagnostic_provider: Some(
                     DiagnosticServerCapabilities::Options(DiagnosticOptions {
                         identifier: Some("falcato".to_string()),
@@ -1699,6 +2295,237 @@ impl LanguageServer for Backend {
         };
 
         Ok(Some(GotoDefinitionResponse::Scalar(location)))
+    }
+
+    // === Format Document ===
+
+    async fn formatting(
+        &self,
+        params: DocumentFormattingParams,
+    ) -> Result<Option<Vec<TextEdit>>> {
+        let uri = params.text_document.uri;
+
+        let docs = self.documentos.read().await;
+        let doc = match docs.get(&uri) {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+
+        let formateado = Self::formatear_falcato(&doc.contenido);
+
+        // Si no cambió, no hay edits
+        if formateado == doc.contenido {
+            return Ok(None);
+        }
+
+        // Calcular el rango completo del documento
+        let lineas = doc.contenido.lines().count().max(1);
+        let ultima_linea = doc.contenido.lines().last().map(|l| l.len()).unwrap_or(0);
+
+        let edit = TextEdit {
+            range: Range {
+                start: Position { line: 0, character: 0 },
+                end: Position {
+                    line: lineas as u32,
+                    character: ultima_linea as u32,
+                },
+            },
+            new_text: formateado,
+        };
+
+        Ok(Some(vec![edit]))
+    }
+
+    // === Inlay Hints ===
+
+    async fn inlay_hint(
+        &self,
+        params: InlayHintParams,
+    ) -> Result<Option<Vec<InlayHint>>> {
+        let uri = params.text_document.uri;
+        let range = params.range;
+
+        let docs = self.documentos.read().await;
+        let doc = match docs.get(&uri) {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+
+        let mut hints = Vec::new();
+
+        // Buscar variables con tipo inferido
+        for (nombre, var) in &doc.indice.variables {
+            // Solo mostrar hint si la variable está en el rango solicitado
+            let linea = var.span_declaracion.inicio.linea.saturating_sub(1);
+            if linea >= range.start.line && linea <= range.end.line {
+                // Hint de tipo después del nombre
+                let hint = InlayHint {
+                    position: Position {
+                        line: linea,
+                        character: var.span_declaracion.inicio.columna as u32 + nombre.len() as u32,
+                    },
+                    label: InlayHintLabel::String(format!(": {}", var.tipo)),
+                    kind: Some(InlayHintKind::TYPE),
+                    tooltip: None,
+                    text_edits: None,
+                    data: None,
+                    padding_left: Some(false),
+                    padding_right: Some(true),
+                };
+                hints.push(hint);
+            }
+        }
+
+        // Buscar funciones con retorno inferido
+        for (nombre, func) in &doc.indice.funciones {
+            if let Some(ref retorno) = func.retorno {
+                let linea = func.span_declaracion.inicio.linea.saturating_sub(1);
+                if linea >= range.start.line && linea <= range.end.line {
+                    // Hint de retorno al final de la firma
+                    let hint = InlayHint {
+                        position: Position {
+                            line: linea,
+                            character: 999, // al final de la línea
+                        },
+                        label: InlayHintLabel::String(format!("-> {}", retorno)),
+                        kind: Some(InlayHintKind::TYPE),
+                        tooltip: None,
+                        text_edits: None,
+                        data: None,
+                        padding_left: Some(true),
+                        padding_right: Some(false),
+                    };
+                    hints.push(hint);
+                }
+            }
+        }
+
+        if hints.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(hints))
+        }
+    }
+
+    // === Rename Symbol ===
+
+    async fn rename(
+        &self,
+        params: RenameParams,
+    ) -> Result<Option<WorkspaceEdit>> {
+        let uri = params.text_document_position.text_document.uri;
+        let pos = params.text_document_position.position;
+        let nuevo_nombre = params.new_name;
+
+        let linea = pos.line + 1;
+        let columna = pos.character + 1;
+
+        let docs = self.documentos.read().await;
+        let doc = match docs.get(&uri) {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+
+        let ast = match &doc.ast {
+            Some(a) => a,
+            None => return Ok(None),
+        };
+
+        let ident = match doc.indice.identificador_en_posicion(ast, linea, columna) {
+            Some(i) => i,
+            None => return Ok(None),
+        };
+
+        // Encontrar todas las referencias
+        let spans = doc.indice.encontrar_referencias(ast, &ident);
+
+        let mut changes = HashMap::new();
+        let mut edits = Vec::new();
+
+        for span in &spans {
+            edits.push(TextEdit {
+                range: Range {
+                    start: Position {
+                        line: span.inicio.linea.saturating_sub(1),
+                        character: span.inicio.columna.saturating_sub(1),
+                    },
+                    end: Position {
+                        line: span.fin.linea.saturating_sub(1),
+                        character: span.fin.columna.saturating_sub(1),
+                    },
+                },
+                new_text: nuevo_nombre.clone(),
+            });
+        }
+
+        changes.insert(uri.clone(), edits);
+
+        Ok(Some(WorkspaceEdit {
+            changes: Some(changes),
+            ..Default::default()
+        }))
+    }
+
+    // === Code Lens ===
+
+    async fn code_lens(
+        &self,
+        params: CodeLensParams,
+    ) -> Result<Option<Vec<CodeLens>>> {
+        let uri = params.text_document.uri;
+
+        let docs = self.documentos.read().await;
+        let doc = match docs.get(&uri) {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+
+        let mut lenses = Vec::new();
+
+        // Agregar "▶ Ejecutar" y "🧪 Test" en cada función
+        for (nombre, func) in &doc.indice.funciones {
+            let linea = func.span_declaracion.inicio.linea.saturating_sub(1);
+            let range = Range {
+                start: Position { line: linea, character: 0 },
+                end: Position { line: linea, character: 0 },
+            };
+
+            // Botón "▶ Ejecutar"
+            lenses.push(CodeLens {
+                range,
+                command: Some(Command {
+                    title: format!("▶ Ejecutar {}", nombre),
+                    command: "falcato.ejecutar".to_string(),
+                    arguments: Some(vec![
+                        serde_json::Value::String(uri.to_string()),
+                        serde_json::Value::String(nombre.clone()),
+                    ]),
+                }),
+                data: None,
+            });
+
+            // Botón "🧪 Test" si es función de test
+            if nombre.starts_with("test_") || nombre.starts_with("prueba_") {
+                lenses.push(CodeLens {
+                    range,
+                    command: Some(Command {
+                        title: format!("🧪 Ejecutar test {}", nombre),
+                        command: "falcato.test".to_string(),
+                        arguments: Some(vec![
+                            serde_json::Value::String(uri.to_string()),
+                            serde_json::Value::String(nombre.clone()),
+                        ]),
+                    }),
+                    data: None,
+                });
+            }
+        }
+
+        if lenses.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(lenses))
+        }
     }
 }
 

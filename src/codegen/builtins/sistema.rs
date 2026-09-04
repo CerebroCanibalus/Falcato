@@ -225,6 +225,51 @@ impl Codegen {
         Ok(builder.inst_results(call)[0])
     }
 
+    /// fecha_anio(unix: Entero64) -> Entero32
+    /// Retorna el año de un timestamp Unix.
+    pub(crate) fn builtin_fecha_anio(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let unix = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let fn_id = self.asegurar_funcion_c("falcato_fecha_anio", &[types::I64], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[unix]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// fecha_mes(unix: Entero64) -> Entero32
+    /// Retorna el mes (1-12) de un timestamp Unix.
+    pub(crate) fn builtin_fecha_mes(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let unix = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let fn_id = self.asegurar_funcion_c("falcato_fecha_mes", &[types::I64], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[unix]);
+        Ok(builder.inst_results(call)[0])
+    }
+
+    /// fecha_dia(unix: Entero64) -> Entero32
+    /// Retorna el día del mes (1-31) de un timestamp Unix.
+    pub(crate) fn builtin_fecha_dia(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let unix = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let fn_id = self.asegurar_funcion_c("falcato_fecha_dia", &[types::I64], Some(types::I32));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[unix]);
+        Ok(builder.inst_results(call)[0])
+    }
+
     // ============================================================
     // DHT distribuido (R8.2)
     // ============================================================

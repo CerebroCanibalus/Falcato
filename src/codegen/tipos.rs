@@ -180,7 +180,16 @@ impl Codegen {
             Tipo::Resultado(_, _) => types::I64, // Puntero
             Tipo::Option(_) => types::I64, // R7.7 F2: packed (tag low 32, data high 32)
             Tipo::Generico(n) => panic!("No se puede compilar tipo genÃƒÂ©rico '{}' sin concretar", n),
-            Tipo::Nombre(n) => panic!("No se puede compilar tipo Nombre '{}' sin resolver (Ã‚Â¿olvidaste importarlo?)", n),
+            Tipo::Nombre(n) => {
+                // R9.0.x — como tamano_tipo: si el struct está registrado, es puntero (I64)
+                // (los structs se pasan por referencia, no por valor, en el ABI C).
+                if self.structs.contains_key(n) || self.enums.contains_key(n) {
+                    types::I64
+                } else {
+                    // MEJORA-003: mensaje descriptivo antes del panic
+                    panic!("Tipo '{}' no resuelto en tipo_a_cranelift. Causas posibles: (1) struct no importado (usar modulo::{};), (2) nombre mal escrito, (3) archivo no incluido en build multi-archivo.", n, n)
+                }
+            },
             Tipo::NombreGenerico(n, _) => panic!("Tipo NombreGenerico '{}' no se pudo resolver (Ã‚Â¿olvidaste concretar genÃƒÂ©ricos?)", n),
         }
     }
@@ -323,10 +332,21 @@ impl Codegen {
                       "archivo_leer" => Tipo::Texto,
                       "archivo_listar" => Tipo::Vector(Box::new(Tipo::Texto)),
                       "vector_nuevo" => Tipo::Vector(Box::new(Tipo::Entero32)),
+                    "vector_poner" => {
+                        // R9.0.x Â vector_poner<T>(v, i, val) retorna T (val).
+                        if llamada.tipo_args.len() == 1 {
+                            llamada.tipo_args[0].clone()
+                        } else {
+                            Tipo::Entero32
+                        }
+                    },
                     "canal_nuevo" => Tipo::Entero64,
                     "tcp_vincular" | "tcp_aceptar" => Tipo::Entero64,
                     "abs" | "max" | "min" | "texto_longitud" | "texto_comparar" | "archivo_escribir" => {
                         Tipo::Entero32
+                    }
+                    "texto_igual" | "texto_desigual" | "archivo_existe" | "texto_obtener_byte" => {
+                        Tipo::Booleano
                     }
                     "tamano_de" => Tipo::Entero32,
                     "raiz" | "potencia" | "seno" | "coseno" | "tangente" | "arcseno" | "arccoseno" | "arctangente" | "arctangente2" | "senoh" | "cosenoh" | "tangenteh" | "exp" | "log" | "log10" | "piso" | "techo" | "fabs" | "fmod" | "seno_preciso" | "coseno_preciso" | "tangente_preciso" | "exp_preciso" | "log_preciso" | "seno_rapido" | "coseno_rapido" | "seno_2pi" | "coseno_2pi" | "exp_rapido" | "log_rapido" | "seno_aprox" => Tipo::Flotante64,
@@ -366,6 +386,15 @@ impl Codegen {
     pub(crate) fn inferir_tipo_rango(&self, inicio: &Expresion, variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>) -> Tipo {
         self.inferir_tipo(inicio, variables)
     }
+    /// FIX (BUG-001, retorno sin tipo): infiere el tipo de una expresión `retornar <expr>`
+    /// sin necesidad del HashMap de variables (usa un HashMap vacío).
+    /// Usado por `compilar_funcion` y `declarar_funcion` para descubrir el tipo de retorno
+    /// cuando func.retorno es None pero la última sentencia es `retornar <expr>;`.
+    pub(crate) fn inferir_tipo_expr_retorno(&self, expr: &Expresion) -> Tipo {
+        let vacio: HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)> = HashMap::new();
+        self.inferir_tipo(expr, &vacio)
+    }
+
 
     /// ¿Es un tipo numérico (entero o flotante)?
     pub(crate) fn es_tipo_numerico(&self, tipo: &Tipo) -> bool {

@@ -1,0 +1,132 @@
+// libEst::texto - Operaciones sobre Texto y Palabra
+// Delega a builtins Rust del runtime
+
+// Creacion
+el función texto_nuevo() -> Texto {
+    retornar texto_desde("");
+}
+
+el función texto_desde(la palabra: Palabra) -> Texto {
+    retornar palabra;
+}
+
+// Inspección
+el función texto_longitud(la t: Texto) -> Entero32 {
+    retornar texto_longitud(t);
+}
+
+el función texto_esta_vacio(la t: Texto) -> Booleano {
+    retornar texto_longitud(t) == 0;
+}
+
+el función texto_contiene(la t: Texto, la sub: Texto) -> Booleano {
+    retornar texto_contiene(t, sub);
+}
+
+el función texto_empieza_con(la t: Texto, la prefijo: Texto) -> Booleano {
+    retornar texto_empieza_con(t, prefijo);
+}
+
+el función texto_termina_con(la t: Texto, la sufijo: Texto) -> Booleano {
+    retornar texto_termina_con(t, sufijo);
+}
+
+// Manipulación
+el función texto_concatenar(la a: Texto, la b: Texto) -> Texto {
+    retornar texto_concatenar(a, b);
+}
+
+el función texto_reemplazar(la t: Texto, la de: Texto, la a: Texto) -> Texto {
+    retornar texto_reemplazar(t, de, a);
+}
+
+el función texto_recortar(la t: Texto) -> Texto {
+    retornar texto_recortar(t);
+}
+
+el función texto_mayusculas(la t: Texto) -> Texto {
+    retornar texto_mayusculas(t);
+}
+
+el función texto_minusculas(la t: Texto) -> Texto {
+    retornar texto_minusculas(t);
+}
+
+// Segmentación
+el función texto_dividir(la t: Texto, la sep: Texto) -> Vector<Texto> {
+    el resultado: Vector<Texto> = vector_nuevo<Texto>();
+    el largo_sep: Entero32 = texto_longitud(sep);
+    si largo_sep == 0 {
+        vector_agregar(resultado, t);
+        retornar resultado;
+    }
+    el largo_t: Entero32 = texto_longitud(t);
+    el inicio: Entero32 = 0;
+    el i: Entero32 = 0;
+    mientras i <= largo_t - largo_sep {
+        el sub: Texto = texto_subtexto(t, i, i + largo_sep);
+        si texto_comparar(sub, sep) == 0 {
+            el parte: Texto = texto_subtexto(t, inicio, i);
+            vector_agregar(resultado, parte);
+            inicio = i + largo_sep;
+            i = i + largo_sep;
+        } sino {
+            i = i + 1;
+        }
+    }
+    vector_agregar(resultado, texto_subtexto(t, inicio, largo_t));
+    retornar resultado;
+}
+
+el función texto_subtexto(la t: Texto, la inicio: Entero32, la fin: Entero32) -> Texto {
+    retornar texto_subtexto(t, inicio, fin);
+}
+
+// Conversión - delega directamente al builtin (retorna el valor crudo)
+el función texto_a_entero(la t: Texto) -> Entero64 {
+    retornar texto_a_entero(t);
+}
+
+el función texto_a_natural(la t: Texto) -> Natural64 {
+    retornar texto_a_natural(t);
+}
+
+el función texto_a_flotante(la t: Texto) -> Flotante64 {
+    retornar texto_a_flotante(t);
+}
+
+el función texto_a_booleano(la t: Texto) -> Booleano {
+    retornar texto_a_booleano(t);
+}
+
+el función texto_a_bytes(la t: Texto) -> Vector<Entero8> {
+    el resultado: Vector<Entero8> = vector_nuevo<Entero8>();
+    texto_a_bytes(t, resultado);
+    retornar resultado;
+}
+
+// Comparación
+el función texto_comparar(la a: Texto, la b: Texto) -> Entero32 {
+    retornar texto_comparar(a, b);
+}
+
+el función texto_es_igual(la a: Texto, la b: Texto) -> Booleano {
+    retornar texto_comparar(a, b) == 0;
+}
+
+el función texto_es_diferente(la a: Texto, la b: Texto) -> Booleano {
+    retornar texto_comparar(a, b) != 0;
+}
+
+// Codificación Base64
+el función texto_codificar_base64(la t: Texto) -> Texto {
+    el resultado: Texto = texto_desde("");
+    texto_codificar_base64(t, resultado);
+    retornar resultado;
+}
+
+el función texto_decodificar_base64(la t: Texto) -> Texto {
+    el resultado: Texto = texto_desde("");
+    texto_decodificar_base64(t, resultado);
+    retornar resultado;
+}

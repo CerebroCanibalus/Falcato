@@ -1,0 +1,28 @@
+// libEst::visual::color — Colores y paletas
+// Stub base para 0.9.x
+
+estructural Color {
+    r: Entero8,
+    g: Entero8,
+    b: Entero8,
+    a: Entero8,
+}
+
+el función color_nuevo(r: Entero8, g: Entero8, b: Entero8) -> Color {
+    retornar Color { r: r, g: g, b: b, a: 255 };
+}
+
+el función color_rojo(c: Color) -> Entero8 { retornar c.r; }
+el función color_verde(c: Color) -> Entero8 { retornar c.g; }
+el función color_azul(c: Color) -> Entero8 { retornar c.b; }
+el función color_alfa(c: Color) -> Entero8 { retornar c.a; }
+
+el función color_desde_hex(hex: Entero32) -> Color {
+    // TODO: implementar extracción de bytes
+    retornar Color { r: 0, g: 0, b: 0, a: 255 };
+}
+
+el función color_mezclar(a: Color, b: Color, t: Flotante64) -> Color {
+    // TODO: implementar interpolación
+    retornar a;
+}

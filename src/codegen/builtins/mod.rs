@@ -13,3 +13,7 @@ pub mod diccionario;
 pub mod proceso;
 pub mod sistema;
 pub mod tls;
+pub mod http;
+pub mod json;
+pub mod opcion;
+pub mod visual;

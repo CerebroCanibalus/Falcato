@@ -130,6 +130,10 @@ impl BuiltinRegistry {
         // Reloj de pared (R7.4)
         r.insert("fecha_unix", "falcato_fecha_unix", &[], Some(types::I64));
         r.insert("fecha_ms", "falcato_fecha_ms", &[], Some(types::I64));
+        r.insert("fecha_anio", "falcato_fecha_anio", &[types::I64], Some(types::I32));
+        r.insert("fecha_mes", "falcato_fecha_mes", &[types::I64], Some(types::I32));
+        r.insert("fecha_dia", "falcato_fecha_dia", &[types::I64], Some(types::I32));
+        r.insert("archivo_tamano", "falcato_archivo_tamano", &[types::I64], Some(types::I64));
 
         // Argumentos de línea de comandos (R7.5)
         r.insert("argumentos", "falcato_argumentos", &[], Some(types::I64));
@@ -177,6 +181,76 @@ impl BuiltinRegistry {
         r.insert("texto_puntero", "falcato_texto_puntero", &[types::I64], Some(types::I64));
         r.insert("texto_desde_bytes", "falcato_texto_desde_bytes", &[types::I64, types::I32, types::I64], None);
 
+        // Texto búsqueda y transformación (libEst)
+        r.insert("texto_contiene", "falcato_texto_contiene", &[types::I64, types::I64], Some(types::I32));
+        r.insert("texto_reemplazar", "falcato_texto_reemplazar", &[types::I64, types::I64, types::I64, types::I64], None);
+        r.insert("texto_mayusculas", "falcato_texto_mayusculas", &[types::I64, types::I64], None);
+        r.insert("texto_minusculas", "falcato_texto_minusculas", &[types::I64, types::I64], None);
+        r.insert("texto_recortar", "falcato_texto_recortar", &[types::I64, types::I64], None);
+        r.insert("texto_empieza_con", "falcato_texto_empieza_con", &[types::I64, types::I64], Some(types::I32));
+        r.insert("texto_termina_con", "falcato_texto_termina_con", &[types::I64, types::I64], Some(types::I32));
+        r.insert("texto_a_bytes", "falcato_texto_a_bytes", &[types::I64, types::I64], None);
+        r.insert("texto_codificar_base64", "falcato_texto_codificar_base64", &[types::I64, types::I64], None);
+        r.insert("texto_decodificar_base64", "falcato_texto_decodificar_base64", &[types::I64, types::I64], None);
+        r.insert("texto_dividir", "falcato_texto_dividir", &[types::I64, types::I64, types::I64], None);
+
+        // Vector (libEst)
+        r.insert("vector_contiene", "falcato_vector_contiene", &[types::I64, types::I64], Some(types::I8));
+        r.insert("vector_indice_de", "falcato_vector_indice_de", &[types::I64, types::I64], Some(types::I32));
+        r.insert("vector_clonar", "falcato_vector_clonar", &[types::I64], Some(types::I64));
+        r.insert("vector_invertir", "falcato_vector_invertir", &[types::I64], None);
+        r.insert("vector_limpiar", "falcato_vector_limpiar", &[types::I64], None);
+
+        // Opción/Resultado (libEst)
+        r.insert("opcion_es_alguno", "falcato_opcion_es_alguno", &[types::I64], Some(types::I8));
+        r.insert("opcion_es_ninguno", "falcato_opcion_es_ninguno", &[types::I64], Some(types::I8));
+        r.insert("resultado_es_exito", "falcato_resultado_es_exito", &[types::I64], Some(types::I8));
+        r.insert("resultado_es_error", "falcato_resultado_es_error", &[types::I64], Some(types::I8));
+
+        // Diccionario/Conjunto (libEst)
+        r.insert("diccionario_claves", "falcato_diccionario_claves", &[types::I64, types::I64, types::I32, types::I32], None);
+        r.insert("diccionario_valores", "falcato_diccionario_valores", &[types::I64, types::I64, types::I32, types::I32], None);
+        r.insert("diccionario_limpiar", "falcato_diccionario_limpiar", &[types::I64, types::I32, types::I32], None);
+        r.insert("conjunto_elementos", "falcato_conjunto_elementos", &[types::I64, types::I64, types::I32], None);
+
+        // Visual — Ventana (Win32)
+        r.insert("ventana_nueva", "falcato_ventana_nueva", &[types::I64, types::I32, types::I32], Some(types::I64));
+        r.insert("ventana_mostrar", "falcato_ventana_mostrar", &[types::I64], None);
+        r.insert("ventana_cerrar", "falcato_ventana_cerrar", &[types::I64], None);
+        r.insert("ventana_bucle_mensajes", "falcato_ventana_bucle_mensajes", &[types::I64], Some(types::I32));
+        r.insert("ventana_titulo", "falcato_ventana_titulo", &[types::I64, types::I64], None);
+        r.insert("ventana_establecer_titulo", "falcato_ventana_establecer_titulo", &[types::I64, types::I64], None);
+        r.insert("ventana_posicion", "falcato_ventana_posicion", &[types::I64, types::I64], None);
+        r.insert("ventana_tamano", "falcato_ventana_tamano", &[types::I64, types::I64], None);
+
+        // Visual — Lienzo (GDI)
+        r.insert("lienzo_nuevo", "falcato_lienzo_nuevo", &[types::I32, types::I32], Some(types::I64));
+        r.insert("lienzo_limpiar", "falcato_lienzo_limpiar", &[types::I64, types::I32], None);
+        r.insert("lienzo_linea", "falcato_lienzo_linea", &[types::I64, types::I32, types::I32, types::I32, types::I32], None);
+        r.insert("lienzo_rectangulo", "falcato_lienzo_rectangulo", &[types::I64, types::I32, types::I32, types::I32, types::I32], None);
+        r.insert("lienzo_circulo", "falcato_lienzo_circulo", &[types::I64, types::I32, types::I32, types::I32], None);
+        r.insert("lienzo_texto", "falcato_lienzo_texto", &[types::I64, types::I32, types::I32, types::I64], None);
+        r.insert("lienzo_guardar_png", "falcato_lienzo_guardar_png", &[types::I64, types::I64], Some(types::I32));
+        r.insert("lienzo_liberar", "falcato_lienzo_liberar", &[types::I64], None);
+
+        // Visual — Imagen (stb_image stub)
+        r.insert("imagen_desde_archivo", "falcato_imagen_desde_archivo", &[types::I64, types::I64], Some(types::I32));
+        r.insert("imagen_ancho", "falcato_imagen_ancho", &[types::I64], Some(types::I32));
+        r.insert("imagen_alto", "falcato_imagen_alto", &[types::I64], Some(types::I32));
+        r.insert("imagen_redimensionar", "falcato_imagen_redimensionar", &[types::I64, types::I32, types::I32, types::I64], None);
+        r.insert("imagen_guardar_png", "falcato_imagen_guardar_png", &[types::I64, types::I64], Some(types::I32));
+        r.insert("imagen_liberar", "falcato_imagen_liberar", &[types::I64], None);
+
+        // Visual — Sonido (stub)
+        r.insert("audio_nuevo", "falcato_audio_nuevo", &[types::I32, types::I32, types::I64], None);
+        r.insert("audio_desde_archivo", "falcato_audio_desde_archivo", &[types::I64, types::I64], Some(types::I32));
+        r.insert("audio_tono", "falcato_audio_tono", &[types::F64, types::I32, types::I32, types::I32, types::I64], None);
+        r.insert("audio_mezclar", "falcato_audio_mezclar", &[types::I64, types::I64, types::I64], None);
+        r.insert("audio_fade_in", "falcato_audio_fade_in", &[types::I64, types::I32], None);
+        r.insert("audio_fade_out", "falcato_audio_fade_out", &[types::I64, types::I32], None);
+        r.insert("audio_guardar_wav", "falcato_audio_guardar_wav", &[types::I64, types::I64], Some(types::I32));
+        r.insert("audio_reproducir", "falcato_audio_reproducir", &[types::I64], Some(types::I32));
+
         // Conversión numérica
         r.insert("entero_a_texto", "falcato_entero_a_texto", &[types::I64, types::I64], None);
         r.insert("flotante_a_texto", "falcato_flotante_a_texto", &[types::I64, types::I64], None);
@@ -198,6 +272,16 @@ impl BuiltinRegistry {
         r.insert("tls_leer", "falcato_tls_leer", &[types::I64, types::I64, types::I32], Some(types::I32));
         r.insert("tls_datos_disponibles", "falcato_tls_datos_disponibles", &[types::I64], Some(types::I32));
         r.insert("tls_cerrar", "falcato_tls_cerrar", &[types::I64], None);
+
+        // HTTP Client (libEst)
+        r.insert("http_get", "falcato_http_get", &[types::I64, types::I32, types::I64, types::I64], Some(types::I32));
+        r.insert("http_post", "falcato_http_post", &[types::I64, types::I32, types::I64, types::I64, types::I64], Some(types::I32));
+
+        // JSON (libEst)
+        r.insert("json_parsear", "falcato_json_parsear", &[types::I64, types::I64], Some(types::I32));
+        r.insert("json_serializar", "falcato_json_serializar", &[types::I64, types::I64], None);
+        r.insert("json_escapar", "falcato_json_escapar", &[types::I64, types::I64], None);
+        r.insert("json_obtener", "falcato_json_obtener", &[types::I64, types::I64, types::I64], Some(types::I32));
 
         r
     }
@@ -272,6 +356,10 @@ impl BuiltinRegistry {
         // Reloj de pared (R7.4)
         r.insert("fecha_unix", "falcato_fecha_unix", &[], Some(types::I64));
         r.insert("fecha_ms", "falcato_fecha_ms", &[], Some(types::I64));
+        r.insert("fecha_anio", "falcato_fecha_anio", &[types::I64], Some(types::I32));
+        r.insert("fecha_mes", "falcato_fecha_mes", &[types::I64], Some(types::I32));
+        r.insert("fecha_dia", "falcato_fecha_dia", &[types::I64], Some(types::I32));
+        r.insert("archivo_tamano", "falcato_archivo_tamano", &[types::I64], Some(types::I64));
 
         // Argumentos de línea de comandos (R7.5)
         r.insert("argumentos", "falcato_argumentos", &[], Some(types::I64));
@@ -317,6 +405,76 @@ impl BuiltinRegistry {
         r.insert("texto_puntero", "falcato_texto_puntero", &[types::I64], Some(types::I64));
         r.insert("texto_desde_bytes", "falcato_texto_desde_bytes", &[types::I64, types::I32, types::I64], None);
 
+        // Texto búsqueda y transformación (libEst)
+        r.insert("texto_contiene", "falcato_texto_contiene", &[types::I64, types::I64], Some(types::I32));
+        r.insert("texto_reemplazar", "falcato_texto_reemplazar", &[types::I64, types::I64, types::I64, types::I64], None);
+        r.insert("texto_mayusculas", "falcato_texto_mayusculas", &[types::I64, types::I64], None);
+        r.insert("texto_minusculas", "falcato_texto_minusculas", &[types::I64, types::I64], None);
+        r.insert("texto_recortar", "falcato_texto_recortar", &[types::I64, types::I64], None);
+        r.insert("texto_empieza_con", "falcato_texto_empieza_con", &[types::I64, types::I64], Some(types::I32));
+        r.insert("texto_termina_con", "falcato_texto_termina_con", &[types::I64, types::I64], Some(types::I32));
+        r.insert("texto_a_bytes", "falcato_texto_a_bytes", &[types::I64, types::I64], None);
+        r.insert("texto_codificar_base64", "falcato_texto_codificar_base64", &[types::I64, types::I64], None);
+        r.insert("texto_decodificar_base64", "falcato_texto_decodificar_base64", &[types::I64, types::I64], None);
+        r.insert("texto_dividir", "falcato_texto_dividir", &[types::I64, types::I64, types::I64], None);
+
+        // Vector (libEst)
+        r.insert("vector_contiene", "falcato_vector_contiene", &[types::I64, types::I64], Some(types::I8));
+        r.insert("vector_indice_de", "falcato_vector_indice_de", &[types::I64, types::I64], Some(types::I32));
+        r.insert("vector_clonar", "falcato_vector_clonar", &[types::I64], Some(types::I64));
+        r.insert("vector_invertir", "falcato_vector_invertir", &[types::I64], None);
+        r.insert("vector_limpiar", "falcato_vector_limpiar", &[types::I64], None);
+
+        // Opción/Resultado (libEst)
+        r.insert("opcion_es_alguno", "falcato_opcion_es_alguno", &[types::I64], Some(types::I8));
+        r.insert("opcion_es_ninguno", "falcato_opcion_es_ninguno", &[types::I64], Some(types::I8));
+        r.insert("resultado_es_exito", "falcato_resultado_es_exito", &[types::I64], Some(types::I8));
+        r.insert("resultado_es_error", "falcato_resultado_es_error", &[types::I64], Some(types::I8));
+
+        // Diccionario/Conjunto (libEst)
+        r.insert("diccionario_claves", "falcato_diccionario_claves", &[types::I64, types::I64, types::I32, types::I32], None);
+        r.insert("diccionario_valores", "falcato_diccionario_valores", &[types::I64, types::I64, types::I32, types::I32], None);
+        r.insert("diccionario_limpiar", "falcato_diccionario_limpiar", &[types::I64, types::I32, types::I32], None);
+        r.insert("conjunto_elementos", "falcato_conjunto_elementos", &[types::I64, types::I64, types::I32], None);
+
+        // Visual — Ventana (Win32)
+        r.insert("ventana_nueva", "falcato_ventana_nueva", &[types::I64, types::I32, types::I32], Some(types::I64));
+        r.insert("ventana_mostrar", "falcato_ventana_mostrar", &[types::I64], None);
+        r.insert("ventana_cerrar", "falcato_ventana_cerrar", &[types::I64], None);
+        r.insert("ventana_bucle_mensajes", "falcato_ventana_bucle_mensajes", &[types::I64], Some(types::I32));
+        r.insert("ventana_titulo", "falcato_ventana_titulo", &[types::I64, types::I64], None);
+        r.insert("ventana_establecer_titulo", "falcato_ventana_establecer_titulo", &[types::I64, types::I64], None);
+        r.insert("ventana_posicion", "falcato_ventana_posicion", &[types::I64, types::I64], None);
+        r.insert("ventana_tamano", "falcato_ventana_tamano", &[types::I64, types::I64], None);
+
+        // Visual — Lienzo (GDI)
+        r.insert("lienzo_nuevo", "falcato_lienzo_nuevo", &[types::I32, types::I32], Some(types::I64));
+        r.insert("lienzo_limpiar", "falcato_lienzo_limpiar", &[types::I64, types::I32], None);
+        r.insert("lienzo_linea", "falcato_lienzo_linea", &[types::I64, types::I32, types::I32, types::I32, types::I32], None);
+        r.insert("lienzo_rectangulo", "falcato_lienzo_rectangulo", &[types::I64, types::I32, types::I32, types::I32, types::I32], None);
+        r.insert("lienzo_circulo", "falcato_lienzo_circulo", &[types::I64, types::I32, types::I32, types::I32], None);
+        r.insert("lienzo_texto", "falcato_lienzo_texto", &[types::I64, types::I32, types::I32, types::I64], None);
+        r.insert("lienzo_guardar_png", "falcato_lienzo_guardar_png", &[types::I64, types::I64], Some(types::I32));
+        r.insert("lienzo_liberar", "falcato_lienzo_liberar", &[types::I64], None);
+
+        // Visual — Imagen (stb_image stub)
+        r.insert("imagen_desde_archivo", "falcato_imagen_desde_archivo", &[types::I64, types::I64], Some(types::I32));
+        r.insert("imagen_ancho", "falcato_imagen_ancho", &[types::I64], Some(types::I32));
+        r.insert("imagen_alto", "falcato_imagen_alto", &[types::I64], Some(types::I32));
+        r.insert("imagen_redimensionar", "falcato_imagen_redimensionar", &[types::I64, types::I32, types::I32, types::I64], None);
+        r.insert("imagen_guardar_png", "falcato_imagen_guardar_png", &[types::I64, types::I64], Some(types::I32));
+        r.insert("imagen_liberar", "falcato_imagen_liberar", &[types::I64], None);
+
+        // Visual — Sonido (stub)
+        r.insert("audio_nuevo", "falcato_audio_nuevo", &[types::I32, types::I32, types::I64], None);
+        r.insert("audio_desde_archivo", "falcato_audio_desde_archivo", &[types::I64, types::I64], Some(types::I32));
+        r.insert("audio_tono", "falcato_audio_tono", &[types::F64, types::I32, types::I32, types::I32, types::I64], None);
+        r.insert("audio_mezclar", "falcato_audio_mezclar", &[types::I64, types::I64, types::I64], None);
+        r.insert("audio_fade_in", "falcato_audio_fade_in", &[types::I64, types::I32], None);
+        r.insert("audio_fade_out", "falcato_audio_fade_out", &[types::I64, types::I32], None);
+        r.insert("audio_guardar_wav", "falcato_audio_guardar_wav", &[types::I64, types::I64], Some(types::I32));
+        r.insert("audio_reproducir", "falcato_audio_reproducir", &[types::I64], Some(types::I32));
+
         // Conversión numérica
         r.insert("entero_a_texto", "falcato_entero_a_texto", &[types::I64, types::I64], None);
         r.insert("flotante_a_texto", "falcato_flotante_a_texto", &[types::I64, types::I64], None);
@@ -338,6 +496,16 @@ impl BuiltinRegistry {
         r.insert("tls_leer", "falcato_tls_leer", &[types::I64, types::I64, types::I32], Some(types::I32));
         r.insert("tls_datos_disponibles", "falcato_tls_datos_disponibles", &[types::I64], Some(types::I32));
         r.insert("tls_cerrar", "falcato_tls_cerrar", &[types::I64], None);
+
+        // HTTP Client (libEst)
+        r.insert("http_get", "falcato_http_get", &[types::I64, types::I32, types::I64, types::I64], Some(types::I32));
+        r.insert("http_post", "falcato_http_post", &[types::I64, types::I32, types::I64, types::I64, types::I64], Some(types::I32));
+
+        // JSON (libEst)
+        r.insert("json_parsear", "falcato_json_parsear", &[types::I64, types::I64], Some(types::I32));
+        r.insert("json_serializar", "falcato_json_serializar", &[types::I64, types::I64], None);
+        r.insert("json_escapar", "falcato_json_escapar", &[types::I64, types::I64], None);
+        r.insert("json_obtener", "falcato_json_obtener", &[types::I64, types::I64, types::I64], Some(types::I32));
 
         r
     }

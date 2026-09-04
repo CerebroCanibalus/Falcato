@@ -23,13 +23,26 @@ impl Codegen {
         // Crear firma para la funciÃ³n
         let mut sig = Signature::new(self.call_conv_default());
         // R9.0.1 — Retorno de struct → sret (puntero oculto como primer parámetro).
-        let ret_es_struct = match &func.retorno {
+        // R9.0.1 — Retorno de struct ← sret (puntero oculto como primer parႡ₡metro).
+        // FIX: si func.retorno es None pero la última sentencia es `retornar <expr>;`,
+        // inferir el tipo de retorno de la expresión (sino el verifier Cranelift falla
+        // con `return type mismatch` cuando el cuerpo emite `return v0` sin tener AbiParam).
+        let retorno_inferido: Option<Tipo> = if func.retorno.is_none() {
+            if let Some(crate::ast::Sentencia::Retornar(Some(expr), _)) = func.cuerpo.sentencias.last() {
+                Some(self.inferir_tipo_expr_retorno(expr))
+            } else {
+                None
+            }
+        } else {
+            func.retorno.clone()
+        };
+        let ret_es_struct = match &retorno_inferido {
             Some(ret) => self.tipo_es_struct(ret).is_some(),
             None => false,
         };
-        if let Some(ref ret) = func.retorno {
+        if let Some(ref ret) = retorno_inferido {
             if *ret == Tipo::Vacio {
-                // Vacío → void, sin retorno
+                // Vacío ← void, sin retorno
             } else if !ret_es_struct {
                 sig.returns.push(AbiParam::new(self.tipo_a_cranelift(ret)));
             }
@@ -147,7 +160,11 @@ impl Codegen {
         self.liberar_scope(0, &mut builder, &variables)?;
 
         // Si no hay retorno explÃ­cito, aÃ±adir retorno void
-        if func.retorno.is_none() || matches!(func.retorno, Some(Tipo::Vacio)) {
+        let ultimo_es_retornar = matches!(
+            func.cuerpo.sentencias.last(),
+            Some(crate::ast::Sentencia::Retornar(_, _))
+        );
+        if !ultimo_es_retornar && (func.retorno.is_none() || matches!(func.retorno, Some(Tipo::Vacio))) {
             builder.ins().return_(&[]);
         }
 
@@ -811,7 +828,11 @@ impl Codegen {
             self.compilar_sentencia(sentencia, &mut builder, &mut variables, &func.span)?;
         }
 
-        if func.retorno.is_none() || matches!(func.retorno, Some(Tipo::Vacio)) {
+        let ultimo_es_retornar = matches!(
+            func.cuerpo.sentencias.last(),
+            Some(crate::ast::Sentencia::Retornar(_, _))
+        );
+        if !ultimo_es_retornar && (func.retorno.is_none() || matches!(func.retorno, Some(Tipo::Vacio))) {
             builder.ins().return_(&[]);
         }
 

@@ -370,4 +370,29 @@ impl Codegen {
         Ok(desc_out)
     }
 
+    /// archivo_tamano(ruta: Texto) -> Entero64
+    /// Retorna el tamaño de un archivo en bytes, o -1 si hay error.
+    pub(crate) fn builtin_archivo_tamano(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let ruta_val = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let tipo_ruta = self.inferir_tipo(&argumentos[0], variables);
+
+        let c_ruta = if tipo_ruta == crate::ast::Tipo::Texto {
+            let ptr = self.cargar_campo_descriptor(builder, ruta_val, Self::OFFSET_PTR);
+            ptr
+        } else {
+            ruta_val
+        };
+
+        // falcato_archivo_tamano(ruta: i64) -> i64
+        let fn_id = self.asegurar_funcion_c("falcato_archivo_tamano", &[types::I64], Some(types::I64));
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        let call = builder.ins().call(fn_ref, &[c_ruta]);
+        Ok(builder.inst_results(call)[0])
+    }
+
 }

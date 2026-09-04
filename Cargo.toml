@@ -1,6 +1,6 @@
 [package]
 name = "falcato"
-version = "0.7.6"
+version = "0.8.0-beta.1"
 edition = "2021"
 authors = ["Falcato Team"]
 description = "Lenguaje de programación de sistemas iberohablante sobre Cranelift"
@@ -48,6 +48,7 @@ anyhow = "1.0"
 # Paquetes (R8): formato falcato.toml / falcato.lock
 toml = "0.8"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
 
 [dev-dependencies]
 assert_cmd = "2.0"

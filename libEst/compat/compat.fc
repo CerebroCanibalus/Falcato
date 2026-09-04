@@ -1,0 +1,17 @@
+// libEst::compat — Aliases de builtins viejos (P-005)
+// Mantener durante 2-3 releases para compatibilidad
+// Después de 0.10.0, eliminar estos aliases
+
+// Texto
+apodo texto_agregar_texto = texto_concatenar;
+apodo texto_longitud_old = texto_longitud;
+apodo texto_contiene_old = texto_contiene;
+
+// Archivo
+apodo archivo_leer_old = archivo_leer;
+apodo archivo_escribir_old = archivo_escribir;
+apodo archivo_agregar_old = archivo_agregar;
+apodo archivo_existe_old = archivo_existe;
+
+// Red
+apodo tcp_conectar_old = tcp_conectar;

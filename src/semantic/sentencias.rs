@@ -330,12 +330,21 @@ No puedes modificar algo que no es 'tuyo'.",
                             Some("Usa una comparación explícita (==, !=) o cambia el tipo de la variable".to_string())
                         );
                     }
-                } else if tipo_cond != Tipo::Booleano {
+                } else if !matches!(&tipo_cond,
+                    Tipo::Booleano |
+                    // R9.0.x Â MEJORA-002: enteros/punteros son válidos en `si`
+                    // (tratados como truthy: 0 = falso, !=0 = verdadero).
+                    // Caso principal: `si texto_comparar(a, b) { }` (devuelve Entero32).
+                    Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64 |
+                    Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64 |
+                    Tipo::Caracter |
+                    Tipo::Palabra | Tipo::Puntero(_)
+                ) {
                     self.reportar_error(
                         CategoriaError::Tipo,
                         CONDICIONAL_NO_BOOLEANO,
                         &cond.span,
-                        format!("La condición 'si' requiere un valor Booleano, encontrado '{:?}'", tipo_cond),
+                        format!("La condición 'si' requiere un valor Booleano o entero, encontrado '{:?}'", tipo_cond),
                         Some("Usa una comparación (==, !=, <, >) o una variable Booleano".to_string())
                     );
                 }
@@ -354,12 +363,19 @@ No puedes modificar algo que no es 'tuyo'.",
             }
             Sentencia::BucleMientras(bucle) => {
                 let tipo_cond = self.inferir_tipo(&bucle.condicion);
-                if tipo_cond != Tipo::Booleano {
+                // R9.0.x Â MEJORA-002: igual que `si`, enteros/punteros válidos
+                if !matches!(&tipo_cond,
+                    Tipo::Booleano |
+                    Tipo::Entero8 | Tipo::Entero16 | Tipo::Entero32 | Tipo::Entero64 |
+                    Tipo::Natural8 | Tipo::Natural16 | Tipo::Natural32 | Tipo::Natural64 |
+                    Tipo::Caracter |
+                    Tipo::Palabra | Tipo::Puntero(_)
+                ) {
                     self.reportar_error(
                         CategoriaError::Tipo,
                         BUCLE_NO_BOOLEANO,
                         &bucle.span,
-                        format!("La condición 'mientras' requiere un valor Booleano, encontrado '{:?}'", tipo_cond),
+                        format!("La condición 'mientras' requiere un valor Booleano o entero, encontrado '{:?}'", tipo_cond),
                         Some("Usa una comparación (==, !=, <, >) o una variable Booleano".to_string())
                     );
                 }

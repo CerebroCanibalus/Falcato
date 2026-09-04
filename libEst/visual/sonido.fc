@@ -1,0 +1,11 @@
+// libEst::visual::sonido — Audio, buffers PCM, efectos (DAW R9.3)
+// Los builtins se llaman directamente desde Falcato
+
+// Uso:
+//   el audio: Audio = audio_nuevo(2, 44100);
+//   el tono: Audio = audio_tono(440.0, 1000, 2, 44100); // La 440Hz, 1 segundo
+//   audio_fade_in(tono, 100);
+//   audio_fade_out(tono, 100);
+//   el mezcla: Audio = audio_mezclar(audio, tono);
+//   audio_guardar_wav(mezcla, "salida.wav");
+//   audio_reproducir(mezcla);

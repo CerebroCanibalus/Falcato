@@ -1,0 +1,58 @@
+// libEst::red::tcp - Operaciones TCP
+// Implementadas sobre builtins del compiler
+
+// Conexion
+el función tcp_conectar(el host: Texto, el puerto: Entero32) -> Entero32 {
+    retornar tcp_conectar(host, puerto);
+}
+
+// Lectura/Escritura
+el función tcp_enviar(el conexion: Entero32, el datos: Texto) -> Entero32 {
+    retornar send(conexion, datos, texto_longitud(datos));
+}
+
+el función tcp_recibir(el conexion: Entero32, el tamano: Entero32) -> Texto {
+    el buf: Texto = texto_desde("");
+    el recibido: Entero32 = recv(conexion, buf, tamano);
+    retornar buf;
+}
+
+// Gestion
+el función tcp_cerrar(el conexion: Entero32) {
+    close_socket(conexion);
+}
+
+el función tcp_establecer_timeout(el conexion: Entero32, el milisegundos: Entero32) {
+    tcp_establecer_timeout(conexion, milisegundos);
+}
+
+el función tcp_datos_disponibles(el conexion: Entero32) -> Entero32 {
+    retornar tcp_datos_disponibles(conexion);
+}
+
+// DNS
+el función dns_resolver(el host: Texto) -> Texto {
+    retornar dns_resolver(host);
+}
+
+// Servidor
+el función tcp_vincular(el host: Texto, el puerto: Entero32) -> Entero32 {
+    el fd: Entero32 = socket(2, 1, 0);
+    si fd < 0 {
+        retornar fd;
+    }
+    el vinculado: Entero32 = bind(fd, host, puerto);
+    si vinculado < 0 {
+        close_socket(fd);
+        retornar vinculado;
+    }
+    retornar fd;
+}
+
+el función tcp_escuchar(el fd: Entero32, el backlog: Entero32) -> Entero32 {
+    retornar listen(fd, backlog);
+}
+
+el función tcp_aceptar(el fd: Entero32) -> Entero32 {
+    retornar accept(fd);
+}

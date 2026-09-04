@@ -527,6 +527,15 @@ fn compilar(
     link_objetos(&rutas_obj, &binario, target, release)?;
 
     println!("[Falcato] Binario generado: {}", binario);
+
+    // === Mensajes post-compilación didácticos ===
+    println!();
+    println!("  [i] LibEst disponible: usar `usar libEst::*` para acceder a todas las funciones.");
+    println!("  [i] Ejemplo: usar archivo::leer, texto::contiene, http::get, json::parsear");
+    println!("  [i] Documentación: falcato.md → sección 'LibEst'");
+    println!("  [i] LSP: falcato lsp → autocompletado con hover de la libEst");
+    println!();
+
     Ok(())
 }
 
@@ -579,7 +588,9 @@ fn compilar_individual(
         .map_err(|e| format!("Error inicializando codegen: {}", e))?;
     codegen.con_emit_clif(emit_clif);
     codegen.con_nivel_memoria(nivel_memoria);
-    codegen.compilar_programa(&programa)
+    let nombre_modulo = std::path::Path::new(archivo).file_stem()
+        .and_then(|s| s.to_str()).unwrap_or("main");
+    codegen.compilar_programa(nombre_modulo, &programa)
         .map_err(|e| format!("Errores de compilación:\n{:?}", e))?;
 
     let obj_ruta = format!("{}.o", archivo.strip_suffix(".fc").unwrap_or(archivo));
@@ -597,6 +608,15 @@ fn compilar_individual(
 
     link_objeto(&obj_ruta, &binario, target, false)?;
     println!("[Falcato] Binario generado: {}", binario);
+
+    // === Mensajes post-compilación didácticos ===
+    println!();
+    println!("  [i] LibEst disponible: usar `usar libEst::*` para acceder a todas las funciones.");
+    println!("  [i] Ejemplo: usar archivo::leer, texto::contiene, http::get, json::parsear");
+    println!("  [i] Documentación: falcato.md → sección 'LibEst'");
+    println!("  [i] LSP: falcato lsp → autocompletado con hover de la libEst");
+    println!();
+
     Ok(())
 }
 
@@ -800,6 +820,12 @@ fn verificar_fuente(archivo: &str, fuente: &str, json: bool, incremental: bool) 
         if incremental {
             escribir_cache_check(archivo, fuente);
         }
+
+        // === Consejos post-verificación ===
+        println!();
+        println!("  [i] LibEst: usar `usar libEst::*` para texto, red, JSON, archivo, etc.");
+        println!("  [i] Ejemplo: usar texto::contiene, archivo::leer, http::get, json::parsear");
+        println!();
     }
 
     Ok(())
@@ -1025,7 +1051,9 @@ fn ejecutar_pruebas(archivos: &[String], _json: bool) -> Result<(), String> {
 
     let mut codegen = Codegen::nuevo("main")
         .map_err(|e| format!("Error inicializando codegen: {}", e))?;
-    codegen.compilar_programa(&programa)
+    let nombre_modulo = std::path::Path::new(archivo).file_stem()
+        .and_then(|s| s.to_str()).unwrap_or("prueba");
+    codegen.compilar_programa(nombre_modulo, &programa)
         .map_err(|e| format!("Errores de compilación:\n{:?}", e))?;
 
     let obj_ruta = format!("{}.o", archivo.strip_suffix(".fc").unwrap_or(archivo));

@@ -510,6 +510,120 @@ impl Codegen {
         self.builtin_diccionario_liberar(builder, variables, argumentos, _tipo_args)
     }
 
+    /// diccionario_claves(d: Diccionario<K,V>) -> Vector<Texto>
+    /// Extrae las claves del diccionario como vector de textos.
+    pub(crate) fn builtin_diccionario_claves(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+        tipo_args: &[Tipo],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_dict = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+
+        // Tamaños de tipos
+        let key_size = if tipo_args.len() > 0 { self.tamano_tipo(&tipo_args[0]) as i32 } else { 8 };
+        let val_size = if tipo_args.len() > 1 { self.tamano_tipo(&tipo_args[1]) as i32 } else { 8 };
+
+        let key_size_val = builder.ins().iconst(types::I32, key_size as i64);
+        let val_size_val = builder.ins().iconst(types::I32, val_size as i64);
+
+        let fn_id = self.asegurar_funcion_c(
+            "falcato_diccionario_claves",
+            &[types::I64, types::I64, types::I32, types::I32],
+            None,
+        );
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_dict, desc_out, key_size_val, val_size_val]);
+
+        Ok(desc_out)
+    }
+
+    /// diccionario_valores(d: Diccionario<K,V>) -> Vector<Texto>
+    /// Extrae los valores del diccionario como vector de textos serializados.
+    pub(crate) fn builtin_diccionario_valores(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+        tipo_args: &[Tipo],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_dict = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+
+        let key_size = if tipo_args.len() > 0 { self.tamano_tipo(&tipo_args[0]) as i32 } else { 8 };
+        let val_size = if tipo_args.len() > 1 { self.tamano_tipo(&tipo_args[1]) as i32 } else { 8 };
+
+        let key_size_val = builder.ins().iconst(types::I32, key_size as i64);
+        let val_size_val = builder.ins().iconst(types::I32, val_size as i64);
+
+        let fn_id = self.asegurar_funcion_c(
+            "falcato_diccionario_valores",
+            &[types::I64, types::I64, types::I32, types::I32],
+            None,
+        );
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_dict, desc_out, key_size_val, val_size_val]);
+
+        Ok(desc_out)
+    }
+
+    /// diccionario_limpiar(d: &mut Diccionario<K,V>)
+    /// Vacía el diccionario sin deallocar.
+    pub(crate) fn builtin_diccionario_limpiar(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+        tipo_args: &[Tipo],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_dict = self.compilar_expresion(&argumentos[0], builder, variables)?;
+
+        let key_size = if tipo_args.len() > 0 { self.tamano_tipo(&tipo_args[0]) as i32 } else { 8 };
+        let val_size = if tipo_args.len() > 1 { self.tamano_tipo(&tipo_args[1]) as i32 } else { 8 };
+
+        let key_size_val = builder.ins().iconst(types::I32, key_size as i64);
+        let val_size_val = builder.ins().iconst(types::I32, val_size as i64);
+
+        let fn_id = self.asegurar_funcion_c(
+            "falcato_diccionario_limpiar",
+            &[types::I64, types::I32, types::I32],
+            None,
+        );
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_dict, key_size_val, val_size_val]);
+
+        Ok(builder.ins().iconst(types::I32, 0))
+    }
+
+    /// conjunto_elementos(c: Conjunto<T>) -> Vector<Texto>
+    /// Extrae los elementos del conjunto como vector de textos.
+    pub(crate) fn builtin_conjunto_elementos(
+        &mut self,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+        argumentos: &[Expresion],
+        tipo_args: &[Tipo],
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        let desc_set = self.compilar_expresion(&argumentos[0], builder, variables)?;
+        let desc_out = self.descriptor_nuevo(builder);
+
+        let key_size = if tipo_args.len() > 0 { self.tamano_tipo(&tipo_args[0]) as i32 } else { 8 };
+
+        let key_size_val = builder.ins().iconst(types::I32, key_size as i64);
+
+        let fn_id = self.asegurar_funcion_c(
+            "falcato_conjunto_elementos",
+            &[types::I64, types::I64, types::I32],
+            None,
+        );
+        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+        builder.ins().call(fn_ref, &[desc_set, desc_out, key_size_val]);
+
+        Ok(desc_out)
+    }
+
     // ============================================================
     // Procesos (R7.1): lanzar comandos y capturar salida
     // ============================================================

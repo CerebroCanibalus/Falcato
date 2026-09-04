@@ -1399,7 +1399,7 @@ impl Codegen {
         matches!(llamada.funcion.as_str(),
             "imprimir" | "imprimir_linea" | "decir" | "tamaño_de" | "afirmar" |
             "texto_nuevo" | "texto_desde" | "texto_agregar" | "texto_longitud" | "texto_tam" | "texto_liberar" |
-            "texto_concatenar" | "texto_subtexto" | "texto_comparar" | "texto_obtener_byte" |
+            "texto_concatenar" | "texto_subtexto" | "texto_comparar" | "texto_igual" | "texto_desigual" | "texto_obtener_byte" |
             "texto_a_entero" | "texto_a_natural" | "texto_a_flotante" | "texto_a_booleano" |
             "archivo_leer" | "archivo_escribir" | "archivo_existe" |
             "abs" | "max" | "min" | "raiz" | "potencia" |
@@ -1412,12 +1412,25 @@ impl Codegen {
             // Trigonometría rápida (F2/F3) — math.rs
             "seno_rapido" | "coseno_rapido" | "seno_2pi" | "coseno_2pi" |
             "exp_rapido" | "log_rapido" | "seno_aprox" |
-            "vector_nuevo" | "vector_agregar" | "vector_obtener" | "vector_longitud" | "vector_tam" | "vector_liberar" |
+            "vector_nuevo" | "vector_agregar" | "vector_poner" | "vector_obtener" | "vector_longitud" | "vector_tam" | "vector_liberar" |
+            "vector_intercambiar" | "vector_insertar" | "vector_eliminar" | "vector_extender" |
+            "vector_contiene" | "vector_indice_de" | "vector_clonar" | "vector_invertir" | "vector_limpiar" |
+            "opcion_es_alguno" | "opcion_es_ninguno" |             "resultado_es_exito" | "resultado_es_error" |
+            // Visual
+            "ventana_nueva" | "ventana_mostrar" | "ventana_cerrar" | "ventana_bucle_mensajes" |
+            "ventana_titulo" | "ventana_establecer_titulo" | "ventana_posicion" | "ventana_tamano" |
+            "lienzo_nuevo" | "lienzo_limpiar" | "lienzo_linea" | "lienzo_rectangulo" |
+            "lienzo_circulo" | "lienzo_texto" | "lienzo_guardar_png" | "lienzo_liberar" |
+            "imagen_desde_archivo" | "imagen_ancho" | "imagen_alto" | "imagen_redimensionar" |
+            "imagen_guardar_png" | "imagen_liberar" |
+            "audio_nuevo" | "audio_desde_archivo" | "audio_tono" | "audio_mezclar" |
+            "audio_fade_in" | "audio_fade_out" | "audio_guardar_wav" | "audio_reproducir" |
             "dormir" |
             "diccionario_nuevo" | "diccionario_insertar" | "diccionario_obtener" |
             "diccionario_existe" | "diccionario_eliminar" | "diccionario_longitud" | "diccionario_liberar" |
+            "diccionario_claves" | "diccionario_valores" | "diccionario_limpiar" |
             "conjunto_nuevo" | "conjunto_insertar" | "conjunto_contiene" |
-            "conjunto_eliminar" | "conjunto_longitud" | "conjunto_liberar" |
+            "conjunto_eliminar" | "conjunto_longitud" | "conjunto_liberar" | "conjunto_elementos" |
             "tcp_vincular" | "tcp_aceptar" | "tcp_leer" | "tcp_escribir" | "tcp_cerrar" |
             "canal_nuevo" | "canal_enviar" | "canal_recibir" | "canal_cerrar" | "canal_intentar" |
             "proceso_crear" | "proceso_esperar" | "proceso_leer_salida_completa" | "proceso_cerrar" |
@@ -1426,10 +1439,15 @@ impl Codegen {
             "proceso_cerrar_bidireccional" |
             "tcp_conectar" | "dns_resolver" | "tcp_establecer_timeout" | "tcp_datos_disponibles" |
             "texto_agregar_texto" | "texto_poner_byte" | "texto_puntero" | "texto_desde_bytes" |
+            "texto_contiene" | "texto_reemplazar" | "texto_mayusculas" | "texto_minusculas" | "texto_recortar" | "texto_dividir" |
+            "texto_empieza_con" | "texto_termina_con" | "texto_a_bytes" |
+            "texto_codificar_base64" | "texto_decodificar_base64" |
             "entero_a_texto" | "flotante_a_texto" | "booleano_a_texto" |
-            "archivo_agregar" | "archivo_borrar" | "archivo_renombrar" | "archivo_escribir_bytes" |
+            "archivo_agregar" | "archivo_borrar" | "archivo_renombrar" | "archivo_escribir_bytes" | "archivo_tamano" |
             "entorno_obtener" | "directorio_actual" | "aleatorio" | "archivo_listar" |
             "tls_conectar" | "tls_escribir" | "tls_leer" | "tls_datos_disponibles" | "tls_cerrar" |
+            "http_get" | "http_post" |
+            "json_parsear" | "json_serializar" | "json_escapar" | "json_obtener" |
             "terminal_modo_raw" | "terminal_leer_tecla" | "terminal_dimensiones" |
             "entrada_leer" |
             "argumentos" |
@@ -1464,12 +1482,26 @@ impl Codegen {
             "texto_concatenar" => self.builtin_texto_concatenar(builder, variables, &llamada.argumentos),
             "texto_subtexto" => self.builtin_texto_subtexto(builder, variables, &llamada.argumentos),
             "texto_comparar" => self.builtin_texto_comparar(builder, variables, &llamada.argumentos),
+            "texto_igual" => self.builtin_texto_igual(builder, variables, &llamada.argumentos),
+            "texto_desigual" => self.builtin_texto_desigual(builder, variables, &llamada.argumentos),
             "texto_obtener_byte" => self.builtin_texto_obtener_byte(builder, variables, &llamada.argumentos),
             "texto_a_entero" => self.builtin_texto_a_entero(builder, variables, &llamada.argumentos),
             "texto_a_natural" => self.builtin_texto_a_natural(builder, variables, &llamada.argumentos),
             "texto_a_flotante" => self.builtin_texto_a_flotante(builder, variables, &llamada.argumentos),
             "texto_a_booleano" => self.builtin_texto_a_booleano(builder, variables, &llamada.argumentos),
             "texto_a_puntero" => self.builtin_texto_a_puntero(builder, variables, &llamada.argumentos),
+            // libEst builtins
+            "texto_contiene" => self.builtin_texto_contiene(builder, variables, &llamada.argumentos),
+            "texto_reemplazar" => self.builtin_texto_reemplazar(builder, variables, &llamada.argumentos),
+            "texto_mayusculas" => self.builtin_texto_mayusculas(builder, variables, &llamada.argumentos),
+            "texto_minusculas" => self.builtin_texto_minusculas(builder, variables, &llamada.argumentos),
+            "texto_recortar" => self.builtin_texto_recortar(builder, variables, &llamada.argumentos),
+            "texto_dividir" => self.builtin_texto_dividir(builder, variables, &llamada.argumentos),
+            "texto_empieza_con" => self.builtin_texto_empieza_con(builder, variables, &llamada.argumentos),
+            "texto_termina_con" => self.builtin_texto_termina_con(builder, variables, &llamada.argumentos),
+            "texto_a_bytes" => self.builtin_texto_a_bytes(builder, variables, &llamada.argumentos),
+            "texto_codificar_base64" => self.builtin_texto_codificar_base64(builder, variables, &llamada.argumentos),
+            "texto_decodificar_base64" => self.builtin_texto_decodificar_base64(builder, variables, &llamada.argumentos),
             "como_entero64" => self.builtin_como_entero64(builder, variables, &llamada.argumentos),
             "como_entero32" => self.builtin_como_entero32(builder, variables, &llamada.argumentos),
             "como_entero8" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Entero8, builder, variables),
@@ -1523,8 +1555,53 @@ impl Codegen {
             "vector_nuevo" => self.builtin_vector_nuevo(builder, &llamada.tipo_args),
             "vector_agregar" => self.builtin_vector_agregar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "vector_obtener" => self.builtin_vector_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_poner" => self.builtin_vector_poner(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_intercambiar" => self.builtin_vector_intercambiar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_insertar" => self.builtin_vector_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_eliminar" => self.builtin_vector_eliminar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_extender" => self.builtin_vector_extender(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "vector_longitud" | "vector_tam" => self.builtin_vector_longitud(builder, variables, &llamada.argumentos),
             "vector_liberar" => self.builtin_vector_liberar(builder, variables, &llamada.argumentos),
+            "vector_contiene" => self.builtin_vector_contiene(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_indice_de" => self.builtin_vector_indice_de(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_clonar" => self.builtin_vector_clonar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_invertir" => self.builtin_vector_invertir(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_limpiar" => self.builtin_vector_limpiar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "opcion_es_alguno" => self.builtin_opcion_es_alguno(builder, variables, &llamada.argumentos),
+            "opcion_es_ninguno" => self.builtin_opcion_es_ninguno(builder, variables, &llamada.argumentos),
+            "resultado_es_exito" => self.builtin_resultado_es_exito(builder, variables, &llamada.argumentos),
+            "resultado_es_error" => self.builtin_resultado_es_error(builder, variables, &llamada.argumentos),
+            // Visual
+            "ventana_nueva" => self.builtin_ventana_nueva(builder, variables, &llamada.argumentos),
+            "ventana_mostrar" => self.builtin_ventana_mostrar(builder, variables, &llamada.argumentos),
+            "ventana_cerrar" => self.builtin_ventana_cerrar(builder, variables, &llamada.argumentos),
+            "ventana_bucle_mensajes" => self.builtin_ventana_bucle_mensajes(builder, variables, &llamada.argumentos),
+            "ventana_titulo" => self.builtin_ventana_titulo(builder, variables, &llamada.argumentos),
+            "ventana_establecer_titulo" => self.builtin_ventana_establecer_titulo(builder, variables, &llamada.argumentos),
+            "ventana_posicion" => self.builtin_ventana_posicion(builder, variables, &llamada.argumentos),
+            "ventana_tamano" => self.builtin_ventana_tamano(builder, variables, &llamada.argumentos),
+            "lienzo_nuevo" => self.builtin_lienzo_nuevo(builder, variables, &llamada.argumentos),
+            "lienzo_limpiar" => self.builtin_lienzo_limpiar(builder, variables, &llamada.argumentos),
+            "lienzo_linea" => self.builtin_lienzo_linea(builder, variables, &llamada.argumentos),
+            "lienzo_rectangulo" => self.builtin_lienzo_rectangulo(builder, variables, &llamada.argumentos),
+            "lienzo_circulo" => self.builtin_lienzo_circulo(builder, variables, &llamada.argumentos),
+            "lienzo_texto" => self.builtin_lienzo_texto(builder, variables, &llamada.argumentos),
+            "lienzo_guardar_png" => self.builtin_lienzo_guardar_png(builder, variables, &llamada.argumentos),
+            "lienzo_liberar" => self.builtin_lienzo_liberar(builder, variables, &llamada.argumentos),
+            "imagen_desde_archivo" => self.builtin_imagen_desde_archivo(builder, variables, &llamada.argumentos),
+            "imagen_ancho" => self.builtin_imagen_ancho(builder, variables, &llamada.argumentos),
+            "imagen_alto" => self.builtin_imagen_alto(builder, variables, &llamada.argumentos),
+            "imagen_redimensionar" => self.builtin_imagen_redimensionar(builder, variables, &llamada.argumentos),
+            "imagen_guardar_png" => self.builtin_imagen_guardar_png(builder, variables, &llamada.argumentos),
+            "imagen_liberar" => self.builtin_imagen_liberar(builder, variables, &llamada.argumentos),
+            "audio_nuevo" => self.builtin_audio_nuevo(builder, variables, &llamada.argumentos),
+            "audio_desde_archivo" => self.builtin_audio_desde_archivo(builder, variables, &llamada.argumentos),
+            "audio_tono" => self.builtin_audio_tono(builder, variables, &llamada.argumentos),
+            "audio_mezclar" => self.builtin_audio_mezclar(builder, variables, &llamada.argumentos),
+            "audio_fade_in" => self.builtin_audio_fade_in(builder, variables, &llamada.argumentos),
+            "audio_fade_out" => self.builtin_audio_fade_out(builder, variables, &llamada.argumentos),
+            "audio_guardar_wav" => self.builtin_audio_guardar_wav(builder, variables, &llamada.argumentos),
+            "audio_reproducir" => self.builtin_audio_reproducir(builder, variables, &llamada.argumentos),
             "dormir" => self.builtin_dormir(builder, variables, &llamada.argumentos),
             "tcp_vincular" => self.builtin_tcp_vincular(builder, variables, &llamada.argumentos),
             "tcp_aceptar" => self.builtin_tcp_aceptar(builder, variables, &llamada.argumentos),
@@ -1572,6 +1649,12 @@ impl Codegen {
             "tls_leer" => self.builtin_tls_leer(builder, variables, &llamada.argumentos),
             "tls_datos_disponibles" => self.builtin_tls_datos_disponibles(builder, variables, &llamada.argumentos),
             "tls_cerrar" => self.builtin_tls_cerrar(builder, variables, &llamada.argumentos),
+            "http_get" => self.builtin_http_get(builder, variables, &llamada.argumentos),
+            "http_post" => self.builtin_http_post(builder, variables, &llamada.argumentos),
+            "json_parsear" => self.builtin_json_parsear(builder, variables, &llamada.argumentos),
+            "json_serializar" => self.builtin_json_serializar(builder, variables, &llamada.argumentos),
+            "json_escapar" => self.builtin_json_escapar(builder, variables, &llamada.argumentos),
+            "json_obtener" => self.builtin_json_obtener(builder, variables, &llamada.argumentos),
             "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
             "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
             "terminal_dimensiones" => self.builtin_terminal_dimensiones(builder, variables, &llamada.argumentos),
@@ -1579,6 +1662,10 @@ impl Codegen {
 "argumentos" => self.builtin_argumentos(builder, variables, &llamada.argumentos),
             "fecha_unix" => self.builtin_fecha_unix(builder, variables, &llamada.argumentos),
             "fecha_ms" => self.builtin_fecha_ms(builder, variables, &llamada.argumentos),
+            "fecha_anio" => self.builtin_fecha_anio(builder, variables, &llamada.argumentos),
+            "fecha_mes" => self.builtin_fecha_mes(builder, variables, &llamada.argumentos),
+            "fecha_dia" => self.builtin_fecha_dia(builder, variables, &llamada.argumentos),
+            "archivo_tamano" => self.builtin_archivo_tamano(builder, variables, &llamada.argumentos),
             "dht_nuevo" => self.builtin_dht_nuevo(builder, variables, &llamada.argumentos),
             "dht_publicar" => self.builtin_dht_publicar(builder, variables, &llamada.argumentos),
             "dht_consultar" => self.builtin_dht_consultar(builder, variables, &llamada.argumentos),
@@ -1599,12 +1686,16 @@ impl Codegen {
             "diccionario_eliminar" => self.builtin_diccionario_eliminar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "diccionario_longitud" => self.builtin_diccionario_longitud(builder, variables, &llamada.argumentos),
             "diccionario_liberar" => self.builtin_diccionario_liberar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_claves" => self.builtin_diccionario_claves(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_valores" => self.builtin_diccionario_valores(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_limpiar" => self.builtin_diccionario_limpiar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "conjunto_nuevo" => self.builtin_conjunto_nuevo(builder, &llamada.tipo_args),
             "conjunto_insertar" => self.builtin_conjunto_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "conjunto_contiene" => self.builtin_conjunto_contiene(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "conjunto_eliminar" => self.builtin_conjunto_eliminar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "conjunto_longitud" => self.builtin_conjunto_longitud(builder, variables, &llamada.argumentos),
             "conjunto_liberar" => self.builtin_conjunto_liberar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "conjunto_elementos" => self.builtin_conjunto_elementos(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             _ => {
                 self.errores.agregar(ErrorCompilador::nuevo(
                     CategoriaError::Interno,

@@ -1,0 +1,12 @@
+// libEst::visual::lienzo — Canvas 2D
+// Los builtins se llaman directamente desde Falcato
+
+// Uso:
+//   el l: Lienzo = lienzo_nuevo(800, 600);
+//   lienzo_limpiar(l, 0x00FFFFFF); // blanco
+//   lienzo_linea(l, 0, 0, 100, 100);
+//   lienzo_rectangulo(l, 10, 10, 50, 50);
+//   lienzo_circulo(l, 200, 200, 50);
+//   lienzo_texto(l, 10, 10, "Hola Mundo");
+//   lienzo_guardar_png(l, "salida.png");
+//   lienzo_liberar(l);

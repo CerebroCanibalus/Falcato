@@ -244,8 +244,29 @@ impl Resolver {
 
         // 4. Codegen unificado
         let mut codegen = crate::codegen::Codegen::nuevo("falcato_programa")?;
+
+        // 4a. Pre-registrar todos los structs/enums/aliases de TODOS los módulos
+        // ANTES de compilar ninguna función. Sin esto, una función en módulo A que
+        // toma un Vector<B> como parámetro falla al calcular `tamano_tipo(Vector(B))`
+        // porque B todavía no está en `self.structs` (B se registra cuando se
+        // compila_programa el módulo B, que corre después en el orden topológico).
+        // Fix: BUG-001 (Vector<Struct> nested en multi-archivo, panic tipos.rs:183).
+        use crate::ast::Declaracion;
         for (_, programa) in &programas {
-            codegen.compilar_programa(programa)
+            for decl in &programa.declaraciones {
+                match decl {
+                    Declaracion::Estructural(s) => codegen.registrar_struct(s),
+                    Declaracion::Enumeracion(e) => codegen.registrar_enum(e),
+                    Declaracion::Apodo(a) => {
+                        codegen.aliases.insert(a.nombre.clone(), a.tipo.clone());
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        for (nombre_modulo, programa) in &programas {
+            codegen.compilar_programa(nombre_modulo, programa)
                 .map_err(|e| format!("Errores de compilación:\n{:?}", e))?;
         }
 
