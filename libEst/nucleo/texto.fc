@@ -19,16 +19,80 @@ el función texto_esta_vacio(la t: Texto) -> Booleano {
     retornar texto_longitud(t) == 0;
 }
 
+// Falcato puro — búsqueda O(n*m) de substring
 el función texto_contiene(la t: Texto, la sub: Texto) -> Booleano {
-    retornar texto_contiene(t, sub);
+    el largo_sub: Entero32 = texto_longitud(sub);
+    si largo_sub == 0 {
+        retornar verdadero;
+    }
+    el largo_t: Entero32 = texto_longitud(t);
+    si largo_sub > largo_t {
+        retornar falso;
+    }
+    el limite: Entero32 = largo_t - largo_sub;
+    el i: Entero32 = 0;
+    mientras i <= limite {
+        el encontrado: Booleano = verdadero;
+        el j: Entero32 = 0;
+        mientras j < largo_sub {
+            el byte_t: Entero8 = texto_obtener_byte(t, i + j);
+            el byte_s: Entero8 = texto_obtener_byte(sub, j);
+            si byte_t != byte_s {
+                encontrado = falso;
+                romper;
+            }
+            j = j + 1;
+        }
+        si encontrado {
+            retornar verdadero;
+        }
+        i = i + 1;
+    }
+    retornar falso;
 }
 
+// Falcato puro — verifica prefijo
 el función texto_empieza_con(la t: Texto, la prefijo: Texto) -> Booleano {
-    retornar texto_empieza_con(t, prefijo);
+    el largo_prefijo: Entero32 = texto_longitud(prefijo);
+    si largo_prefijo == 0 {
+        retornar verdadero;
+    }
+    el largo_t: Entero32 = texto_longitud(t);
+    si largo_prefijo > largo_t {
+        retornar falso;
+    }
+    el i: Entero32 = 0;
+    mientras i < largo_prefijo {
+        el byte_t: Entero8 = texto_obtener_byte(t, i);
+        el byte_p: Entero8 = texto_obtener_byte(prefijo, i);
+        si byte_t != byte_p {
+            retornar falso;
+        }
+        i = i + 1;
+    }
+    retornar verdadero;
 }
 
+// Falcato puro — verifica sufijo
 el función texto_termina_con(la t: Texto, la sufijo: Texto) -> Booleano {
-    retornar texto_termina_con(t, sufijo);
+    el largo_sufijo: Entero32 = texto_longitud(sufijo);
+    si largo_sufijo == 0 {
+        retornar verdadero;
+    }
+    el largo_t: Entero32 = texto_longitud(t);
+    si largo_sufijo > largo_t {
+        retornar falso;
+    }
+    el i: Entero32 = 0;
+    mientras i < largo_sufijo {
+        el byte_t: Entero8 = texto_obtener_byte(t, largo_t - largo_sufijo + i);
+        el byte_s: Entero8 = texto_obtener_byte(sufijo, i);
+        si byte_t != byte_s {
+            retornar falso;
+        }
+        i = i + 1;
+    }
+    retornar verdadero;
 }
 
 // Manipulación

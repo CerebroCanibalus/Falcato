@@ -1439,8 +1439,8 @@ impl Codegen {
             "proceso_cerrar_bidireccional" |
             "tcp_conectar" | "dns_resolver" | "tcp_establecer_timeout" | "tcp_datos_disponibles" |
             "texto_agregar_texto" | "texto_poner_byte" | "texto_puntero" | "texto_desde_bytes" |
-            "texto_contiene" | "texto_reemplazar" | "texto_mayusculas" | "texto_minusculas" | "texto_recortar" | "texto_dividir" |
-            "texto_empieza_con" | "texto_termina_con" | "texto_a_bytes" |
+            "texto_reemplazar" | "texto_mayusculas" | "texto_minusculas" | "texto_recortar" | "texto_dividir" |
+            "texto_a_bytes" |
             "texto_codificar_base64" | "texto_decodificar_base64" |
             "entero_a_texto" | "flotante_a_texto" | "booleano_a_texto" |
             "archivo_agregar" | "archivo_borrar" | "archivo_renombrar" | "archivo_escribir_bytes" | "archivo_tamano" |
@@ -1491,14 +1491,11 @@ impl Codegen {
             "texto_a_booleano" => self.builtin_texto_a_booleano(builder, variables, &llamada.argumentos),
             "texto_a_puntero" => self.builtin_texto_a_puntero(builder, variables, &llamada.argumentos),
             // libEst builtins
-            "texto_contiene" => self.builtin_texto_contiene(builder, variables, &llamada.argumentos),
             "texto_reemplazar" => self.builtin_texto_reemplazar(builder, variables, &llamada.argumentos),
             "texto_mayusculas" => self.builtin_texto_mayusculas(builder, variables, &llamada.argumentos),
             "texto_minusculas" => self.builtin_texto_minusculas(builder, variables, &llamada.argumentos),
             "texto_recortar" => self.builtin_texto_recortar(builder, variables, &llamada.argumentos),
             "texto_dividir" => self.builtin_texto_dividir(builder, variables, &llamada.argumentos),
-            "texto_empieza_con" => self.builtin_texto_empieza_con(builder, variables, &llamada.argumentos),
-            "texto_termina_con" => self.builtin_texto_termina_con(builder, variables, &llamada.argumentos),
             "texto_a_bytes" => self.builtin_texto_a_bytes(builder, variables, &llamada.argumentos),
             "texto_codificar_base64" => self.builtin_texto_codificar_base64(builder, variables, &llamada.argumentos),
             "texto_decodificar_base64" => self.builtin_texto_decodificar_base64(builder, variables, &llamada.argumentos),

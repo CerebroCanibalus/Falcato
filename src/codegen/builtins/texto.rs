@@ -602,24 +602,6 @@ impl Codegen {
 
     // === libEst builtins ===
 
-    /// texto_contiene(texto: Texto, sub: Texto) -> Booleano
-    /// Busca si `sub` aparece dentro de `texto`.
-    pub(crate) fn builtin_texto_contiene(
-        &mut self,
-        builder: &mut FunctionBuilder,
-        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
-        argumentos: &[Expresion],
-    ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
-        let desc_sub = self.compilar_expresion(&argumentos[1], builder, variables)?;
-
-        // falcato_texto_contiene(desc_texto: i64, desc_sub: i64) -> i32
-        let fn_id = self.asegurar_funcion_c("falcato_texto_contiene", &[types::I64, types::I64], Some(types::I32));
-        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
-        let call = builder.ins().call(fn_ref, &[desc_texto, desc_sub]);
-        Ok(builder.inst_results(call)[0])
-    }
-
     /// texto_reemplazar(texto: Texto, de: Texto, a: Texto) -> Texto
     /// Reemplaza todas las ocurrencias de `de` por `a`.
     pub(crate) fn builtin_texto_reemplazar(
@@ -697,38 +679,6 @@ impl Codegen {
         builder.ins().call(fn_ref, &[desc_texto, desc_out]);
 
         Ok(desc_out)
-    }
-
-    /// texto_empieza_con(texto: Texto, prefijo: Texto) -> Booleano
-    pub(crate) fn builtin_texto_empieza_con(
-        &mut self,
-        builder: &mut FunctionBuilder,
-        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
-        argumentos: &[Expresion],
-    ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
-        let desc_prefijo = self.compilar_expresion(&argumentos[1], builder, variables)?;
-
-        let fn_id = self.asegurar_funcion_c("falcato_texto_empieza_con", &[types::I64, types::I64], Some(types::I32));
-        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
-        let call = builder.ins().call(fn_ref, &[desc_texto, desc_prefijo]);
-        Ok(builder.inst_results(call)[0])
-    }
-
-    /// texto_termina_con(texto: Texto, sufijo: Texto) -> Booleano
-    pub(crate) fn builtin_texto_termina_con(
-        &mut self,
-        builder: &mut FunctionBuilder,
-        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
-        argumentos: &[Expresion],
-    ) -> Result<cranelift_codegen::ir::Value, ()> {
-        let desc_texto = self.compilar_expresion(&argumentos[0], builder, variables)?;
-        let desc_sufijo = self.compilar_expresion(&argumentos[1], builder, variables)?;
-
-        let fn_id = self.asegurar_funcion_c("falcato_texto_termina_con", &[types::I64, types::I64], Some(types::I32));
-        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
-        let call = builder.ins().call(fn_ref, &[desc_texto, desc_sufijo]);
-        Ok(builder.inst_results(call)[0])
     }
 
     /// texto_codificar_base64(texto: Texto) -> Texto
