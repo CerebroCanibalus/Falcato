@@ -48,6 +48,60 @@ Estamos en **"pasos de bebé"**: todavía hay tensiones de diseño que debemos r
 | **P-006** | Default `Entero` = 32 (rompe ABI) vs 64 | 🟡 Diferido | RFC 0.8.0 con aliases |
 | **P-007** | Keyword renames: `apodo`/`alias`, `rasgo`/`protocolo`, `retornar`/`devolver` | 🟡 Diferido | Requiere `MAYOR` (1.0) |
 | **P-008** | Mensajes de error: `T001 disconcordancia` vs `no coincide` | 🟡 Diferido | Decisión de estilo 0.8.0 |
+
+#### Regla de migración de builtins (P-005)
+
+**Regla:** Builtins de **solo lectura** → Falcato puro. Builtins de **creación/escritura** → C.
+
+| Categoría | Builtins | ¿Por qué? |
+|-----------|----------|------------|
+| **Solo lectura** | `contiene`, `empieza_con`, `termina_con`, `longitud` | Solo comparan bytes, devuelven valores simples |
+| **Creación** | `mayusculas`, `minusculas`, `recortar`, `reemplazar` | Necesitan malloc para crear nuevo Texto |
+| **I/O** | `archivo_*`, `tcp_*`, `http_*` | Syscalls del SO |
+| **Hardware** | `lienzo_*`, `imagen_*`, `audio_*` | Win32/X11 APIs |
+
+**Implementación Falcato puro:**
+```falcato
+// Solo lectura — loop + comparación de bytes
+el función texto_contiene(la t: Texto, la sub: Texto) -> Booleano {
+    el largo_sub: Entero32 = texto_longitud(sub);
+    si largo_sub == 0 { retornar verdadero; }
+    el largo_t: Entero32 = texto_longitud(t);
+    si largo_sub > largo_t { retornar falso; }
+    el limite: Entero32 = largo_t - largo_sub;
+    el i: Entero32 = 0;
+    mientras i <= limite {
+        el encontrado: Booleano = verdadero;
+        el j: Entero32 = 0;
+        mientras j < largo_sub {
+            el byte_t: Entero8 = texto_obtener_byte(t, i + j);
+            el byte_s: Entero8 = texto_obtener_byte(sub, j);
+            si byte_t != byte_s {
+                encontrado = falso;
+                romper;
+            }
+            j = j + 1;
+        }
+        si encontrado { retornar verdadero; }
+        i = i + 1;
+    }
+    retornar falso;
+}
+```
+
+**Builtins migrados (v0.8.0):**
+- `texto_contiene` → Falcato puro ✅
+- `texto_empieza_con` → Falcato puro ✅
+- `texto_termina_con` → Falcato puro ✅
+
+**Builtins que DEBEN quedarse en C:**
+- `texto_mayusculas/minusculas` — necesitan malloc
+- `texto_recortar` — necesita malloc
+- `vector_*` — necesitan acceso directo a memoria
+- `diccionario_*` — necesitan hashing + malloc
+- `archivo_*` — syscalls del SO
+- `tcp_*` — sockets
+- `http_*` — network I/O
 | **P-009** | Artículos opacos `el`/`la`/`un` (curva de aprendizaje) | 🟢 Activo | Tabla + sugerencias clippy |
 | **P-010** | Inconsistencia API: `archivo_escribir(ruta=Palabra)` vs `archivo_agregar(ruta=Texto)` | 🔴 Bug | F-019, fix 0.7.6 |
 | **P-011** | Concurrencia con keyword `paralelo { }` + integración con modos verbales (`fut`/`fuese`/`lanzar`) | 🟡 RFC abierta | Diseñar antes de 1.0; feature signature |
