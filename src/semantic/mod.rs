@@ -1992,7 +1992,7 @@ impl AnalizadorSemantico {
         self.funciones.insert("opcion_es_alguno".to_string(), FirmaFuncion {
             nombre: "opcion_es_alguno".to_string(),
             parametros_genericos: vec![],
-            parametros: vec![("opcion".to_string(), Tipo::Entero64)],
+            parametros: vec![("opcion".to_string(), Tipo::Option(Box::new(Tipo::Entero64)))],
             retorno: Some(Tipo::Booleano),
             span: span_vacio.clone(),
             es_publica: true,
@@ -2000,7 +2000,7 @@ impl AnalizadorSemantico {
         self.funciones.insert("opcion_es_ninguno".to_string(), FirmaFuncion {
             nombre: "opcion_es_ninguno".to_string(),
             parametros_genericos: vec![],
-            parametros: vec![("opcion".to_string(), Tipo::Entero64)],
+            parametros: vec![("opcion".to_string(), Tipo::Option(Box::new(Tipo::Entero64)))],
             retorno: Some(Tipo::Booleano),
             span: span_vacio.clone(),
             es_publica: true,
@@ -2008,7 +2008,7 @@ impl AnalizadorSemantico {
         self.funciones.insert("resultado_es_exito".to_string(), FirmaFuncion {
             nombre: "resultado_es_exito".to_string(),
             parametros_genericos: vec![],
-            parametros: vec![("resultado".to_string(), Tipo::Entero64)],
+            parametros: vec![("resultado".to_string(), Tipo::Resultado(Box::new(Tipo::Entero64), Box::new(Tipo::Entero64)))],
             retorno: Some(Tipo::Booleano),
             span: span_vacio.clone(),
             es_publica: true,
@@ -2016,7 +2016,7 @@ impl AnalizadorSemantico {
         self.funciones.insert("resultado_es_error".to_string(), FirmaFuncion {
             nombre: "resultado_es_error".to_string(),
             parametros_genericos: vec![],
-            parametros: vec![("resultado".to_string(), Tipo::Entero64)],
+            parametros: vec![("resultado".to_string(), Tipo::Resultado(Box::new(Tipo::Entero64), Box::new(Tipo::Entero64)))],
             retorno: Some(Tipo::Booleano),
             span: span_vacio.clone(),
             es_publica: true,

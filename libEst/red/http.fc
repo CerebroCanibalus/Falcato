@@ -2,6 +2,10 @@
 // Los builtins http_get/http_post se llaman directamente desde Falcato
 // No necesitan wrapper — el compiler los resuelve como builtins
 
-// Uso:
+// Uso directo (builtins):
 //   el body: Texto = http_get(host, puerto, path);
 //   el body: Texto = http_post(host, puerto, path, cuerpo);
+
+// Uso con URL completa (wrapper):
+//   el body: Texto = http_get_url("https://ejemplo.com/api/datos");
+//   el body: Texto = http_post_url("https://ejemplo.com/api/crear", "{\"clave\": \"valor\"}")

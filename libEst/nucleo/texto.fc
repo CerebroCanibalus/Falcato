@@ -53,30 +53,8 @@ el función texto_minusculas(la t: Texto) -> Texto {
 }
 
 // Segmentación
-el función texto_dividir(la t: Texto, la sep: Texto) -> Vector<Texto> {
-    el resultado: Vector<Texto> = vector_nuevo<Texto>();
-    el largo_sep: Entero32 = texto_longitud(sep);
-    si largo_sep == 0 {
-        vector_agregar(resultado, t);
-        retornar resultado;
-    }
-    el largo_t: Entero32 = texto_longitud(t);
-    el inicio: Entero32 = 0;
-    el i: Entero32 = 0;
-    mientras i <= largo_t - largo_sep {
-        el sub: Texto = texto_subtexto(t, i, i + largo_sep);
-        si texto_comparar(sub, sep) == 0 {
-            el parte: Texto = texto_subtexto(t, inicio, i);
-            vector_agregar(resultado, parte);
-            inicio = i + largo_sep;
-            i = i + largo_sep;
-        } sino {
-            i = i + 1;
-        }
-    }
-    vector_agregar(resultado, texto_subtexto(t, inicio, largo_t));
-    retornar resultado;
-}
+// texto_dividir es un builtin (C ABI) — no necesita wrapper
+// Firma: texto_dividir(t: Texto, sep: Texto) -> Vector<Texto>
 
 el función texto_subtexto(la t: Texto, la inicio: Entero32, la fin: Entero32) -> Texto {
     retornar texto_subtexto(t, inicio, fin);
