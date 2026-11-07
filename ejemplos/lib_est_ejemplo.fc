@@ -1,0 +1,27 @@
+// Ejemplo: libEst con namespaces :: 
+// Valida que el parser soporta mod::funcion y que la resolución funciona
+// Compilar: falcato compila ejemplos/lib_est_ejemplo.fc libEst/archivo/archivo.fc libEst/nucleo/texto.fc
+
+usar archivo::*;
+usar texto::*;
+
+función principal() -> Entero32 {
+    // Crear texto
+    el saludo: Texto = texto_desde("Hola desde libEst!");
+    imprimir_linea(saludo);
+
+    // Llamada calificada: archivo::leer (resuelve modulo::funcion)
+    el contenido: Texto = archivo_leer("ejemplos/hola_mundo.fc");
+    imprimir_linea("Contenido leído:");
+    imprimir_linea(contenido);
+
+    // Llamada calificada: texto::texto_longitud
+    el largo: Entero32 = texto_longitud(contenido);
+    imprimir("Longitud: ");
+    imprimir_linea(largo);
+
+    // Builtins directos (sin namespace) siguen funcionando
+    imprimir_linea("Builtins directos: OK");
+
+    retornar 0;
+}

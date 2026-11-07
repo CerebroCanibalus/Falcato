@@ -1,0 +1,36 @@
+// libEst::tiempo - Reloj, fecha, temporizador
+// Delega a builtins Rust del runtime
+
+// Reloj
+el función tiempo_ahora() -> Entero64 {
+    retornar fecha_unix();
+}
+
+el función tiempo_milisegundos() -> Entero64 {
+    retornar fecha_ms();
+}
+
+el función tiempo_dormir(la ms: Entero32) {
+    dormir(ms);
+}
+
+// Fecha - componentes de timestamp Unix
+el función fecha_unix() -> Entero64 {
+    retornar fecha_unix();
+}
+
+el función fecha_ms() -> Entero64 {
+    retornar fecha_ms();
+}
+
+el función fecha_anio(la unix: Entero64) -> Entero32 {
+    retornar fecha_anio(unix);
+}
+
+el función fecha_mes(la unix: Entero64) -> Entero32 {
+    retornar fecha_mes(unix);
+}
+
+el función fecha_dia(la unix: Entero64) -> Entero32 {
+    retornar fecha_dia(unix);
+}

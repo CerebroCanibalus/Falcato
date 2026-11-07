@@ -144,13 +144,39 @@ fn parse_asignacion(cursor: &mut ParserCursor) -> Result<Sentencia, ErrorSintaxi
     }))
 }
 
-/// Parsea un retorno: retornar [expresion];
+/// Parsea un retorno: retornar [expresion]; — también `retornar Struct { campo: valor }`
 fn parse_retornar(cursor: &mut ParserCursor) -> Result<Sentencia, ErrorSintaxis> {
     let span_inicio = cursor.span_actual();
     cursor.esperar(Token::Retornar)?;
 
     let expr = if cursor.actual() != Some(&Token::PuntoYComa) {
-        Some(parse_expresion(cursor)?)
+        // 3.8: `retornar Nombre { campo: valor }` — struct literal (como en declaración)
+        if let Some(Token::Identificador(n)) = cursor.actual() {
+            if cursor.peek(1) == Some(&Token::LlaveAbre) {
+                let nombre_struct = n.clone();
+                let span_struct = cursor.span_actual();
+                cursor.avanzar(); // Nombre
+                cursor.avanzar(); // {
+                let mut campos = Vec::new();
+                while cursor.actual() != Some(&Token::LlaveCierra) && !cursor.esta_vacio() {
+                    let nombre_campo = match cursor.actual() {
+                        Some(Token::Identificador(cn)) => { let cn = cn.clone(); cursor.avanzar(); cn }
+                        _ => return Err(ErrorSintaxis::identificador_esperado(cursor.span_actual(), "nombre de campo en retorno struct"))
+                    };
+                    cursor.esperar(Token::DosPuntos)?;
+                    let val = parse_expresion(cursor)?;
+                    campos.push((nombre_campo, val));
+                    if let Some(Token::Coma) = cursor.actual() { cursor.avanzar(); } else { break; }
+                }
+                cursor.esperar(Token::LlaveCierra)?;
+                let span = Span::combinar(&span_struct, &cursor.span_actual());
+                Some(Expresion::InicializacionStruct(nombre_struct, campos, span))
+            } else {
+                Some(parse_expresion(cursor)?)
+            }
+        } else {
+            Some(parse_expresion(cursor)?)
+        }
     } else {
         None
     };
@@ -250,9 +276,66 @@ fn parse_condicional(cursor: &mut ParserCursor) -> Result<Sentencia, ErrorSintax
 
     let bloque_entonces = parse_bloque(cursor)?;
 
+    // 3.7: sino pues / sino po (canónico) + sino si / o si (alias) — desugar a sino { si ... }
     let bloque_sino = if cursor.actual() == Some(&Token::Sino) {
-        cursor.avanzar();
-        Some(parse_bloque(cursor)?)
+        cursor.avanzar(); // sino
+        // sino pues / sino po / sino si → else if
+        if cursor.actual() == Some(&Token::Pues) || cursor.actual() == Some(&Token::Po) {
+            cursor.avanzar(); // pues / po
+            if cursor.actual() == Some(&Token::Si) { cursor.avanzar(); } // sino pues si → opcional
+            // Parsear condición del else-if (simple: expresión + bloque)
+            let expr_izq2 = parse_expresion(cursor)?;
+            let mut modo2 = ModoVerbal::Indicativo;
+            if cursor.actual() == Some(&Token::Fuese) { cursor.avanzar(); modo2 = ModoVerbal::Subjuntivo; }
+            let cond2 = match cursor.actual() {
+                Some(Token::Es) => { cursor.avanzar(); let d = parse_expresion(cursor)?; let s = Span::combinar(expr_izq2.span(), d.span()); Expresion::Binaria(Box::new(expr_izq2), OperadorBinario::Igual, Box::new(d), s) }
+                Some(Token::Esta) => { cursor.avanzar(); if cursor.actual() == Some(&Token::LlaveAbre) { expr_izq2 } else { let d = parse_expresion(cursor)?; let s = Span::combinar(expr_izq2.span(), d.span()); Expresion::Binaria(Box::new(expr_izq2), OperadorBinario::Igual, Box::new(d), s) } }
+                _ => expr_izq2,
+            };
+            let bloque2 = parse_bloque(cursor)?;
+            // Recursión para encadenar: sino pues ... sino
+            let inner_sino = if cursor.actual() == Some(&Token::Sino) {
+                let es_else_if = matches!(cursor.peek(1), Some(Token::Pues) | Some(Token::Po) | Some(Token::Si));
+                if es_else_if {
+                    // Cadena de else-if múltiple: parsear el resto recursivamente
+                    // (el siguiente `sino` ya está en cursor; parsear como condicional anidado)
+                    Some(parse_bloque_else_if(cursor)?)
+                } else {
+                    cursor.avanzar(); // sino
+                    Some(parse_bloque(cursor)?)
+                }
+            } else { None };
+            let span_inner = Span::combinar(&cond2.span().clone(), &bloque2.span);
+            let inner = Sentencia::Condicional(Condicional { condicion: cond2, bloque_entonces: bloque2, bloque_sino: inner_sino, modo: modo2, span: span_inner.clone() });
+            Some(Bloque { sentencias: vec![inner], span: span_inner })
+        } else if cursor.actual() == Some(&Token::Si) {
+            cursor.avanzar(); // sino si → else if clásico
+            let expr_izq2 = parse_expresion(cursor)?;
+            let mut modo2 = ModoVerbal::Indicativo;
+            if cursor.actual() == Some(&Token::Fuese) { cursor.avanzar(); modo2 = ModoVerbal::Subjuntivo; }
+            let cond2 = match cursor.actual() {
+                Some(Token::Es) => { cursor.avanzar(); let d = parse_expresion(cursor)?; let s = Span::combinar(expr_izq2.span(), d.span()); Expresion::Binaria(Box::new(expr_izq2), OperadorBinario::Igual, Box::new(d), s) }
+                Some(Token::Esta) => { cursor.avanzar(); if cursor.actual() == Some(&Token::LlaveAbre) { expr_izq2 } else { let d = parse_expresion(cursor)?; let s = Span::combinar(expr_izq2.span(), d.span()); Expresion::Binaria(Box::new(expr_izq2), OperadorBinario::Igual, Box::new(d), s) } }
+                _ => expr_izq2,
+            };
+            let bloque2 = parse_bloque(cursor)?;
+            // Recursión para encadenar: sino si ... sino
+            let inner_sino = if cursor.actual() == Some(&Token::Sino) {
+                let es_else_if = matches!(cursor.peek(1), Some(Token::Pues) | Some(Token::Po) | Some(Token::Si));
+                if es_else_if {
+                    // Cadena de else-if múltiple: parsear el resto recursivamente
+                    Some(parse_bloque_else_if(cursor)?)
+                } else {
+                    cursor.avanzar(); // sino
+                    Some(parse_bloque(cursor)?)
+                }
+            } else { None };
+            let span_inner = Span::combinar(&cond2.span().clone(), &bloque2.span);
+            let inner = Sentencia::Condicional(Condicional { condicion: cond2, bloque_entonces: bloque2, bloque_sino: inner_sino, modo: modo2, span: span_inner.clone() });
+            Some(Bloque { sentencias: vec![inner], span: span_inner })
+        } else {
+            Some(parse_bloque(cursor)?)
+        }
     } else {
         None
     };
@@ -267,6 +350,41 @@ fn parse_condicional(cursor: &mut ParserCursor) -> Result<Sentencia, ErrorSintax
         modo,
         span,
     }))
+}
+
+/// Parsea un bloque que empieza con `sino` (ya consumido el `sino` anterior).
+/// Usado para cadenas de else-if: `sino pues X {} sino po Y {} sino {}`.
+/// El cursor está en `sino` — lo consume y decide si es else-if o else final.
+fn parse_bloque_else_if(cursor: &mut ParserCursor) -> Result<Bloque, ErrorSintaxis> {
+    cursor.esperar(Token::Sino)?; // consumir 'sino'
+    if cursor.actual() == Some(&Token::Pues) || cursor.actual() == Some(&Token::Po) {
+        cursor.avanzar(); // pues / po
+    }
+    if cursor.actual() == Some(&Token::Si) { cursor.avanzar(); } // opcional
+
+    let expr_izq = parse_expresion(cursor)?;
+    let mut modo = ModoVerbal::Indicativo;
+    if cursor.actual() == Some(&Token::Fuese) { cursor.avanzar(); modo = ModoVerbal::Subjuntivo; }
+    let cond = match cursor.actual() {
+        Some(Token::Es) => { cursor.avanzar(); let d = parse_expresion(cursor)?; let s = Span::combinar(expr_izq.span(), d.span()); Expresion::Binaria(Box::new(expr_izq), OperadorBinario::Igual, Box::new(d), s) }
+        Some(Token::Esta) => { cursor.avanzar(); if cursor.actual() == Some(&Token::LlaveAbre) { expr_izq } else { let d = parse_expresion(cursor)?; let s = Span::combinar(expr_izq.span(), d.span()); Expresion::Binaria(Box::new(expr_izq), OperadorBinario::Igual, Box::new(d), s) } }
+        _ => expr_izq,
+    };
+    let bloque = parse_bloque(cursor)?;
+
+    let inner_sino = if cursor.actual() == Some(&Token::Sino) {
+        let es_else_if = matches!(cursor.peek(1), Some(Token::Pues) | Some(Token::Po) | Some(Token::Si));
+        if es_else_if {
+            Some(parse_bloque_else_if(cursor)?)
+        } else {
+            cursor.avanzar();
+            Some(parse_bloque(cursor)?)
+        }
+    } else { None };
+
+    let span_inner = Span::combinar(cond.span(), &bloque.span);
+    let inner = Sentencia::Condicional(Condicional { condicion: cond, bloque_entonces: bloque, bloque_sino: inner_sino, modo, span: span_inner.clone() });
+    Ok(Bloque { sentencias: vec![inner], span: span_inner })
 }
 
 /// Parsea un bucle mientras: mientras expresion { bloque }

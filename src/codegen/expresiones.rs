@@ -357,7 +357,15 @@ impl Codegen {
                             }
                         }
                         // Si no es un identificador o acceso a campo, compilar la expresi├│n y retornar su direcci├│n
-                        // (esto es una simplificaci├│n, no funciona para expresiones complejas)
+                        if *op == OperadorUnario::ReferenciaMut {
+                            self.errores.agregar(ErrorCompilador::nuevo(
+                                CategoriaError::Interno,
+                                99,
+                                span.clone(),
+                                "borrow mutable de campo/expresion no soportado: solo se puede prestar &mut de variable o de campo directo `&mut s.campo`".to_string(),
+                            ));
+                            return Err(());
+                        }
                         let val = self.compilar_expresion(expr, builder, variables)?;
                         Ok(val)
                     }
@@ -457,7 +465,12 @@ impl Codegen {
 
                 // Struct normal: almacenar cada campo
                 for (nombre_campo, valor) in campos {
-                    let val = self.compilar_expresion(valor, builder, variables)?;
+                    let tipo_campo = layout.tipos.get(nombre_campo).cloned().unwrap_or(Tipo::Entero32);
+                    let val = if self.es_tipo_numerico(&tipo_campo) {
+                        self.compilar_expresion_con_tipo_esperado(valor, &tipo_campo, builder, variables)?
+                    } else {
+                        self.compilar_expresion(valor, builder, variables)?
+                    };
                     let offset = match layout.offsets.get(nombre_campo) {
                         Some(o) => *o as i64,
                         None => {
@@ -472,12 +485,30 @@ impl Codegen {
                     };
 
                     let campo_ptr = builder.ins().iadd_imm(base_ptr, offset);
-                    builder.ins().store(
-                        cranelift_codegen::ir::MemFlags::new(),
-                        val,
-                        campo_ptr,
-                        0,
-                    );
+                    // F-014 — Texto: deep copy para evitar alias y double-free (incluye p.t campo→campo)
+                    if tipo_campo == Tipo::Texto {
+                        let src_desc = val;
+                        let src_ptr = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 0);
+                        let src_len = builder.ins().load(types::I64, cranelift_codegen::ir::MemFlags::new(), src_desc, 8);
+                        let src_len_i32 = builder.ins().ireduce(types::I32, src_len);
+                        let new_desc = self.descriptor_nuevo(builder);
+                        let fn_id = self.asegurar_funcion_c("falcato_texto_desde_bytes", &[types::I64, types::I32, types::I64], None);
+                        let fn_ref = self.module.declare_func_in_func(fn_id, builder.func);
+                        builder.ins().call(fn_ref, &[src_ptr, src_len_i32, new_desc]);
+                        builder.ins().store(
+                            cranelift_codegen::ir::MemFlags::new(),
+                            new_desc,
+                            campo_ptr,
+                            0,
+                        );
+                    } else {
+                        builder.ins().store(
+                            cranelift_codegen::ir::MemFlags::new(),
+                            val,
+                            campo_ptr,
+                            0,
+                        );
+                    }
                 }
 
                 Ok(base_ptr)
@@ -486,8 +517,28 @@ impl Codegen {
                 let struct_ptr = self.compilar_expresion(expr, builder, variables)?;
                 let tipo_expr = self.inferir_tipo(expr, variables);
 
-                let nombre_struct = match tipo_expr {
-                    Tipo::Nombre(n) => n,
+                // S003 fix: acceso a campo a través de referencia (&T / &mut T).
+                // El identificador de tipo referencia ya carga el PUNTERO (stack_load),
+                // que es exactamente lo que necesitamos como base — solo hay que
+                // resolver el tipo interno para encontrar el layout del struct.
+                let nombre_struct = match &tipo_expr {
+                    Tipo::Nombre(n) => n.clone(),
+                    Tipo::Referencia(inner) | Tipo::ReferenciaMut(inner) |
+                    Tipo::ReferenciaConLifetime(_, inner) | Tipo::ReferenciaMutConLifetime(_, inner) |
+                    Tipo::ReferenciaSelf(inner) | Tipo::ReferenciaMutSelf(inner) => {
+                        match self.resolver_alias(inner) {
+                            Tipo::Nombre(n) => n,
+                            otro => {
+                                self.errores.agregar(ErrorCompilador::nuevo(
+                                    CategoriaError::Interno,
+                                    32,
+                                    span.clone(),
+                                    format!("Acceso a campo en tipo no-struct '{:?}'", otro),
+                                ));
+                                return Err(());
+                            }
+                        }
+                    }
                     _ => {
                         self.errores.agregar(ErrorCompilador::nuevo(
                             CategoriaError::Interno,
@@ -1080,6 +1131,69 @@ impl Codegen {
             _ => self.compilar_literal(lit, builder),
         }
     }
+
+    /// Compila una expresión respetando un tipo esperado (para literales grandes en contexto Entero64).
+    /// Maneja Literal, Unaria(Literal) y Binaria donde algún operando es literal.
+    pub(crate) fn compilar_expresion_con_tipo_esperado(
+        &mut self,
+        expr: &Expresion,
+        tipo_esperado: &Tipo,
+        builder: &mut FunctionBuilder,
+        variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
+    ) -> Result<cranelift_codegen::ir::Value, ()> {
+        if self.es_tipo_numerico(tipo_esperado) {
+            match expr {
+                Expresion::Literal(lit) => {
+                    return self.compilar_literal_con_tipo(lit, tipo_esperado, builder);
+                }
+                Expresion::Unaria(op, inner, span) => {
+                    if let Expresion::Literal(lit) = inner.as_ref() {
+                        let val = self.compilar_literal_con_tipo(lit, tipo_esperado, builder)?;
+                        return self.compilar_operacion_unaria(*op, val, builder, span);
+                    }
+                }
+                Expresion::Binaria(izq, op, der, _) => {
+                    // Si algún lado es literal (o unaria literal), compilarlo con el tipo esperado
+                    let izq_es_lit = matches!(izq.as_ref(), Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _)))
+                        || matches!(izq.as_ref(), Expresion::Unaria(OperadorUnario::Negacion, inner, _) if matches!(inner.as_ref(), Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _))));
+                    let der_es_lit = matches!(der.as_ref(), Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _)))
+                        || matches!(der.as_ref(), Expresion::Unaria(OperadorUnario::Negacion, inner, _) if matches!(inner.as_ref(), Expresion::Literal(Literal::Entero(_, _)) | Expresion::Literal(Literal::Flotante(_, _))));
+                    if izq_es_lit || der_es_lit {
+                        let val_izq = if izq_es_lit {
+                            self.compilar_expresion_con_tipo_esperado(izq, tipo_esperado, builder, variables)?
+                        } else {
+                            self.compilar_expresion(izq, builder, variables)?
+                        };
+                        let val_der = if der_es_lit {
+                            self.compilar_expresion_con_tipo_esperado(der, tipo_esperado, builder, variables)?
+                        } else {
+                            self.compilar_expresion(der, builder, variables)?
+                        };
+                        // Si los vals tienen anchos distintos, extender al esperado
+                        let ct = self.tipo_a_cranelift(tipo_esperado);
+                        let vi = if builder.func.dfg.value_type(val_izq) != ct {
+                            let t_izq = self.inferir_tipo(izq, variables);
+                            self.adaptar_valor_widening(val_izq, &t_izq, tipo_esperado, builder)
+                        } else { val_izq };
+                        let vd = if builder.func.dfg.value_type(val_der) != ct {
+                            let t_der = self.inferir_tipo(der, variables);
+                            self.adaptar_valor_widening(val_der, &t_der, tipo_esperado, builder)
+                        } else { val_der };
+                        return self.compilar_operacion_binaria(*op, vi, vd, builder);
+                    }
+                }
+                _ => {}
+            }
+        }
+        // Fallback: compilación normal + widening si hace falta
+        let val = self.compilar_expresion(expr, builder, variables)?;
+        let t_src = self.inferir_tipo(expr, variables);
+        if self.es_widening_codegen(tipo_esperado, &t_src) {
+            Ok(self.adaptar_valor_widening(val, &t_src, tipo_esperado, builder))
+        } else {
+            Ok(val)
+        }
+    }
     pub(crate) fn indice_variante_enum(&self, enum_nombre: &str, variante: &str) -> Option<u32> {
         self.enums.get(enum_nombre).and_then(|layout| layout.variantes.get(variante).copied())
     }
@@ -1231,8 +1345,42 @@ impl Codegen {
             slot_sret = Some(slot);
             args.push(builder.ins().stack_addr(types::I64, slot, 0));
         }
-        for arg in &llamada.argumentos {
-            let val = self.compilar_expresion(arg, builder, variables)?;
+        // F-013 — literales polimórficas + widening: compilar cada arg respetando el tipo del parámetro
+        let param_tipos: Vec<Tipo> = self.declaraciones.get(&llamada.funcion)
+            .map(|d| d.parametros.iter().map(|p| p.tipo.clone()).collect())
+            .unwrap_or_default();
+        for (idx, arg) in llamada.argumentos.iter().enumerate() {
+            let tipo_dest_opt = param_tipos.get(idx);
+            let val = if let Some(tipo_dest) = tipo_dest_opt {
+                let tipo_dest_res = self.resolver_alias(tipo_dest);
+                // Literal → emitir con ancho del destino
+                match arg {
+                    Expresion::Literal(lit) if self.es_tipo_numerico(&tipo_dest_res) => {
+                        self.compilar_literal_con_tipo(lit, &tipo_dest_res, builder)?
+                    }
+                    Expresion::Unaria(OperadorUnario::Negacion, inner, span) if self.es_tipo_numerico(&tipo_dest_res) => {
+                        if let Expresion::Literal(lit) = inner.as_ref() {
+                            let v = self.compilar_literal_con_tipo(lit, &tipo_dest_res, builder)?;
+                            self.compilar_operacion_unaria(OperadorUnario::Negacion, v, builder, span)?
+                        } else {
+                            let v = self.compilar_expresion(arg, builder, variables)?;
+                            let tipo_src = self.inferir_tipo(arg, variables);
+                            if self.es_widening_codegen(&tipo_dest_res, &tipo_src) {
+                                self.adaptar_valor_widening(v, &tipo_src, &tipo_dest_res, builder)
+                            } else { v }
+                        }
+                    }
+                    _ => {
+                        let v = self.compilar_expresion(arg, builder, variables)?;
+                        let tipo_src = self.inferir_tipo(arg, variables);
+                        if self.es_widening_codegen(&tipo_dest_res, &tipo_src) {
+                            self.adaptar_valor_widening(v, &tipo_src, &tipo_dest_res, builder)
+                        } else { v }
+                    }
+                }
+            } else {
+                self.compilar_expresion(arg, builder, variables)?
+            };
             args.push(val);
         }
 
@@ -1251,7 +1399,7 @@ impl Codegen {
         matches!(llamada.funcion.as_str(),
             "imprimir" | "imprimir_linea" | "decir" | "tamaño_de" | "afirmar" |
             "texto_nuevo" | "texto_desde" | "texto_agregar" | "texto_longitud" | "texto_tam" | "texto_liberar" |
-            "texto_concatenar" | "texto_subtexto" | "texto_comparar" | "texto_obtener_byte" |
+            "texto_concatenar" | "texto_subtexto" | "texto_comparar" | "texto_igual" | "texto_desigual" | "texto_obtener_byte" |
             "texto_a_entero" | "texto_a_natural" | "texto_a_flotante" | "texto_a_booleano" |
             "archivo_leer" | "archivo_escribir" | "archivo_existe" |
             "abs" | "max" | "min" | "raiz" | "potencia" |
@@ -1264,12 +1412,25 @@ impl Codegen {
             // Trigonometría rápida (F2/F3) — math.rs
             "seno_rapido" | "coseno_rapido" | "seno_2pi" | "coseno_2pi" |
             "exp_rapido" | "log_rapido" | "seno_aprox" |
-            "vector_nuevo" | "vector_agregar" | "vector_obtener" | "vector_longitud" | "vector_tam" | "vector_liberar" |
+            "vector_nuevo" | "vector_agregar" | "vector_poner" | "vector_obtener" | "vector_longitud" | "vector_tam" | "vector_liberar" |
+            "vector_intercambiar" | "vector_insertar" | "vector_eliminar" | "vector_extender" |
+            "vector_contiene" | "vector_indice_de" | "vector_clonar" | "vector_invertir" | "vector_limpiar" |
+            "opcion_es_alguno" | "opcion_es_ninguno" |             "resultado_es_exito" | "resultado_es_error" |
+            // Visual
+            "ventana_nueva" | "ventana_mostrar" | "ventana_cerrar" | "ventana_bucle_mensajes" |
+            "ventana_titulo" | "ventana_establecer_titulo" | "ventana_posicion" | "ventana_tamano" |
+            "lienzo_nuevo" | "lienzo_limpiar" | "lienzo_linea" | "lienzo_rectangulo" |
+            "lienzo_circulo" | "lienzo_texto" | "lienzo_guardar_png" | "lienzo_liberar" |
+            "imagen_desde_archivo" | "imagen_ancho" | "imagen_alto" | "imagen_redimensionar" |
+            "imagen_guardar_png" | "imagen_liberar" |
+            "audio_nuevo" | "audio_desde_archivo" | "audio_tono" | "audio_mezclar" |
+            "audio_fade_in" | "audio_fade_out" | "audio_guardar_wav" | "audio_reproducir" |
             "dormir" |
             "diccionario_nuevo" | "diccionario_insertar" | "diccionario_obtener" |
             "diccionario_existe" | "diccionario_eliminar" | "diccionario_longitud" | "diccionario_liberar" |
+            "diccionario_claves" | "diccionario_valores" | "diccionario_limpiar" |
             "conjunto_nuevo" | "conjunto_insertar" | "conjunto_contiene" |
-            "conjunto_eliminar" | "conjunto_longitud" | "conjunto_liberar" |
+            "conjunto_eliminar" | "conjunto_longitud" | "conjunto_liberar" | "conjunto_elementos" |
             "tcp_vincular" | "tcp_aceptar" | "tcp_leer" | "tcp_escribir" | "tcp_cerrar" |
             "canal_nuevo" | "canal_enviar" | "canal_recibir" | "canal_cerrar" | "canal_intentar" |
             "proceso_crear" | "proceso_esperar" | "proceso_leer_salida_completa" | "proceso_cerrar" |
@@ -1278,19 +1439,27 @@ impl Codegen {
             "proceso_cerrar_bidireccional" |
             "tcp_conectar" | "dns_resolver" | "tcp_establecer_timeout" | "tcp_datos_disponibles" |
             "texto_agregar_texto" | "texto_poner_byte" | "texto_puntero" | "texto_desde_bytes" |
+            "texto_reemplazar" | "texto_mayusculas" | "texto_minusculas" | "texto_recortar" | "texto_dividir" |
+            "texto_a_bytes" |
+            "texto_codificar_base64" | "texto_decodificar_base64" |
             "entero_a_texto" | "flotante_a_texto" | "booleano_a_texto" |
-            "archivo_agregar" | "archivo_borrar" | "archivo_renombrar" | "archivo_escribir_bytes" |
+            "archivo_agregar" | "archivo_borrar" | "archivo_renombrar" | "archivo_escribir_bytes" | "archivo_tamano" |
             "entorno_obtener" | "directorio_actual" | "aleatorio" | "archivo_listar" |
             "tls_conectar" | "tls_escribir" | "tls_leer" | "tls_datos_disponibles" | "tls_cerrar" |
+            "http_get" | "http_post" |
+            "json_parsear" | "json_serializar" | "json_escapar" | "json_obtener" |
             "terminal_modo_raw" | "terminal_leer_tecla" | "terminal_dimensiones" |
             "entrada_leer" |
             "argumentos" |
             "fecha_unix" | "fecha_ms" |
             "dht_nuevo" | "dht_publicar" | "dht_consultar" | "dht_bootstrap" | "dht_cerrar" |
+            "memoria_usada" | "memoria_volcar" | "memoria_rastrear" | "memoria_canario_verificar" |
+            "reloj_mono_ns" | "perfil_inicio" | "perfil_marca" | "perfil_reporte" |
             "cancelar" |
             "texto_a_puntero" |
             "como_entero64" | "como_entero32" |
             "como_entero8" | "como_entero16" |
+            "como_natural8" | "como_natural16" | "como_natural32" | "como_natural64" |
             "como_flotante32" | "como_flotante64"
         )
     }
@@ -1313,16 +1482,31 @@ impl Codegen {
             "texto_concatenar" => self.builtin_texto_concatenar(builder, variables, &llamada.argumentos),
             "texto_subtexto" => self.builtin_texto_subtexto(builder, variables, &llamada.argumentos),
             "texto_comparar" => self.builtin_texto_comparar(builder, variables, &llamada.argumentos),
+            "texto_igual" => self.builtin_texto_igual(builder, variables, &llamada.argumentos),
+            "texto_desigual" => self.builtin_texto_desigual(builder, variables, &llamada.argumentos),
             "texto_obtener_byte" => self.builtin_texto_obtener_byte(builder, variables, &llamada.argumentos),
             "texto_a_entero" => self.builtin_texto_a_entero(builder, variables, &llamada.argumentos),
             "texto_a_natural" => self.builtin_texto_a_natural(builder, variables, &llamada.argumentos),
             "texto_a_flotante" => self.builtin_texto_a_flotante(builder, variables, &llamada.argumentos),
             "texto_a_booleano" => self.builtin_texto_a_booleano(builder, variables, &llamada.argumentos),
             "texto_a_puntero" => self.builtin_texto_a_puntero(builder, variables, &llamada.argumentos),
+            // libEst builtins
+            "texto_reemplazar" => self.builtin_texto_reemplazar(builder, variables, &llamada.argumentos),
+            "texto_mayusculas" => self.builtin_texto_mayusculas(builder, variables, &llamada.argumentos),
+            "texto_minusculas" => self.builtin_texto_minusculas(builder, variables, &llamada.argumentos),
+            "texto_recortar" => self.builtin_texto_recortar(builder, variables, &llamada.argumentos),
+            "texto_dividir" => self.builtin_texto_dividir(builder, variables, &llamada.argumentos),
+            "texto_a_bytes" => self.builtin_texto_a_bytes(builder, variables, &llamada.argumentos),
+            "texto_codificar_base64" => self.builtin_texto_codificar_base64(builder, variables, &llamada.argumentos),
+            "texto_decodificar_base64" => self.builtin_texto_decodificar_base64(builder, variables, &llamada.argumentos),
             "como_entero64" => self.builtin_como_entero64(builder, variables, &llamada.argumentos),
             "como_entero32" => self.builtin_como_entero32(builder, variables, &llamada.argumentos),
             "como_entero8" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Entero8, builder, variables),
             "como_entero16" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Entero16, builder, variables),
+            "como_natural8" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Natural8, builder, variables),
+            "como_natural16" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Natural16, builder, variables),
+            "como_natural32" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Natural32, builder, variables),
+            "como_natural64" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Natural64, builder, variables),
             "como_flotante32" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Flotante32, builder, variables),
             "como_flotante64" => self.builtin_conversion_numerica(&llamada.argumentos, Tipo::Flotante64, builder, variables),
             "archivo_leer" => self.builtin_archivo_leer(builder, variables, &llamada.argumentos),
@@ -1368,8 +1552,53 @@ impl Codegen {
             "vector_nuevo" => self.builtin_vector_nuevo(builder, &llamada.tipo_args),
             "vector_agregar" => self.builtin_vector_agregar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "vector_obtener" => self.builtin_vector_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_poner" => self.builtin_vector_poner(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_intercambiar" => self.builtin_vector_intercambiar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_insertar" => self.builtin_vector_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_eliminar" => self.builtin_vector_eliminar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_extender" => self.builtin_vector_extender(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "vector_longitud" | "vector_tam" => self.builtin_vector_longitud(builder, variables, &llamada.argumentos),
             "vector_liberar" => self.builtin_vector_liberar(builder, variables, &llamada.argumentos),
+            "vector_contiene" => self.builtin_vector_contiene(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_indice_de" => self.builtin_vector_indice_de(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_clonar" => self.builtin_vector_clonar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_invertir" => self.builtin_vector_invertir(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "vector_limpiar" => self.builtin_vector_limpiar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "opcion_es_alguno" => self.builtin_opcion_es_alguno(builder, variables, &llamada.argumentos),
+            "opcion_es_ninguno" => self.builtin_opcion_es_ninguno(builder, variables, &llamada.argumentos),
+            "resultado_es_exito" => self.builtin_resultado_es_exito(builder, variables, &llamada.argumentos),
+            "resultado_es_error" => self.builtin_resultado_es_error(builder, variables, &llamada.argumentos),
+            // Visual
+            "ventana_nueva" => self.builtin_ventana_nueva(builder, variables, &llamada.argumentos),
+            "ventana_mostrar" => self.builtin_ventana_mostrar(builder, variables, &llamada.argumentos),
+            "ventana_cerrar" => self.builtin_ventana_cerrar(builder, variables, &llamada.argumentos),
+            "ventana_bucle_mensajes" => self.builtin_ventana_bucle_mensajes(builder, variables, &llamada.argumentos),
+            "ventana_titulo" => self.builtin_ventana_titulo(builder, variables, &llamada.argumentos),
+            "ventana_establecer_titulo" => self.builtin_ventana_establecer_titulo(builder, variables, &llamada.argumentos),
+            "ventana_posicion" => self.builtin_ventana_posicion(builder, variables, &llamada.argumentos),
+            "ventana_tamano" => self.builtin_ventana_tamano(builder, variables, &llamada.argumentos),
+            "lienzo_nuevo" => self.builtin_lienzo_nuevo(builder, variables, &llamada.argumentos),
+            "lienzo_limpiar" => self.builtin_lienzo_limpiar(builder, variables, &llamada.argumentos),
+            "lienzo_linea" => self.builtin_lienzo_linea(builder, variables, &llamada.argumentos),
+            "lienzo_rectangulo" => self.builtin_lienzo_rectangulo(builder, variables, &llamada.argumentos),
+            "lienzo_circulo" => self.builtin_lienzo_circulo(builder, variables, &llamada.argumentos),
+            "lienzo_texto" => self.builtin_lienzo_texto(builder, variables, &llamada.argumentos),
+            "lienzo_guardar_png" => self.builtin_lienzo_guardar_png(builder, variables, &llamada.argumentos),
+            "lienzo_liberar" => self.builtin_lienzo_liberar(builder, variables, &llamada.argumentos),
+            "imagen_desde_archivo" => self.builtin_imagen_desde_archivo(builder, variables, &llamada.argumentos),
+            "imagen_ancho" => self.builtin_imagen_ancho(builder, variables, &llamada.argumentos),
+            "imagen_alto" => self.builtin_imagen_alto(builder, variables, &llamada.argumentos),
+            "imagen_redimensionar" => self.builtin_imagen_redimensionar(builder, variables, &llamada.argumentos),
+            "imagen_guardar_png" => self.builtin_imagen_guardar_png(builder, variables, &llamada.argumentos),
+            "imagen_liberar" => self.builtin_imagen_liberar(builder, variables, &llamada.argumentos),
+            "audio_nuevo" => self.builtin_audio_nuevo(builder, variables, &llamada.argumentos),
+            "audio_desde_archivo" => self.builtin_audio_desde_archivo(builder, variables, &llamada.argumentos),
+            "audio_tono" => self.builtin_audio_tono(builder, variables, &llamada.argumentos),
+            "audio_mezclar" => self.builtin_audio_mezclar(builder, variables, &llamada.argumentos),
+            "audio_fade_in" => self.builtin_audio_fade_in(builder, variables, &llamada.argumentos),
+            "audio_fade_out" => self.builtin_audio_fade_out(builder, variables, &llamada.argumentos),
+            "audio_guardar_wav" => self.builtin_audio_guardar_wav(builder, variables, &llamada.argumentos),
+            "audio_reproducir" => self.builtin_audio_reproducir(builder, variables, &llamada.argumentos),
             "dormir" => self.builtin_dormir(builder, variables, &llamada.argumentos),
             "tcp_vincular" => self.builtin_tcp_vincular(builder, variables, &llamada.argumentos),
             "tcp_aceptar" => self.builtin_tcp_aceptar(builder, variables, &llamada.argumentos),
@@ -1417,6 +1646,12 @@ impl Codegen {
             "tls_leer" => self.builtin_tls_leer(builder, variables, &llamada.argumentos),
             "tls_datos_disponibles" => self.builtin_tls_datos_disponibles(builder, variables, &llamada.argumentos),
             "tls_cerrar" => self.builtin_tls_cerrar(builder, variables, &llamada.argumentos),
+            "http_get" => self.builtin_http_get(builder, variables, &llamada.argumentos),
+            "http_post" => self.builtin_http_post(builder, variables, &llamada.argumentos),
+            "json_parsear" => self.builtin_json_parsear(builder, variables, &llamada.argumentos),
+            "json_serializar" => self.builtin_json_serializar(builder, variables, &llamada.argumentos),
+            "json_escapar" => self.builtin_json_escapar(builder, variables, &llamada.argumentos),
+            "json_obtener" => self.builtin_json_obtener(builder, variables, &llamada.argumentos),
             "terminal_modo_raw" => self.builtin_terminal_modo_raw(builder, variables, &llamada.argumentos),
             "terminal_leer_tecla" => self.builtin_terminal_leer_tecla(builder, variables, &llamada.argumentos),
             "terminal_dimensiones" => self.builtin_terminal_dimensiones(builder, variables, &llamada.argumentos),
@@ -1424,11 +1659,23 @@ impl Codegen {
 "argumentos" => self.builtin_argumentos(builder, variables, &llamada.argumentos),
             "fecha_unix" => self.builtin_fecha_unix(builder, variables, &llamada.argumentos),
             "fecha_ms" => self.builtin_fecha_ms(builder, variables, &llamada.argumentos),
+            "fecha_anio" => self.builtin_fecha_anio(builder, variables, &llamada.argumentos),
+            "fecha_mes" => self.builtin_fecha_mes(builder, variables, &llamada.argumentos),
+            "fecha_dia" => self.builtin_fecha_dia(builder, variables, &llamada.argumentos),
+            "archivo_tamano" => self.builtin_archivo_tamano(builder, variables, &llamada.argumentos),
             "dht_nuevo" => self.builtin_dht_nuevo(builder, variables, &llamada.argumentos),
             "dht_publicar" => self.builtin_dht_publicar(builder, variables, &llamada.argumentos),
             "dht_consultar" => self.builtin_dht_consultar(builder, variables, &llamada.argumentos),
             "dht_bootstrap" => self.builtin_dht_bootstrap(builder, variables, &llamada.argumentos),
             "dht_cerrar" => self.builtin_dht_cerrar(builder, variables, &llamada.argumentos),
+            "memoria_usada" => self.builtin_memoria_usada(builder, variables, &llamada.argumentos),
+            "memoria_volcar" => self.builtin_memoria_volcar(builder, variables, &llamada.argumentos),
+            "memoria_rastrear" => self.builtin_memoria_rastrear(builder, variables, &llamada.argumentos),
+            "memoria_canario_verificar" => self.builtin_memoria_canario_verificar(builder, variables, &llamada.argumentos),
+            "reloj_mono_ns" => self.builtin_reloj_mono_ns(builder, variables, &llamada.argumentos),
+            "perfil_inicio" => self.builtin_perfil_inicio(builder, variables, &llamada.argumentos),
+            "perfil_marca" => self.builtin_perfil_marca(builder, variables, &llamada.argumentos),
+            "perfil_reporte" => self.builtin_perfil_reporte(builder, variables, &llamada.argumentos),
             "diccionario_nuevo" => self.builtin_diccionario_nuevo(builder, &llamada.tipo_args),
             "diccionario_insertar" => self.builtin_diccionario_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "diccionario_obtener" => self.builtin_diccionario_obtener(builder, variables, &llamada.argumentos, &llamada.tipo_args),
@@ -1436,12 +1683,16 @@ impl Codegen {
             "diccionario_eliminar" => self.builtin_diccionario_eliminar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "diccionario_longitud" => self.builtin_diccionario_longitud(builder, variables, &llamada.argumentos),
             "diccionario_liberar" => self.builtin_diccionario_liberar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_claves" => self.builtin_diccionario_claves(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_valores" => self.builtin_diccionario_valores(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "diccionario_limpiar" => self.builtin_diccionario_limpiar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "conjunto_nuevo" => self.builtin_conjunto_nuevo(builder, &llamada.tipo_args),
             "conjunto_insertar" => self.builtin_conjunto_insertar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "conjunto_contiene" => self.builtin_conjunto_contiene(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "conjunto_eliminar" => self.builtin_conjunto_eliminar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             "conjunto_longitud" => self.builtin_conjunto_longitud(builder, variables, &llamada.argumentos),
             "conjunto_liberar" => self.builtin_conjunto_liberar(builder, variables, &llamada.argumentos, &llamada.tipo_args),
+            "conjunto_elementos" => self.builtin_conjunto_elementos(builder, variables, &llamada.argumentos, &llamada.tipo_args),
             _ => {
                 self.errores.agregar(ErrorCompilador::nuevo(
                     CategoriaError::Interno,

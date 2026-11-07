@@ -1,0 +1,19 @@
+// libEst::opcion — Helpers para Option<T> y Resultado<T, E>
+// Stub base para 0.8.0
+
+el función opcion_es_alguno<T>(o: Option<T>) -> Booleano {
+    // TODO: implementar pattern matching
+    retornar falso;
+}
+
+el función opcion_es_ninguno<T>(o: Option<T>) -> Booleano {
+    retornar falso; // TODO: implementar
+}
+
+el función resultado_es_exito<T, E>(r: Resultado<T, E>) -> Booleano {
+    retornar falso; // TODO: implementar
+}
+
+el función resultado_es_error<T, E>(r: Resultado<T, E>) -> Booleano {
+    retornar falso; // TODO: implementar
+}

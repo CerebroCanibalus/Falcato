@@ -1,0 +1,66 @@
+// libEst::matematicas - Funciones matematicas
+// Stub base para 0.8.0 - delega a builtins
+
+el función mate_abs(n: Flotante64) -> Flotante64 {
+    retornar abs(n);
+}
+
+el función mate_maximo(a: Flotante64, b: Flotante64) -> Flotante64 {
+    retornar max(a, b);
+}
+
+el función mate_minimo(a: Flotante64, b: Flotante64) -> Flotante64 {
+    retornar min(a, b);
+}
+
+el función mate_raiz(n: Flotante64) -> Flotante64 {
+    retornar raiz(n);
+}
+
+el función mate_potencia(base: Flotante64, exp: Flotante64) -> Flotante64 {
+    retornar potencia(base, exp);
+}
+
+el función mate_seno(angulo: Flotante64) -> Flotante64 {
+    retornar seno(angulo);
+}
+
+el función mate_coseno(angulo: Flotante64) -> Flotante64 {
+    retornar coseno(angulo);
+}
+
+el función mate_tangente(angulo: Flotante64) -> Flotante64 {
+    retornar tangente(angulo);
+}
+
+el función mate_logaritmo(n: Flotante64) -> Flotante64 {
+    retornar logaritmo(n);
+}
+
+el función mate_logaritmo10(n: Flotante64) -> Flotante64 {
+    retornar logaritmo10(n);
+}
+
+el función mate_piso(n: Flotante64) -> Entero64 {
+    retornar piso(n);
+}
+
+el función mate_techo(n: Flotante64) -> Entero64 {
+    retornar techo(n);
+}
+
+el función mate_pi() -> Flotante64 {
+    retornar 3.141592653589793;
+}
+
+el función mate_e() -> Flotante64 {
+    retornar 2.718281828459045;
+}
+
+el función mate_grados_a_radianes(grados: Flotante64) -> Flotante64 {
+    retornar grados * mate_pi() / 180.0;
+}
+
+el función mate_radianes_a_grados(radianes: Flotante64) -> Flotante64 {
+    retornar radianes * 180.0 / mate_pi();
+}

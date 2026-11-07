@@ -80,6 +80,9 @@ enum Comandos {
         /// Diagnósticos como JSON estructurado (agentes LLM, CI)
         #[arg(long)]
         json: bool,
+        /// Depuración de memoria graduable (0=off, 1=guardián, 2=cirujano, 3=enfermizo)
+        #[arg(long = "depurar-memoria", alias = "debug-mem", value_name = "NIVEL", default_missing_value = "1", num_args = 0..=1, require_equals = false)]
+        depurar_memoria: Option<String>,
     },
     /// Compila y ejecuta archivos .fc
     #[command(name = "corre", alias = "run", alias = "ejecutar", help_template = TEMPLATE_AYUDA)]
@@ -87,6 +90,9 @@ enum Comandos {
         /// Archivo(s) fuente .fc (principal + dependencias)
         #[arg(required = true)]
         archivos: Vec<String>,
+        /// Depuración de memoria graduable (0=off, 1=guardián, 2=cirujano, 3=enfermizo)
+        #[arg(long = "depurar-memoria", alias = "debug-mem", value_name = "NIVEL", default_missing_value = "1", num_args = 0..=1, require_equals = false)]
+        depurar_memoria: Option<String>,
         /// Argumentos para el programa ejecutado
         #[arg(allow_hyphen_values = true, last = true)]
         args: Vec<String>,
@@ -183,6 +189,20 @@ enum PaqueteComandos {
 
 /// Construye el comando con el template de ayuda en español y los textos de
 /// help/version hispanizados, recursivamente en TODOS los subcomandos.
+fn parsear_nivel_memoria(val: Option<&str>) -> u8 {
+    match val {
+        None => 0,
+        Some("") | Some("1") => 1,
+        Some("0") => 0,
+        Some("2") => 2,
+        Some("3") => 3,
+        Some(s) => {
+            eprintln!("[WARN] nivel de memoria '{}' no válido, usando 1 (válidos: 0,1,2,3)", s);
+            1
+        }
+    }
+}
+
 fn parsear_cli() -> Cli {
     use clap::CommandFactory;
 
@@ -222,20 +242,24 @@ fn main() {
             release,
             emit_clif,
             json,
+            depurar_memoria,
         } => {
+            let nivel = parsear_nivel_memoria(depurar_memoria.as_deref());
             if let Err(e) = compilar(&archivos,
                 output.as_deref(),
                 target.as_deref(),
                 release,
                 emit_clif,
                 json,
+                nivel,
             ) {
                 eprintln!("[ERROR] {}", e);
                 std::process::exit(1);
             }
         }
-        Comandos::Run { archivos, args } => {
-            if let Err(e) = compilar_y_ejecutar(&archivos, &args) {
+        Comandos::Run { archivos, depurar_memoria, args } => {
+            let nivel = parsear_nivel_memoria(depurar_memoria.as_deref());
+            if let Err(e) = compilar_y_ejecutar(&archivos, &args, nivel) {
                 eprintln!("[ERROR] {}", e);
                 std::process::exit(1);
             }
@@ -456,6 +480,7 @@ fn compilar(
     release: bool,
     emit_clif: bool,
     json: bool,
+    nivel_memoria: u8,
 ) -> Result<(), String> {
     if archivos.is_empty() {
         return Err("No se especificaron archivos fuente.".to_string());
@@ -465,7 +490,7 @@ fn compilar(
     // El resolver multi-archivo se usa solo cuando se pasan múltiples archivos explícitamente.
     if archivos.len() == 1 {
         let archivo = &archivos[0];
-        return compilar_individual(archivo, output, target, release, emit_clif, json);
+        return compilar_individual(archivo, output, target, release, emit_clif, json, nivel_memoria);
     }
 
     // Ruta multi-archivo con Resolver
@@ -502,6 +527,15 @@ fn compilar(
     link_objetos(&rutas_obj, &binario, target, release)?;
 
     println!("[Falcato] Binario generado: {}", binario);
+
+    // === Mensajes post-compilación didácticos ===
+    println!();
+    println!("  [i] LibEst disponible: usar `usar libEst::*` para acceder a todas las funciones.");
+    println!("  [i] Ejemplo: usar archivo::leer, texto::contiene, http::get, json::parsear");
+    println!("  [i] Documentación: falcato.md → sección 'LibEst'");
+    println!("  [i] LSP: falcato lsp → autocompletado con hover de la libEst");
+    println!();
+
     Ok(())
 }
 
@@ -513,6 +547,7 @@ fn compilar_individual(
     _release: bool,
     emit_clif: bool,
     _json: bool,
+    nivel_memoria: u8,
 ) -> Result<(), String> {
     println!("[Falcato] Compilando '{}'...", archivo);
 
@@ -539,12 +574,23 @@ fn compilar_individual(
     let mut semantica = AnalizadorSemantico::nuevo();
     semantica.analizar(&programa)
         .map_err(|e| format!("Errores semánticos:\n{}", e))?;
-    println!("[Falcato] Análisis semántico: sin errores de concordancia");
+    if semantica.errores.hay_warnings() {
+        for w in &semantica.errores.warnings {
+            eprintln!("{}", w);
+        }
+        println!("[Falcato] Análisis semántico: sin errores de concordancia ({} advertencia(s))",
+            semantica.errores.cantidad_warnings());
+    } else {
+        println!("[Falcato] Análisis semántico: sin errores de concordancia");
+    }
 
     let mut codegen = Codegen::nuevo("main")
         .map_err(|e| format!("Error inicializando codegen: {}", e))?;
     codegen.con_emit_clif(emit_clif);
-    codegen.compilar_programa(&programa)
+    codegen.con_nivel_memoria(nivel_memoria);
+    let nombre_modulo = std::path::Path::new(archivo).file_stem()
+        .and_then(|s| s.to_str()).unwrap_or("main");
+    codegen.compilar_programa(nombre_modulo, &programa)
         .map_err(|e| format!("Errores de compilación:\n{:?}", e))?;
 
     let obj_ruta = format!("{}.o", archivo.strip_suffix(".fc").unwrap_or(archivo));
@@ -562,10 +608,19 @@ fn compilar_individual(
 
     link_objeto(&obj_ruta, &binario, target, false)?;
     println!("[Falcato] Binario generado: {}", binario);
+
+    // === Mensajes post-compilación didácticos ===
+    println!();
+    println!("  [i] LibEst disponible: usar `usar libEst::*` para acceder a todas las funciones.");
+    println!("  [i] Ejemplo: usar archivo::leer, texto::contiene, http::get, json::parsear");
+    println!("  [i] Documentación: falcato.md → sección 'LibEst'");
+    println!("  [i] LSP: falcato lsp → autocompletado con hover de la libEst");
+    println!();
+
     Ok(())
 }
 
-fn compilar_y_ejecutar(archivos: &[String], args: &[String]) -> Result<(), String> {
+fn compilar_y_ejecutar(archivos: &[String], args: &[String], nivel_memoria: u8) -> Result<(), String> {
     if archivos.is_empty() {
         return Err("No se especificaron archivos fuente.".to_string());
     }
@@ -573,7 +628,7 @@ fn compilar_y_ejecutar(archivos: &[String], args: &[String]) -> Result<(), Strin
     let primer = &archivos[0];
     let binario = format!("{}.exe", primer.strip_suffix(".fc").unwrap_or(primer));
     
-    compilar(archivos, Some(&binario), None, false, false, false)?;
+    compilar(archivos, Some(&binario), None, false, false, false, nivel_memoria)?;
 
     println!("[Falcato] Ejecutando '{}'...", binario);
     
@@ -603,6 +658,75 @@ fn verificar(archivos: &[String], json: bool, stdin: bool, incremental: bool) ->
 
     if archivos.is_empty() {
         return Err("No se especificaron archivos fuente.".to_string());
+    }
+
+    // F-008 — cross-file: si hay múltiples archivos, compartir símbolos públicos
+    if archivos.len() > 1 {
+        let base_dir = Path::new(&archivos[0]).parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
+        let mut resolver = Resolver::nuevo(&base_dir);
+        for archivo in archivos {
+            resolver.agregar_archivo(Path::new(archivo))?;
+        }
+        resolver.calcular_orden()?;
+        // Colectar símbolos públicos de todos los módulos (como en compilar_todo)
+        let mut programas: Vec<(String, crate::ast::Programa)> = Vec::new();
+        for nombre_modulo in &resolver.orden.clone() {
+            let unidad = resolver.modulos.get(nombre_modulo).unwrap();
+            let ruta_str = unidad.ruta.to_string_lossy().to_string();
+            let lexer = LexerFalcato::nuevo(&unidad.fuente, &ruta_str);
+            let tokens = lexer.tokenizar();
+            let programa = ParserFalcato::parse(tokens)
+                .map_err(|errs| {
+                    let msgs: Vec<String> = errs.iter().map(|e| e.error.to_string()).collect();
+                    format!("Errores de parseo en '{}':\n{}", unidad.ruta.display(), msgs.join("\n"))
+                })?;
+            programas.push((nombre_modulo.clone(), programa));
+        }
+        let mut simbolos_publicos: std::collections::HashMap<String, crate::semantic::FirmaFuncion> = std::collections::HashMap::new();
+        let mut structs_publicos: std::collections::HashMap<String, crate::semantic::InfoStruct> = std::collections::HashMap::new();
+        let mut enums_publicos: std::collections::HashMap<String, crate::semantic::InfoEnum> = std::collections::HashMap::new();
+        for (nombre_modulo, programa) in &programas {
+            for decl in &programa.declaraciones {
+                Resolver::colectar_simbolos_publicos_decl(
+                    decl, nombre_modulo, "",
+                    &mut simbolos_publicos, &mut structs_publicos, &mut enums_publicos,
+                );
+            }
+        }
+        for (nombre_modulo, programa) in &programas {
+            let mut semantica = AnalizadorSemantico::con_simbolos_publicos_completo(
+                simbolos_publicos.clone(),
+                structs_publicos.clone(),
+                enums_publicos.clone(),
+            );
+            // Verificar con símbolos compartidos
+            let mut prog_clone = programa.clone();
+            // R7.5 Fase 2: transformar principal(args: Struct)
+            if let Err(msg) = crate::args_tipados::preprocesar(&mut prog_clone) {
+                return Err(format!("Error en argumentos tipados ({}): {}", nombre_modulo, msg));
+            }
+            match semantica.analizar(&prog_clone) {
+                Ok(_) => {
+                    if !json {
+                        println!("[Falcato] '{}' verificado: sin errores", nombre_modulo);
+                    } else {
+                        println!("{{\"ok\":true,\"archivo\":\"{}\"}}", nombre_modulo);
+                    }
+                }
+                Err(errores) => {
+                    if json {
+                        println!("{{\"ok\":false,\"archivo\":\"{}\",\"errores\":[{}]}}",
+                            nombre_modulo,
+                            errores.errores.iter().map(|e| format!("{{\"codigo\":\"{}\",\"mensaje\":\"{}\"}}", e.codigo_str(), e.mensaje)).collect::<Vec<_>>().join(","));
+                        return Err(JSON_YA_IMPRESO.to_string());
+                    }
+                    return Err(format!("Errores semánticos en '{}':\n{}", nombre_modulo, errores));
+                }
+            }
+        }
+        return Ok(());
     }
 
     for archivo in archivos {
@@ -668,13 +792,40 @@ fn verificar_fuente(archivo: &str, fuente: &str, json: bool, incremental: bool) 
         }
     }
 
+    // F-006: imprimir warnings (shadowing de declaraciones) sin abortar
+    if !json && semantica.errores.hay_warnings() {
+        for w in &semantica.errores.warnings {
+            eprintln!("{}", w);
+        }
+    }
+
     if json {
-        println!("{{\"ok\":true,\"archivo\":\"{}\"}}", escapar_json(archivo));
+        let warnings_json: String = semantica.errores.warnings.iter()
+            .map(formato_error_json)
+            .collect::<Vec<_>>()
+            .join(",");
+        if warnings_json.is_empty() {
+            println!("{{\"ok\":true,\"archivo\":\"{}\"}}", escapar_json(archivo));
+        } else {
+            println!("{{\"ok\":true,\"archivo\":\"{}\",\"warnings\":[{}]}}",
+                escapar_json(archivo), warnings_json);
+        }
     } else {
-        println!("[Falcato] '{}' verificado: sin errores", archivo);
+        if semantica.errores.hay_warnings() {
+            println!("[Falcato] '{}' verificado: sin errores ({} advertencia(s))",
+                archivo, semantica.errores.cantidad_warnings());
+        } else {
+            println!("[Falcato] '{}' verificado: sin errores", archivo);
+        }
         if incremental {
             escribir_cache_check(archivo, fuente);
         }
+
+        // === Consejos post-verificación ===
+        println!();
+        println!("  [i] LibEst: usar `usar libEst::*` para texto, red, JSON, archivo, etc.");
+        println!("  [i] Ejemplo: usar texto::contiene, archivo::leer, http::get, json::parsear");
+        println!();
     }
 
     Ok(())
@@ -891,10 +1042,18 @@ fn ejecutar_pruebas(archivos: &[String], _json: bool) -> Result<(), String> {
     let mut semantica = AnalizadorSemantico::nuevo();
     semantica.analizar(&programa)
         .map_err(|e| format!("Errores semánticos:\n{}", e))?;
+    // F-006: warnings (shadowing) no abortan, pero se reportan
+    if semantica.errores.hay_warnings() {
+        for w in &semantica.errores.warnings {
+            eprintln!("{}", w);
+        }
+    }
 
     let mut codegen = Codegen::nuevo("main")
         .map_err(|e| format!("Error inicializando codegen: {}", e))?;
-    codegen.compilar_programa(&programa)
+    let nombre_modulo = std::path::Path::new(archivo).file_stem()
+        .and_then(|s| s.to_str()).unwrap_or("prueba");
+    codegen.compilar_programa(nombre_modulo, &programa)
         .map_err(|e| format!("Errores de compilación:\n{:?}", e))?;
 
     let obj_ruta = format!("{}.o", archivo.strip_suffix(".fc").unwrap_or(archivo));

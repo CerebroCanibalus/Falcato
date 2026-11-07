@@ -1,0 +1,26 @@
+// libEst::diccionario — Operaciones sobre Diccionario<K, V>
+// Delega a builtins Rust del runtime
+
+el función diccionario_longitud<K, V>(d: Diccionario<K, V>) -> Entero32 {
+    retornar diccionario_longitud(d);
+}
+
+el función diccionario_existe<K, V>(d: Diccionario<K, V>, clave: K) -> Booleano {
+    retornar diccionario_existe(d, clave);
+}
+
+el función diccionario_claves<K, V>(d: Diccionario<K, V>) -> Vector<Texto> {
+    el resultado: Vector<Texto> = vector_nuevo<Texto>();
+    diccionario_claves(d, resultado, 8, 8);
+    retornar resultado;
+}
+
+el función diccionario_valores<K, V>(d: Diccionario<K, V>) -> Vector<Texto> {
+    el resultado: Vector<Texto> = vector_nuevo<Texto>();
+    diccionario_valores(d, resultado, 8, 8);
+    retornar resultado;
+}
+
+el función diccionario_limpiar<K, V>(d: Diccionario<K, V>) {
+    diccionario_limpiar(d, 8, 8);
+}

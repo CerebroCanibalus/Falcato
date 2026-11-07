@@ -20,16 +20,20 @@ pub enum Token {
     #[token("si")]
     Si,
     
-    #[token("entonces")]
-    Entonces,
-    
     #[token("sino")]
     Sino,
+
+    #[token("pues")]
+    Pues,
+
+    #[token("po")]
+    Po,
 
     #[token("es")]
     Es,
 
     #[token("está")]
+    #[token("esta")]
     Esta,
 
     #[token("fuese")]
@@ -51,15 +55,19 @@ pub enum Token {
     En,
     
     #[token("estructural")]
+    #[token("estructura")]
+    #[token("estruct")]
     Estructural,
     
     #[token("enumeración")]
+    #[token("enumeracion")]
     Enumeracion,
     
     #[token("usar")]
     Usar,
     
     #[token("módulo")]
+    #[token("modulo")]
     Modulo,
     
     #[token("todos")]
@@ -84,13 +92,11 @@ pub enum Token {
     Estricto,
     
     #[token("mut")]
+    #[token("cambia")]
     Mut,
     
     #[token("como")]
     Como,
-    
-    #[token("tipo")]
-    Tipo,
 
     #[token("región")]
     #[token("region")]
@@ -179,6 +185,7 @@ pub enum Token {
     EnteroCorto,
     
     #[token("EnteroMínimo")]
+    #[token("EnteroMinimo")]
     EnteroMinimo,
     
     #[token("Natural")]
@@ -191,6 +198,7 @@ pub enum Token {
     NaturalCorto,
     
     #[token("NaturalMínimo")]
+    #[token("NaturalMinimo")]
     NaturalMinimo,
     
     #[token("Real")]
@@ -206,6 +214,7 @@ pub enum Token {
     RealCorto,
     
     #[token("Lógico")]
+    #[token("Logico")]
     Logico,
     
     #[token("Entero8")]
@@ -254,6 +263,7 @@ pub enum Token {
     Resultado,
     
     #[token("Vacío")]
+    #[token("Vacio")]
     Vacio,
 
     // Literales
@@ -271,7 +281,7 @@ pub enum Token {
     #[regex(r#""([^"\\]|\\.)*""#, |lex| {
         let slice = lex.slice();
         let inner = &slice[1..slice.len()-1];
-        Some(desescapar_cadena(inner))
+        desescapar_cadena(inner)
     })]
     PalabraLiteral(Option<String>),
     
@@ -410,7 +420,8 @@ pub enum Token {
 
 /// Convierte secuencias de escape en su carácter real.
 /// Soporta: \\n, \\t, \\r, \\\\, \\\", \\0, \\xNN
-fn desescapar_cadena(entrada: &str) -> String {
+/// Retorna None si hay escape desconocido (F-012) — el lexer genera PalabraLiteral(None) → error con span
+fn desescapar_cadena(entrada: &str) -> Option<String> {
     let mut resultado = String::with_capacity(entrada.len());
     let mut chars = entrada.chars().peekable();
     
@@ -448,8 +459,8 @@ fn desescapar_cadena(entrada: &str) -> String {
                     }
                 }
                 Some(other) => {
-                    // Escape desconocido: conservar el carácter tal cual
-                    resultado.push(other);
+                    // F-012: escape desconocido → error léxico con span (no silencioso)
+                    return None;
                 }
                 None => {
                     // Backslash al final: conservar
@@ -461,7 +472,7 @@ fn desescapar_cadena(entrada: &str) -> String {
         }
     }
     
-    resultado
+    Some(resultado)
 }
 
 /// Token con su span asociado

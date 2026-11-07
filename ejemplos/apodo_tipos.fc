@@ -23,7 +23,7 @@ función principal() -> Entero32 {
     // Tamaño como adjetivo
     el grande: EnteroLargo = 9999999999;
     el pequeño: NaturalCorto = 5;
-    el minimo: EnteroMínimo = -128;
+    el minimo_val: EnteroMínimo = -128;
     el real_corto: RealCorto = 1.5;
 
     imprimir_linea("id = {id}");
@@ -35,7 +35,7 @@ función principal() -> Entero32 {
     imprimir_linea("conteo = {conteo}");
     imprimir_linea("grande = {grande}");
     imprimir_linea("pequeño = {pequeño}");
-    imprimir_linea("minimo = {minimo}");
+    imprimir_linea("minimo_val = {minimo_val}");
     imprimir_linea("real_corto = {real_corto}");
 
     // Los apodos son transparentes: ID es Entero64

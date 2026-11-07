@@ -29,6 +29,13 @@ mod archivo_avanzado;
 // de sistema; los builtins tls_* quedan sin impl en macOS → error de compilación (Day-0).
 #[cfg(not(target_os = "macos"))]
 mod tls;
+mod http;
+mod json;
+mod diccionario;
+mod visual;
+mod panic_handler;
+mod memoria_debug;
+mod perfil;
 
 use std::ffi::c_void;
 
@@ -339,3 +346,5 @@ pub unsafe extern "C" fn falcato_tcp_datos_disponibles(sock: i64) -> i32 {
         tcp_cliente::tcp_datos_disponibles(sock)
     }
 }
+
+

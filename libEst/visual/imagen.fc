@@ -1,0 +1,11 @@
+// libEst::visual::imagen — Imágenes rasterizadas
+// Los builtins se llaman directamente desde Falcato
+
+// Uso:
+//   el img: Imagen = imagen_desde_archivo("foto.png");
+//   el w: Entero32 = imagen_ancho(img);
+//   el h: Entero32 = imagen_alto(img);
+//   el resized: Imagen = imagen_redimensionar(img, 200, 200);
+//   imagen_guardar_png(resized, "salida.png");
+//   imagen_liberar(img);
+//   imagen_liberar(resized);

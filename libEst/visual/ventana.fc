@@ -1,0 +1,45 @@
+// libEst::visual::ventana — Ventanas nativas (Win32)
+// Los builtins se llaman directamente desde Falcato
+
+// Tipos
+estructural Punto {
+    x: Entero32,
+    y: Entero32,
+}
+
+estructural Rect {
+    izquierda: Entero32,
+    superior: Entero32,
+    derecha: Entero32,
+    inferior: Entero32,
+}
+
+estructural Tamano {
+    ancho: Entero32,
+    alto: Entero32,
+}
+
+apodo Ventana = Entero64;
+
+// Constructores de geometría (Falcato puro)
+el función punto_nuevo(la x: Entero32, la y: Entero32) -> Punto {
+    retornar Punto { x: x, y: y };
+}
+
+el función rect_nuevo(la x: Entero32, la y: Entero32, la ancho: Entero32, la alto: Entero32) -> Rect {
+    retornar Rect { izquierda: x, superior: y, derecha: x + ancho, inferior: y + alto };
+}
+
+el función rect_contiene(la r: Rect, la p: Punto) -> Booleano {
+    retornar p.x >= r.izquierda && p.x <= r.derecha && p.y >= r.superior && p.y <= r.inferior;
+}
+
+// Uso de builtins:
+//   el v: Ventana = ventana_nueva("Mi Ventana", 800, 600);
+//   ventana_mostrar(v);
+//   el titulo: Texto = ventana_titulo(v);
+//   ventana_establecer_titulo(v, "Nuevo Título");
+//   el pos: Punto = ventana_posicion(v);
+//   el tam: Tamano = ventana_tamano(v);
+//   ventana_bucle_mensajes(v);
+//   ventana_cerrar(v);

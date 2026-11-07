@@ -85,6 +85,8 @@ pub struct Codegen {
     pub(crate) executor_worker_generado: bool,
     /// Si true, imprime el CLIF de cada función antes de definirla (flag --emit-clif)
     pub(crate) emit_clif: bool,
+    /// Nivel de depuración de memoria (0=off, 1=guardián, 2=cirujano, 3=enfermizo)
+    pub(crate) nivel_memoria: u8,
     // ─── R6: Drop automático ────────────────────────────────────────────────
     /// Declaraciones de funciones no genéricas: nombre → declaración.
     /// Para consultar el artículo de un parámetro (el=owned→mueve, la=presta).
@@ -100,6 +102,8 @@ pub struct Codegen {
     /// R9.0.1 — sret: puntero destino del struct retornado por la función actual.
     /// Se setea en el prólogo (primer parámetro oculto) y se usa en `retornar struct`.
     pub(crate) sret_destino: Option<cranelift_codegen::ir::Value>,
+    /// F-013 — tipo de retorno de la función actual (para literales polimórficos en `retornar`).
+    pub(crate) retorno_actual: Option<Tipo>,
 }
 
 /// Info para compilar un closure diferidamente
@@ -165,17 +169,24 @@ impl Codegen {
             executor_pool_var: None,
             executor_worker_generado: false,
             emit_clif: false,
+            nivel_memoria: 0,
             declaraciones: HashMap::new(),
             heap_vivas: Vec::new(),
             scope_marcas: Vec::new(),
             pila_bucles: Vec::new(),
             sret_destino: None,
+            retorno_actual: None,
         }.registrar_builtins_codegen())
     }
 
     /// Activa la emisión de CLIF (flag --emit-clif).
     pub fn con_emit_clif(&mut self, activo: bool) -> &mut Self {
         self.emit_clif = activo;
+        self
+    }
+
+    pub fn con_nivel_memoria(&mut self, v: u8) -> &mut Self {
+        self.nivel_memoria = v;
         self
     }
 
@@ -277,11 +288,12 @@ impl Codegen {
     }
 
     pub fn compilar_programa(&mut self,
+        nombre_modulo: &str,
         programa: &Programa,
     ) -> Result<(), Errores> {
         // Obtener todas las declaraciones con prefijo de mÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³dulo
         let todas: Vec<(String, &Declaracion)> = programa.declaraciones.iter()
-            .flat_map(|d| self.aplanar_con_prefijo("", d))
+            .flat_map(|d| self.aplanar_con_prefijo(nombre_modulo, d))
 
             .collect();
 
@@ -330,14 +342,32 @@ impl Codegen {
             }
         }
 
-        // Tercera pasada: compilar cuerpos (solo funciones no genÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ricas)
+        // Tercera pasada: compilar cuerpos (solo funciones no genericas)
+        // 3.1c — si codegen falla, error duro — nunca continuar silencioso.
+        let mut fallidas: Vec<(String, Span)> = Vec::new();
         for (_prefijo, decl) in &todas {
             if let Declaracion::Funcion(func) = decl {
                 if func.parametros_genericos.is_empty() {
+                    if func.es_insegura && func.cuerpo.sentencias.is_empty() {
+                        continue;
+                    }
                     if let Err(_) = self.compilar_funcion(func) {
-                        // Error ya agregado a self.errores
+                        fallidas.push((func.nombre.clone(), func.span.clone()));
+                    } else if !self.funciones.contains_key(&func.nombre) {
+                        self.errores.agregar(ErrorCompilador::nuevo(
+                            CategoriaError::Interno,
+                            99,
+                            func.span.clone(),
+                            format!("La funcion '{}' fue declarada pero no se emitio al objeto (codegen la salto en silencio)", func.nombre),
+                        ));
+                        fallidas.push((func.nombre.clone(), func.span.clone()));
                     }
                 }
+            }
+        }
+        if !fallidas.is_empty() {
+            for (nombre, span) in &fallidas {
+                eprintln!("[C009] {}:{}:{}: la funcion '{}' no se pudo compilar y no sera vinculada (causaria LNK2019)", span.archivo, span.inicio.linea, span.inicio.columna, nombre);
             }
         }
 
@@ -499,7 +529,7 @@ impl Codegen {
         }
     }
 
-    fn registrar_struct(&mut self, s: &EstructuralDecl) {
+    pub(crate) fn registrar_struct(&mut self, s: &EstructuralDecl) {
         let mut offsets = HashMap::new();
         let mut tipos = HashMap::new();
         let mut bitfields = HashMap::new();
@@ -566,7 +596,7 @@ impl Codegen {
         });
     }
 
-    fn registrar_enum(&mut self, e: &EnumeracionDecl) {
+    pub(crate) fn registrar_enum(&mut self, e: &EnumeracionDecl) {
         let mut variantes = HashMap::new();
         let mut tipos_datos = HashMap::new();
         let mut max_tamano_datos = 0u32;
@@ -786,11 +816,22 @@ impl Codegen {
 
         // R9.0.1 — Retorno de struct → sret (puntero oculto como primer parámetro).
         // La función escribe el struct en esa memoria y retorna void.
-        let ret_es_struct = match &func.retorno {
+        // FIX: si func.retorno es None pero la última sentencia es `retornar <expr>;`,
+        // inferir el tipo de retorno de la expresión (mismo fix que en compilar_funcion).
+        let retorno_inferido: Option<Tipo> = if func.retorno.is_none() {
+            if let Some(crate::ast::Sentencia::Retornar(Some(expr), _)) = func.cuerpo.sentencias.last() {
+                Some(self.inferir_tipo_expr_retorno(expr))
+            } else {
+                None
+            }
+        } else {
+            func.retorno.clone()
+        };
+        let ret_es_struct = match &retorno_inferido {
             Some(ret) => self.tipo_es_struct(ret).is_some(),
             None => false,
         };
-        if let Some(ref ret) = func.retorno {
+        if let Some(ref ret) = retorno_inferido {
             if !ret_es_struct {
                 let tipo = self.tipo_a_cranelift(ret);
                 sig.returns.push(AbiParam::new(tipo));
@@ -997,8 +1038,8 @@ impl BackendFalcato for Codegen {
         Codegen::nuevo(nombre_modulo)
     }
 
-    fn compilar_programa(&mut self, programa: &Programa) -> Result<(), Errores> {
-        self.compilar_programa(programa)
+    fn compilar_programa(&mut self, nombre_modulo: &str, programa: &Programa) -> Result<(), Errores> {
+        self.compilar_programa(nombre_modulo, programa)
     }
 
     fn escribir_objeto(&mut self, ruta: &str) -> Result<(), String> {

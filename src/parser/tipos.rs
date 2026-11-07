@@ -25,9 +25,9 @@ pub fn parse_tipo(cursor: &mut ParserCursor) -> Result<Tipo, ErrorSintaxis> {
         Some(Token::Ampersand) => {
             cursor.avanzar(); // &
             
-            // Verificar si es &mut
-            if cursor.actual() == Some(&Token::Mut) {
-                cursor.avanzar(); // mut
+            // Verificar si es &mut (alias: &muta, &cambia)
+            if cursor.actual() == Some(&Token::Mut) || cursor.actual() == Some(&Token::Muta) {
+                cursor.avanzar(); // mut / muta / cambia (cambia ya es Mut)
                 
                 // Verificar si es &mut self T (self-referential)
                 if cursor.actual() == Some(&Token::SelfKw) {

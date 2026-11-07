@@ -377,28 +377,36 @@ mod imp {
         }
         FindClose(handle);
 
-        // Construir array de descriptores Texto en heap
-        let count = nombres.len();
-        let tam_descriptor = 24usize; // sizeof(Texto descriptor)
-        let array_size = count * tam_descriptor;
-        let array_ptr = malloc(array_size) as *mut u8;
-        if array_ptr.is_null() {
-            // Liberar nombres
-            for (ptr, _) in nombres {
-                free(ptr as *mut c_void);
-            }
-            return;
-        }
+          // Construir array de PUNTEROS a descriptores Texto en heap
+          // Convención: Vector<Texto> contiene punteros a descriptores individuales
+          let count = nombres.len();
+          let tam_puntero = 8usize; // sizeof(puntero)
+          let array_size = count * tam_puntero;
+          let array_ptr = malloc(array_size) as *mut u8;
+          if array_ptr.is_null() {
+              // Liberar nombres
+              for (ptr, _) in nombres {
+                  free(ptr as *mut c_void);
+              }
+              return;
+          }
 
-        // Copiar cada descriptor al array
-        for (i, (nombre_ptr, nombre_len)) in nombres.iter().enumerate() {
-            let desc_ptr = array_ptr.offset((i * tam_descriptor) as isize);
-            let cap = nombre_len + 1;
-            // Escribir ptr, len, cap en el descriptor
-            *(desc_ptr as *mut i64) = *nombre_ptr as i64;
-            *(desc_ptr.offset(8) as *mut i64) = *nombre_len as i64;
-            *(desc_ptr.offset(16) as *mut i64) = cap as i64;
-        }
+          // Crear un descriptor individual para cada nombre y guardar puntero en el array
+          for (i, (nombre_ptr, nombre_len)) in nombres.iter().enumerate() {
+              // Crear descriptor de Texto en heap (24 bytes)
+              let desc_ptr = malloc(24) as *mut u8;
+              if desc_ptr.is_null() {
+                  free(*nombre_ptr as *mut c_void);
+                  continue;
+              }
+              let cap = *nombre_len + 1;
+              // Escribir ptr, len, cap en el descriptor
+              *(desc_ptr as *mut i64) = *nombre_ptr as i64;
+              *(desc_ptr.offset(8) as *mut i64) = *nombre_len as i64;
+              *(desc_ptr.offset(16) as *mut i64) = cap as i64;
+              // Guardar puntero al descriptor en el array
+              *(array_ptr.offset((i * tam_puntero) as isize) as *mut i64) = desc_ptr as i64;
+          }
 
         // Escribir descriptor del Vector<Texto>
         escribir_campo(desc_out, OFFSET_PTR, array_ptr as i64);
@@ -614,27 +622,165 @@ mod imp {
         }
         closedir(d);
 
-        let count = nombres.len();
-        let tam_descriptor = 24usize;
-        let array_size = count * tam_descriptor;
-        let array_ptr = malloc(array_size) as *mut u8;
-        if array_ptr.is_null() {
-            for (ptr, _) in nombres { free(ptr as *mut c_void); }
-            return;
-        }
+          // Construir array de PUNTEROS a descriptores Texto en heap
+          // Convención: Vector<Texto> contiene punteros a descriptores individuales
+          let count = nombres.len();
+          let tam_puntero = 8usize;
+          let array_size = count * tam_puntero;
+          let array_ptr = malloc(array_size) as *mut u8;
+          if array_ptr.is_null() {
+              for (ptr, _) in nombres { free(ptr as *mut c_void); }
+              return;
+          }
 
-        for (i, (nombre_ptr, nombre_len)) in nombres.iter().enumerate() {
-            let desc_ptr = array_ptr.offset((i * tam_descriptor) as isize);
-            let cap = nombre_len + 1;
-            *(desc_ptr as *mut i64) = *nombre_ptr as i64;
-            *(desc_ptr.offset(8) as *mut i64) = *nombre_len as i64;
-            *(desc_ptr.offset(16) as *mut i64) = cap as i64;
-        }
+          // Crear un descriptor individual para cada nombre y guardar puntero en el array
+          for (i, (nombre_ptr, nombre_len)) in nombres.iter().enumerate() {
+              let desc_ptr = malloc(24) as *mut u8;
+              if desc_ptr.is_null() {
+                  free(*nombre_ptr as *mut c_void);
+                  continue;
+              }
+              let cap = *nombre_len + 1;
+              *(desc_ptr as *mut i64) = *nombre_ptr as i64;
+              *(desc_ptr.offset(8) as *mut i64) = *nombre_len as i64;
+              *(desc_ptr.offset(16) as *mut i64) = cap as i64;
+              *(array_ptr.offset((i * tam_puntero) as isize) as *mut i64) = desc_ptr as i64;
+          }
 
         escribir_campo(desc_out, OFFSET_PTR, array_ptr as i64);
         escribir_campo(desc_out, OFFSET_LEN, count as i64);
         escribir_campo(desc_out, OFFSET_CAP, count as i64);
     }
+
+    /// Obtiene el tamaño de un archivo en bytes.
+    /// Retorna -1 si hay error.
+    #[cfg(target_os = "windows")]
+    #[no_mangle]
+    pub unsafe extern "C" fn falcato_archivo_tamano(ruta: i64) -> i64 {
+        use std::ffi::CStr;
+        let ptr = leer_campo(ruta, OFFSET_PTR) as *const i8;
+        if ptr.is_null() { return -1; }
+        let cstr = CStr::from_ptr(ptr);
+        let ruta_str = match cstr.to_str() {
+            Ok(s) => s,
+            Err(_) => return -1,
+        };
+        match std::fs::metadata(ruta_str) {
+            Ok(m) => m.len() as i64,
+            Err(_) => -1,
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[no_mangle]
+    pub unsafe extern "C" fn falcato_archivo_tamano(ruta: i64) -> i64 {
+        use std::ffi::CStr;
+        let ptr = leer_campo(ruta, OFFSET_PTR) as *const i8;
+        if ptr.is_null() { return -1; }
+        let cstr = CStr::from_ptr(ptr);
+        let ruta_str = match cstr.to_str() {
+            Ok(s) => s,
+            Err(_) => return -1,
+        };
+        match std::fs::metadata(ruta_str) {
+            Ok(m) => m.len() as i64,
+            Err(_) => -1,
+        }
+    }
+}
+
+/// Funciones de fecha/time — componentes de timestamp Unix
+pub mod tiempo {
+    use super::*;
+
+    /// Retorna el año de un timestamp Unix.
+    #[no_mangle]
+    pub unsafe extern "C" fn falcato_fecha_anio(unix: i64) -> i32 {
+        // Conversión simple: días desde 1970-01-01
+        let dias = unix / 86400;
+        let mut year = 1970i32;
+        let mut remaining = dias;
+
+        loop {
+            let days_in_year = if es_bisiesto(year) { 366 } else { 365 };
+            if remaining < days_in_year as i64 {
+                break;
+            }
+            remaining -= days_in_year as i64;
+            year += 1;
+        }
+
+        // Encontrar mes y día
+        let mes_dia = dias_a_mes_dia(remaining as i32, year);
+        mes_dia.0 // retorno: mes (1-12)
+    }
+
+    /// Retorna el mes (1-12) de un timestamp Unix.
+    #[no_mangle]
+    pub unsafe extern "C" fn falcato_fecha_mes(unix: i64) -> i32 {
+        let dias = unix / 86400;
+        let mut year = 1970i32;
+        let mut remaining = dias;
+
+        loop {
+            let days_in_year = if es_bisiesto(year) { 366 } else { 365 };
+            if remaining < days_in_year as i64 {
+                break;
+            }
+            remaining -= days_in_year as i64;
+            year += 1;
+        }
+
+        let mes_dia = dias_a_mes_dia(remaining as i32, year);
+        mes_dia.0
+    }
+
+    /// Retorna el día del mes (1-31) de un timestamp Unix.
+    #[no_mangle]
+    pub unsafe extern "C" fn falcato_fecha_dia(unix: i64) -> i32 {
+        let dias = unix / 86400;
+        let mut year = 1970i32;
+        let mut remaining = dias;
+
+        loop {
+            let days_in_year = if es_bisiesto(year) { 366 } else { 365 };
+            if remaining < days_in_year as i64 {
+                break;
+            }
+            remaining -= days_in_year as i64;
+            year += 1;
+        }
+
+        let mes_dia = dias_a_mes_dia(remaining as i32, year);
+        mes_dia.1
+    }
+
+    fn es_bisiesto(year: i32) -> bool {
+        (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    }
+
+    fn dias_en_mes(mes: i32, year: i32) -> i32 {
+        match mes {
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+            4 | 6 | 9 | 11 => 30,
+            2 => if es_bisiesto(year) { 29 } else { 28 },
+            _ => 0,
+        }
+    }
+
+    /// Convierte días del año a (mes, día_del_mes).
+    fn dias_a_mes_dia(dias_restantes: i32, year: i32) -> (i32, i32) {
+        let mut remaining = dias_restantes;
+        for mes in 1..=12 {
+            let dias_mes = dias_en_mes(mes, year);
+            if remaining < dias_mes {
+                return (mes, remaining + 1);
+            }
+            remaining -= dias_mes;
+        }
+        (12, 31) // fallback
+    }
 }
 
 pub use imp::*;
+pub use tiempo::*;

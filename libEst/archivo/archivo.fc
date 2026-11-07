@@ -1,0 +1,42 @@
+// libEst::archivo - Operaciones de archivo
+// Delega a builtins Rust del runtime
+
+// Lectura
+el función archivo_leer(la ruta: Texto) -> Texto {
+    retornar archivo_leer(ruta);
+}
+
+// Escritura
+el función archivo_escribir(la ruta: Texto, la contenido: Texto) -> Entero32 {
+    retornar archivo_escribir(ruta, contenido);
+}
+
+// Append
+el función archivo_agregar(la ruta: Texto, la contenido: Texto) -> Entero32 {
+    retornar archivo_agregar(ruta, contenido);
+}
+
+// Verificar existencia
+el función archivo_existe(la ruta: Texto) -> Booleano {
+    retornar archivo_existe(ruta);
+}
+
+// Borrar
+el función archivo_borrar(la ruta: Texto) -> Entero32 {
+    retornar archivo_borrar(ruta);
+}
+
+// Renombrar
+el función archivo_renombrar(la de: Texto, la a: Texto) -> Entero32 {
+    retornar archivo_renombrar(de, a);
+}
+
+// Listar directorio
+el función archivo_listar(la ruta: Texto) -> Vector<Texto> {
+    retornar archivo_listar(ruta);
+}
+
+// Obtener tamaño
+el función archivo_tamano(la ruta: Texto) -> Entero64 {
+    retornar archivo_tamano(ruta);
+}

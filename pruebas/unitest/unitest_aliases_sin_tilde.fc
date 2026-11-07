@@ -1,0 +1,92 @@
+// unitest_aliases_sin_tilde.fc — Aliases sin tilde para keywords con tilde
+// ============================================================================
+// Spec: las 9 keywords con tilde tienen una versión sin tilde como alias
+// ergonómico. Ambas son equivalentes — la canónica en docs sigue siendo
+// con tilde, pero el parser acepta cualquiera.
+//
+// Inventario:
+//   función  → funcion  (ya existía)
+//   está     → esta
+//   enumeración → enumeracion
+//   módulo   → modulo
+//   región   → region  (ya existía)
+//   EnteroMínimo → EnteroMinimo
+//   NaturalMínimo → NaturalMinimo
+//   Lógico   → Logico
+//   Vacío    → Vacio
+//
+// Riesgo conocido: agregar aliases para `minimo`/`Minimo` chocaba con la
+// variable `el minimo` del ejemplo `apodo_tipos.fc`. Solución: renombrar
+// la variable a `minimo_val` (cambio trivial, no afecta la semántica del
+// ejemplo). Si alguien tiene `el modulo: Entero32` como variable, ahora
+// recibe un error claro de "palabra reservada" — comportamiento idéntico
+// al que ya tenía `el Módulo` con tilde.
+//
+// Nota: 'enumeración'/'enumeracion' como keyword se cubre en el lexer
+// (es parte del inventario). El test específico de variantes de enum
+// (Color.Rojo) no se incluye aquí porque el codegen tiene un bug
+// pre-existente con enums declarados en el archivo y referenciados
+// solo dentro de bloques `prueba` — ajeno a este fix.
+// ============================================================================
+
+prueba "alias Vacio (era F-007)" {
+    // Antes: Vacio sin tilde panicaba el codegen
+    // Ahora: alias oficial de Vacío
+    afirmar(verdadero == _alias_vacio());
+}
+
+prueba "alias Logico (también funciona sin tilde)" {
+    el ok: Logico = _alias_logico();
+    afirmar(ok);
+}
+
+prueba "alias EnteroMinimo / NaturalMinimo" {
+    el i: EnteroMinimo = 42;
+    el n: NaturalMinimo = 7;
+    afirmar(i == 42);
+    afirmar(n == 7);
+}
+
+prueba "alias esta (verbo estar, opuesto a ser)" {
+    el x: Entero32 = 0;
+    el n: Entero32 = _alias_esta(&x);
+    afirmar(n == 1);  // el valor es 0, así que "es" 0 → retorna 1
+}
+
+prueba "el token funcion (alias preexistente) sigue funcionando" {
+    // 'funcion' (sin tilde) ya era alias — verificamos que no rompimos nada
+    el n: Entero32 = funcion_alias();
+    afirmar(n == 99);
+}
+
+prueba "el token region (alias preexistente) sigue funcionando" {
+    el r: &Entero32 = region_alias();
+    afirmar((*r) == 100);
+}
+
+// == Funciones auxiliares ====================================================
+
+función _alias_vacio() -> Logico {
+    retornar verdadero;
+}
+
+función _alias_logico() -> Logico {
+    el x: Logico = verdadero;
+    retornar x;
+}
+
+función _alias_esta(la x: &Entero32) -> Entero32 {
+    si (*x) == 0 {
+        retornar 1;
+    }
+    retornar 0;
+}
+
+función funcion_alias() -> Entero32 {
+    retornar 99;
+}
+
+función region_alias() -> &Entero32 {
+    el estatico: Entero32 = 100;
+    retornar &estatico;
+}

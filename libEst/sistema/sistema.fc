@@ -1,0 +1,30 @@
+// libEst::sistema — Entorno, argumentos, consola, aleatorio
+// Stub base para 0.8.0
+
+el función entorno_obtener(nombre: Texto) -> Texto {
+    retornar entorno_obtener(nombre); // builtin
+}
+
+el función argumentos_cantidad() -> Entero32 {
+    retornar argumentos_cantidad(); // builtin
+}
+
+el función argumentos_obtener(indice: Entero32) -> Texto {
+    retornar argumentos_obtener(indice); // builtin
+}
+
+el función consola_imprimir(texto: Texto) {
+    imprimir(texto); // builtin
+}
+
+el función consola_imprimir_linea(texto: Texto) {
+    imprimir_linea(texto); // builtin
+}
+
+el función aleatorio_entero() -> Entero64 {
+    retornar aleatorio(); // builtin
+}
+
+el función aleatorio_entero_entre(min: Entero64, max: Entero64) -> Entero64 {
+    retornar aleatorio(); // TODO: implementar con rango
+}

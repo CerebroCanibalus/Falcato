@@ -1,0 +1,5 @@
+[proyecto]
+entry = "main.fc"
+watch_dir = "."
+output_dir = "build"
+falcato_bin = "falcato"

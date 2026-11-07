@@ -1,0 +1,39 @@
+// libEst::red::json - Serialización JSON
+// Los builtins json_parsear/json_serializar/json_escapar/json_obtener
+// se llaman directamente desde Falcato
+
+// Uso:
+//   el valor: Texto = json_parsear(json_texto);
+//   el texto: Texto = json_serializar(valor);
+//   el escapado: Texto = json_escapar(texto_simple);
+//   el campo: Texto = json_obtener(json, "clave");
+
+// Constructores de valores JSON (Falcato puro)
+estructural JsonValor {
+    tipo: Entero32,
+    texto: Texto,
+}
+
+el función json_nulo() -> JsonValor {
+    retornar JsonValor { tipo: 0, texto: texto_desde("null") };
+}
+
+el función json_booleano(la valor: Booleano) -> JsonValor {
+    si valor {
+        retornar JsonValor { tipo: 1, texto: texto_desde("true") };
+    } sino {
+        retornar JsonValor { tipo: 1, texto: texto_desde("false") };
+    }
+}
+
+el función json_entero(la valor: Entero64) -> JsonValor {
+    retornar JsonValor { tipo: 2, texto: entero_a_texto(valor) };
+}
+
+el función json_real(la valor: Flotante64) -> JsonValor {
+    retornar JsonValor { tipo: 3, texto: flotante_a_texto(valor) };
+}
+
+el función json_texto(la valor: Texto) -> JsonValor {
+    retornar JsonValor { tipo: 4, texto: valor };
+}

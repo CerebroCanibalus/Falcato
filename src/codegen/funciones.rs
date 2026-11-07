@@ -23,12 +23,27 @@ impl Codegen {
         // Crear firma para la funciÃ³n
         let mut sig = Signature::new(self.call_conv_default());
         // R9.0.1 — Retorno de struct → sret (puntero oculto como primer parámetro).
-        let ret_es_struct = match &func.retorno {
+        // R9.0.1 — Retorno de struct ← sret (puntero oculto como primer parႡ₡metro).
+        // FIX: si func.retorno es None pero la última sentencia es `retornar <expr>;`,
+        // inferir el tipo de retorno de la expresión (sino el verifier Cranelift falla
+        // con `return type mismatch` cuando el cuerpo emite `return v0` sin tener AbiParam).
+        let retorno_inferido: Option<Tipo> = if func.retorno.is_none() {
+            if let Some(crate::ast::Sentencia::Retornar(Some(expr), _)) = func.cuerpo.sentencias.last() {
+                Some(self.inferir_tipo_expr_retorno(expr))
+            } else {
+                None
+            }
+        } else {
+            func.retorno.clone()
+        };
+        let ret_es_struct = match &retorno_inferido {
             Some(ret) => self.tipo_es_struct(ret).is_some(),
             None => false,
         };
-        if let Some(ref ret) = func.retorno {
-            if !ret_es_struct {
+        if let Some(ref ret) = retorno_inferido {
+            if *ret == Tipo::Vacio {
+                // Vacío ← void, sin retorno
+            } else if !ret_es_struct {
                 sig.returns.push(AbiParam::new(self.tipo_a_cranelift(ret)));
             }
         }
@@ -86,6 +101,22 @@ impl Codegen {
         } else {
             None
         };
+        // F-013 — guardar retorno actual para literales polimórficos
+        self.retorno_actual = func.retorno.clone();
+
+        // 3.1b — instalar manejador de panics si es principal (auto-flush + stack trace)
+        if func.nombre == "principal" {
+            let func_id = self.asegurar_funcion_c("falcato_instalar_manejador_panico", &[], None);
+            let func_ref = self.module.declare_func_in_func(func_id, builder.func);
+            builder.ins().call(func_ref, &[]);
+            // Memoria debug — lente graduable (nivel 0=off)
+            if self.nivel_memoria > 0 {
+                let mem_id = self.asegurar_funcion_c("falcato_memoria_init", &[types::I8], None);
+                let mem_ref = self.module.declare_func_in_func(mem_id, builder.func);
+                let nivel_val = builder.ins().iconst(types::I8, self.nivel_memoria as i64);
+                builder.ins().call(mem_ref, &[nivel_val]);
+            }
+        }
 
         // ParÃ¡metros como variables
         for (i, param) in func.parametros.iter().enumerate() {
@@ -129,11 +160,16 @@ impl Codegen {
         self.liberar_scope(0, &mut builder, &variables)?;
 
         // Si no hay retorno explÃ­cito, aÃ±adir retorno void
-        if func.retorno.is_none() {
+        let ultimo_es_retornar = matches!(
+            func.cuerpo.sentencias.last(),
+            Some(crate::ast::Sentencia::Retornar(_, _))
+        );
+        if !ultimo_es_retornar && (func.retorno.is_none() || matches!(func.retorno, Some(Tipo::Vacio))) {
             builder.ins().return_(&[]);
         }
 
         builder.finalize();
+        self.retorno_actual = None;
 
         // Definir funciÃ³n en el mÃ³dulo (usar func_id existente o declarar nueva)
         let func_id = match self.funciones.get(&func.nombre).copied() {
@@ -792,7 +828,11 @@ impl Codegen {
             self.compilar_sentencia(sentencia, &mut builder, &mut variables, &func.span)?;
         }
 
-        if func.retorno.is_none() {
+        let ultimo_es_retornar = matches!(
+            func.cuerpo.sentencias.last(),
+            Some(crate::ast::Sentencia::Retornar(_, _))
+        );
+        if !ultimo_es_retornar && (func.retorno.is_none() || matches!(func.retorno, Some(Tipo::Vacio))) {
             builder.ins().return_(&[]);
         }
 
