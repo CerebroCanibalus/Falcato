@@ -95,10 +95,17 @@ mod imp {
         fn pthread_mutex_lock(mtx: *mut c_void) -> i32;
         fn pthread_mutex_unlock(mtx: *mut c_void) -> i32;
         fn pthread_mutex_destroy(mtx: *mut c_void) -> i32;
+        // Nombres Rust internos sys_sem_* (sin colisión E0428 con los wrappers);
+        // el símbolo C real es sem_* (link_name).
+        #[link_name = "sem_init"]
         fn sys_sem_init(sem: *mut c_void, pshared: i32, value: u32) -> i32;
+        #[link_name = "sem_wait"]
         fn sys_sem_wait(sem: *mut c_void) -> i32;
+        #[link_name = "sem_trywait"]
         fn sys_sem_trywait(sem: *mut c_void) -> i32;
+        #[link_name = "sem_post"]
         fn sys_sem_post(sem: *mut c_void) -> i32;
+        #[link_name = "sem_destroy"]
         fn sys_sem_destroy(sem: *mut c_void) -> i32;
         fn malloc(size: usize) -> *mut c_void;
         fn free(ptr: *mut c_void);

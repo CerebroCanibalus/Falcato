@@ -27,13 +27,14 @@ mod tls_schannel_windows;
 use tls_schannel_windows::*;
 
 // ============================================================
-// POSIX — OpenSSL
+// POSIX (no Windows, no macOS) — OpenSSL
+// (macOS no tiene libssl de sistema — ticket 3, Iteración 2, Opción A)
 // ============================================================
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
 #[path = "tls_openssl_posix.rs"]
 mod tls_openssl_posix;
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
 use tls_openssl_posix::*;
 
 /// Conecta a un servidor TLS/HTTPS.

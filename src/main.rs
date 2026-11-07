@@ -1054,13 +1054,29 @@ fn buscar_link_msvc() -> Option<String> {
     None
 }
 
+/// Triple del host actual (default de `--destino` cuando no se pasa explícito).
+fn triple_del_host() -> String {
+    match std::env::consts::OS {
+        "windows" => "x86_64-pc-windows-msvc".to_string(),
+        "macos" => match std::env::consts::ARCH {
+            "aarch64" => "aarch64-apple-darwin".to_string(),
+            _ => "x86_64-apple-darwin".to_string(),
+        },
+        _ => match std::env::consts::ARCH {
+            "aarch64" => "aarch64-unknown-linux-gnu".to_string(),
+            _ => "x86_64-unknown-linux-gnu".to_string(),
+        },
+    }
+}
+
 fn link_objetos(
     objetos: &[&str],
     binario: &str,
     target: Option<&str>,
     _release: bool,
 ) -> Result<(), String> {
-    let target = target.unwrap_or("x86_64-pc-windows-msvc");
+    // Default: triple nativo (el CLI dice "default: nativo" — antes era Windows siempre)
+    let target = target.map(String::from).unwrap_or_else(triple_del_host);
 
     if target.contains("windows") {
         // Buscar link.exe de MSVC de forma robusta:
@@ -1123,7 +1139,7 @@ fn link_objetos(
     } else {
         // Linux/macOS: usar PlatformLinker (clang/gcc + runtime + libs)
         use crate::platform::linker::PlatformLinker;
-        let linker = PlatformLinker::for_target(target);
+        let linker = PlatformLinker::for_target(&target);
 
         let mut cmd = Command::new(&linker.cmd);
         for obj in objetos {

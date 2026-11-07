@@ -347,11 +347,60 @@ impl Codegen {
         // Quinta pasada: compilar wrappers de hilos (lanzar)
         self.compilar_hilos_pendientes();
 
+        // Sexta pasada: entry point `main → principal` (POSIX/Mach-O; en Windows es
+        // símbolo muerto porque el entry es `principal` vía /ENTRY:principal).
+        if let Err(_) = self.emitir_main() {
+            // Error ya agregado a self.errores
+        }
+
         if self.errores.hay_errores() {
             Err(self.errores.clone())
         } else {
             Ok(())
         }
+    }
+
+    /// Emite `main() -> i32 { principal(); 0 }` en el .o del programa.
+    ///
+    /// Permite que la runtime (staticlib) NO defina `_main`: así `ld` solo extrae
+    /// los objetos de la runtime que el programa realmente referencia (ej: los que
+    /// no usan TLS no arrastran OpenSSL, que macOS no provee).
+    fn emitir_main(&mut self) -> Result<(), ()> {
+        let principal_id = match self.funciones.get("principal") {
+            Some(&id) => id,
+            None => return Ok(()), // sin `principal` no hay entry
+        };
+
+        let mut sig = Signature::new(self.call_conv_default());
+        sig.returns.push(AbiParam::new(types::I32));
+
+        let func_id = self.module.declare_function("main", Linkage::Export, &sig).map_err(|e| {
+            self.errores.agregar(ErrorCompilador::nuevo(
+                CategoriaError::Interno, 10, Span::vacio(),
+                format!("Error declarando main: {}", e),
+            ));
+        })?;
+
+        let mut ctx = self.module.make_context();
+        ctx.func.signature = sig;
+        let mut func_ctx = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut ctx.func, &mut func_ctx);
+        let entry = builder.create_block();
+        builder.switch_to_block(entry);
+        builder.seal_block(entry);
+
+        let principal_ref = self.module.declare_func_in_func(principal_id, builder.func);
+        builder.ins().call(principal_ref, &[]);
+        let cero = builder.ins().iconst(types::I32, 0);
+        builder.ins().return_(&[cero]);
+        builder.finalize();
+
+        self.definir_funcion(func_id, &mut ctx, "main").map_err(|e| {
+            self.errores.agregar(ErrorCompilador::nuevo(
+                CategoriaError::Interno, 10, Span::vacio(),
+                format!("Error definiendo main: {}", e),
+            ));
+        })
     }
 
     /// Compila una declaraciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n `prueba` como una funciÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³n void sin parÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡metros

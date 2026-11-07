@@ -25,6 +25,9 @@ mod tcp_cliente;
 mod texto_dinamico;
 mod conversion_numerica;
 mod archivo_avanzado;
+// TLS deshabilitado en macOS (ticket 3, Iteración 2, Opción A): no hay libssl/OpenSSL
+// de sistema; los builtins tls_* quedan sin impl en macOS → error de compilación (Day-0).
+#[cfg(not(target_os = "macos"))]
 mod tls;
 
 use std::ffi::c_void;
