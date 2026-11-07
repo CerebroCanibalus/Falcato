@@ -420,9 +420,22 @@ impl Codegen {
         builder.seal_block(entry);
 
         let principal_ref = self.module.declare_func_in_func(principal_id, builder.func);
-        builder.ins().call(principal_ref, &[]);
-        let cero = builder.ins().iconst(types::I32, 0);
-        builder.ins().return_(&[cero]);
+        let llamada = builder.ins().call(principal_ref, &[]);
+        // El código de salida del proceso ES el retorno de `principal`, igual
+        // que en Windows (entry = principal vía /ENTRY). Antes se devolvía 0
+        // fijo y el resultado de `principal` se perdía solo en POSIX.
+        let resultados = builder.inst_results(llamada);
+        let codigo_salida = if resultados.is_empty() {
+            builder.ins().iconst(types::I32, 0)
+        } else {
+            let v = resultados[0];
+            if builder.func.dfg.value_type(v) == types::I32 {
+                v
+            } else {
+                builder.ins().ireduce(types::I32, v)
+            }
+        };
+        builder.ins().return_(&[codigo_salida]);
         builder.finalize();
 
         self.definir_funcion(func_id, &mut ctx, "main").map_err(|e| {
