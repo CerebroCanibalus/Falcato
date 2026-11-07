@@ -27,8 +27,18 @@ mod tls_schannel_windows;
 use tls_schannel_windows::*;
 
 // ============================================================
+// macOS — Network.framework (vía shim Objective-C)
+// ============================================================
+#[cfg(target_os = "macos")]
+#[path = "tls_network_macos.rs"]
+mod tls_network_macos;
+
+#[cfg(target_os = "macos")]
+use tls_network_macos::*;
+
+// ============================================================
 // POSIX (no Windows, no macOS) — OpenSSL
-// (macOS no tiene libssl de sistema — ticket 3, Iteración 2, Opción A)
+// (macOS no tiene libssl de sistema; usa Network.framework)
 // ============================================================
 #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
 #[path = "tls_openssl_posix.rs"]

@@ -539,16 +539,8 @@ impl BuiltinRegistry {
         //     &[types::I64, types::I64], Some(types::I32));
         // usleep ya viene de Self::linux() con firma (I32) → I32 — OK.
 
-        // TLS: macOS no trae OpenSSL de sistema y el runtime no incluye el
-        // módulo tls → los builtins tls_* no tienen implementación. Se marcan
-        // como no soportados para que el codegen emita error de compilación
-        // en lugar de dejar símbolos indefinidos al enlazar.
-        for builtin in ["tls_conectar", "tls_escribir", "tls_leer",
-                        "tls_datos_disponibles", "tls_cerrar"] {
-            r.entries.remove(builtin);
-            r.no_soportados.insert(builtin.to_string(),
-                "TLS no está implementado en macOS: no hay OpenSSL de sistema y el runtime se compila sin el módulo tls. Usa http_get/http_post (sin TLS) o compila con --destino a una plataforma con TLS disponible.".to_string());
-        }
+        // TLS: macOS usa Network.framework (shim ObjC en la runtime), así que
+        // los builtins tls_* SÍ están soportados y se conservan del registry Linux.
 
         // En macOS, pthread y semáforos POSIX están disponibles
         // (aunque sem_init está deprecado, usar dispatch_semaphore sería más nativo)
