@@ -32,6 +32,11 @@ pub struct BuiltinEntry {
     /// Función variádica (printf): la firma exacta la decide el caller
     /// en cada llamada, no el registry. El registry solo remapea el nombre.
     pub variadic: bool,
+    /// Nombre alternativo cuando la llamada pasa un argumento flotante (F64).
+    /// Apple AArch64 no puede llamar variádicas desde Cranelift, así que macOS
+    /// remapea `printf` a shims con ABI fija; el shim float es distinto porque
+    /// el double viaja por registro FP, no como bits I64.
+    pub variante_f64: Option<String>,
 }
 
 /// Registry de builtins por plataforma.
@@ -51,13 +56,24 @@ pub struct BuiltinEntry {
 /// 2. Agregar entrada en `for_target()`
 pub struct BuiltinRegistry {
     entries: HashMap<String, BuiltinEntry>,
+    /// Builtins que la plataforma NO implementa: nombre → motivo en español.
+    /// El codegen los rechaza en compilación (Day-0: builtin sin impl para el
+    /// target = error, nunca link error ni crash).
+    no_soportados: HashMap<String, String>,
 }
 
 impl BuiltinRegistry {
     fn new() -> Self {
         Self {
             entries: HashMap::new(),
+            no_soportados: HashMap::new(),
         }
+    }
+
+    /// Motivo (en español) por el que un builtin no existe en esta plataforma.
+    /// `None` = el builtin está disponible.
+    pub fn motivo_no_soportado(&self, nombre: &str) -> Option<&str> {
+        self.no_soportados.get(nombre).map(|s| s.as_str())
     }
 
     /// Busca un builtin por su nombre abstracto.
@@ -523,9 +539,37 @@ impl BuiltinRegistry {
         //     &[types::I64, types::I64], Some(types::I32));
         // usleep ya viene de Self::linux() con firma (I32) → I32 — OK.
 
+        // TLS: macOS no trae OpenSSL de sistema y el runtime no incluye el
+        // módulo tls → los builtins tls_* no tienen implementación. Se marcan
+        // como no soportados para que el codegen emita error de compilación
+        // en lugar de dejar símbolos indefinidos al enlazar.
+        for builtin in ["tls_conectar", "tls_escribir", "tls_leer",
+                        "tls_datos_disponibles", "tls_cerrar"] {
+            r.entries.remove(builtin);
+            r.no_soportados.insert(builtin.to_string(),
+                "TLS no está implementado en macOS: no hay OpenSSL de sistema y el runtime se compila sin el módulo tls. Usa http_get/http_post (sin TLS) o compila con --destino a una plataforma con TLS disponible.".to_string());
+        }
+
         // En macOS, pthread y semáforos POSIX están disponibles
         // (aunque sem_init está deprecado, usar dispatch_semaphore sería más nativo)
         // Por ahora, usar mismo que Linux — funciona.
+
+        // Apple AArch64 pasa los argumentos variádicos por la pila y Cranelift
+        // no modela varargs: un `printf(fmt, val)` generado por el codegen pone
+        // el valor en un registro y la libc lee pila sin inicializar (basura o
+        // SIGSEGV). Se remapea `printf` a shims con ABI fija implementados en la
+        // runtime (lib/falcato_runtime/src/print_shim.rs), que llaman a printf
+        // desde Rust con la ABI correcta.
+        let shim = BuiltinEntry {
+            name: "falcato_printf".to_string(),
+            sig: FuncSignature {
+                params: vec![types::I64],
+                ret: Some(types::I32),
+            },
+            variadic: true,
+            variante_f64: Some("falcato_printf_f64".to_string()),
+        };
+        r.entries.insert("printf".to_string(), shim);
 
         r
     }
@@ -624,6 +668,7 @@ impl BuiltinRegistry {
                 ret,
             },
             variadic: false,
+            variante_f64: None,
         });
     }
 
@@ -637,6 +682,7 @@ impl BuiltinRegistry {
                 ret,
             },
             variadic: true,
+            variante_f64: None,
         });
     }
 
@@ -692,6 +738,13 @@ impl BuiltinRegistry {
                 // Variádicas (printf): la firma exacta la decide el caller
                 // en cada llamada. Solo remapeamos el nombre.
                 if entry.variadic {
+                    // Si la llamada pasa un double, usar el shim float cuando
+                    // la plataforma lo exija (macOS/Apple AArch64).
+                    if let Some(ref f64_name) = entry.variante_f64 {
+                        if default_params.iter().any(|t| *t == types::F64) {
+                            return (f64_name.clone(), default_params.to_vec(), default_ret);
+                        }
+                    }
                     return (entry.name.clone(), default_params.to_vec(), default_ret);
                 }
                 return (entry.name.clone(), entry.sig.params.clone(), entry.sig.ret);

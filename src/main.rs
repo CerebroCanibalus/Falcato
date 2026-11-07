@@ -632,7 +632,7 @@ fn compilar_y_ejecutar(archivos: &[String], args: &[String], nivel_memoria: u8) 
 
     println!("[Falcato] Ejecutando '{}'...", binario);
     
-    let mut cmd = Command::new(&binario);
+    let mut cmd = Command::new(ruta_ejecutable(&binario));
     cmd.args(args);
     
     let status = cmd.status()
@@ -1065,7 +1065,7 @@ fn ejecutar_pruebas(archivos: &[String], _json: bool) -> Result<(), String> {
     println!("[Falcato] Binario de pruebas generado: {}", binario);
     println!();
 
-    let status = Command::new(&binario)
+    let status = Command::new(ruta_ejecutable(&binario))
         .status()
         .map_err(|e| format!("No se pudo ejecutar '{}': {}", binario, e))?;
 
@@ -1228,6 +1228,45 @@ fn triple_del_host() -> String {
     }
 }
 
+/// Resuelve la ruta de la runtime staticlib (`lib/falcato_runtime/target/...`).
+///
+/// La ruta del linker es relativa a la raíz del repo, pero el usuario compila
+/// desde SU proyecto (`falcato corre hola.fc` desde cualquier carpeta). Se
+/// prueban: ruta absoluta → CWD → candidatos relativos al ejecutable (subiendo
+/// hasta 5 niveles desde `target/release/falcato`).
+fn resolver_ruta_runtime(relativa: &str) -> Option<std::path::PathBuf> {
+    let p = std::path::Path::new(relativa);
+    if p.is_absolute() {
+        return p.exists().then(|| p.to_path_buf());
+    }
+    if p.exists() {
+        return Some(p.to_path_buf());
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(|d| d.to_path_buf());
+        for _ in 0..5 {
+            let Some(base) = dir.take() else { break };
+            let candidato = base.join(relativa);
+            if candidato.exists() {
+                return Some(candidato);
+            }
+            dir = base.parent().map(|d| d.to_path_buf());
+        }
+    }
+    None
+}
+
+/// En POSIX, ejecutar un binario por nombre relativo busca en PATH, no en el
+/// CWD (a diferencia de Windows). Añade "./" cuando haga falta.
+fn ruta_ejecutable(binario: &str) -> String {
+    let p = std::path::Path::new(binario);
+    if p.is_absolute() || binario.contains('/') || cfg!(windows) {
+        binario.to_string()
+    } else {
+        format!("./{}", binario)
+    }
+}
+
 fn link_objetos(
     objetos: &[&str],
     binario: &str,
@@ -1256,9 +1295,10 @@ fn link_objetos(
             cmd.arg(trampolin);
         }
         // Runtime library (falcato_runtime staticlib)
-        let runtime_lib = std::path::Path::new("lib/falcato_runtime/target/release/falcato_runtime.lib");
-        if runtime_lib.exists() {
-            cmd.arg(runtime_lib);
+        match resolver_ruta_runtime("lib/falcato_runtime/target/release/falcato_runtime.lib") {
+            Some(runtime_lib) => { cmd.arg(runtime_lib); }
+            None => return Err("No se encontró la runtime staticlib \
+(falcato_runtime.lib). Compila la runtime: cd lib/falcato_runtime && cargo build --release".to_string()),
         }
         cmd.arg(format!("/OUT:{}", binario))
             .arg("/SUBSYSTEM:CONSOLE")
@@ -1313,9 +1353,10 @@ fn link_objetos(
         }
         // Runtime library (libfalcato_runtime.a)
         if let Some(ref rt) = linker.runtime_lib {
-            let p = std::path::Path::new(rt);
-            if p.exists() {
-                cmd.arg(rt);
+            match resolver_ruta_runtime(rt) {
+                Some(path) => { cmd.arg(path); }
+                None => return Err(format!("No se encontró la runtime staticlib '{}'. \
+Compila la runtime: cd lib/falcato_runtime && cargo build --release", rt)),
             }
         }
         // Librerías del sistema

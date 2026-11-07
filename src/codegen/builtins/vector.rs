@@ -184,7 +184,23 @@ impl Codegen {
 
         builder.seal_block(merge_block);
         builder.switch_to_block(merge_block);
-        Ok(builder.block_params(merge_block)[0])
+        let valor_final = builder.block_params(merge_block)[0];
+
+        // Propiedad: `el` en el destino implica dueno. El vector guarda el puntero
+        // al descriptor del elemento (store shallow en vector_agregar), asi que
+        // devolverlo tal cual comparte dueno con el vector -> el drop automatico
+        // o un `texto_liberar` manual liberan el mismo bloque dos veces.
+        // Para Texto se devuelve una COPIA INDEPENDIENTE (contrato de las APIs
+        // de lectura: el caller es dueno de lo que recibe).
+        if matches!(self.resolver_alias(tipo_t), Tipo::Texto) {
+            let clonar_id = self.asegurar_funcion_c(
+                "falcato_texto_clonar", &[types::I64], Some(types::I64));
+            let clonar_ref = self.module.declare_func_in_func(clonar_id, builder.func);
+            let call = builder.ins().call(clonar_ref, &[valor_final]);
+            return Ok(builder.inst_results(call)[0]);
+        }
+
+        Ok(valor_final)
     }
 
     /// vector_poner<T>(v: Vector<T>, i: Entero32, val: T) -> Entero32

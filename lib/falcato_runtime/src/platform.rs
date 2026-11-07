@@ -95,6 +95,14 @@ mod imp {
         fn pthread_mutex_lock(mtx: *mut c_void) -> i32;
         fn pthread_mutex_unlock(mtx: *mut c_void) -> i32;
         fn pthread_mutex_destroy(mtx: *mut c_void) -> i32;
+        #[allow(dead_code)]
+        fn pthread_cond_init(cond: *mut c_void, attr: *const c_void) -> i32;
+        #[allow(dead_code)]
+        fn pthread_cond_destroy(cond: *mut c_void) -> i32;
+        #[allow(dead_code)]
+        fn pthread_cond_wait(cond: *mut c_void, mtx: *mut c_void) -> i32;
+        #[allow(dead_code)]
+        fn pthread_cond_signal(cond: *mut c_void) -> i32;
         // Nombres Rust internos sys_sem_* (sin colisión E0428 con los wrappers);
         // el símbolo C real es sem_* (link_name).
         #[link_name = "sem_init"]
@@ -132,12 +140,51 @@ mod imp {
         mtx
     }
 
+    // macOS: `sem_init(3)` devuelve ENOSYS (Darwin no soporta semáforos sin
+    // nombre). Se implementa un semáforo contador con mutex + cond sobre un
+    // bloque propio, manteniendo la misma API de puntero opaco.
+    #[cfg(target_os = "macos")]
+    #[repr(C)]
+    struct SemDarwin {
+        mtx: *mut c_void,   // pthread_mutex_t (64 bytes)
+        cond: *mut c_void,  // pthread_cond_t (48 bytes)
+        count: i32,
+    }
+
+    #[cfg(target_os = "macos")]
+    const PTHREAD_COND_SIZE: usize = 48;
+
     pub unsafe fn sem_init(initial_count: i32, _max_count: i32) -> *mut c_void {
-        let sem = malloc(SEM_T_SIZE);
-        if !sem.is_null() {
-            sys_sem_init(sem, 0, initial_count as u32);
+        #[cfg(target_os = "macos")]
+        {
+            let sem = malloc(core::mem::size_of::<SemDarwin>());
+            if sem.is_null() {
+                return sem;
+            }
+            let mtx = malloc(PTHREAD_MUTEX_SIZE);
+            let cond = malloc(PTHREAD_COND_SIZE);
+            if mtx.is_null() || cond.is_null() {
+                free(mtx);
+                free(cond);
+                free(sem);
+                return core::ptr::null_mut();
+            }
+            pthread_mutex_init(mtx, core::ptr::null());
+            pthread_cond_init(cond, core::ptr::null());
+            let s = &mut *(sem as *mut SemDarwin);
+            s.mtx = mtx;
+            s.cond = cond;
+            s.count = initial_count;
+            return sem;
         }
-        sem
+        #[cfg(not(target_os = "macos"))]
+        {
+            let sem = malloc(SEM_T_SIZE);
+            if !sem.is_null() {
+                sys_sem_init(sem, 0, initial_count as u32);
+            }
+            sem
+        }
     }
 
     pub unsafe fn mutex_lock(mtx: *mut c_void) -> i32 {
@@ -149,14 +196,50 @@ mod imp {
     }
 
     pub unsafe fn sem_wait(sem: *mut c_void) -> i32 {
+        #[cfg(target_os = "macos")]
+        {
+            let s = &mut *(sem as *mut SemDarwin);
+            pthread_mutex_lock(s.mtx);
+            while s.count <= 0 {
+                pthread_cond_wait(s.cond, s.mtx);
+            }
+            s.count -= 1;
+            pthread_mutex_unlock(s.mtx);
+            return 0;
+        }
+        #[cfg(not(target_os = "macos"))]
         sys_sem_wait(sem)
     }
 
     pub unsafe fn sem_trywait(sem: *mut c_void) -> i32 {
+        #[cfg(target_os = "macos")]
+        {
+            let s = &mut *(sem as *mut SemDarwin);
+            pthread_mutex_lock(s.mtx);
+            let ok = if s.count > 0 {
+                s.count -= 1;
+                0
+            } else {
+                -1
+            };
+            pthread_mutex_unlock(s.mtx);
+            return ok;
+        }
+        #[cfg(not(target_os = "macos"))]
         sys_sem_trywait(sem)
     }
 
     pub unsafe fn sem_post(sem: *mut c_void) -> i32 {
+        #[cfg(target_os = "macos")]
+        {
+            let s = &mut *(sem as *mut SemDarwin);
+            pthread_mutex_lock(s.mtx);
+            s.count += 1;
+            pthread_cond_signal(s.cond);
+            pthread_mutex_unlock(s.mtx);
+            return 0;
+        }
+        #[cfg(not(target_os = "macos"))]
         sys_sem_post(sem)
     }
 
@@ -166,8 +249,21 @@ mod imp {
     }
 
     pub unsafe fn sem_destroy(sem: *mut c_void) {
-        sys_sem_destroy(sem);
-        free(sem);
+        #[cfg(target_os = "macos")]
+        {
+            let s = &mut *(sem as *mut SemDarwin);
+            pthread_cond_destroy(s.cond);
+            pthread_mutex_destroy(s.mtx);
+            free(s.cond);
+            free(s.mtx);
+            free(sem);
+            return;
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            sys_sem_destroy(sem);
+            free(sem);
+        }
     }
 }
 

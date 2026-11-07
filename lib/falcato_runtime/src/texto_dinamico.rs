@@ -55,6 +55,43 @@ unsafe fn texto_desde_buffer(data: &[u8], desc_out: i64) {
     escribir_campo(desc_out, OFFSET_CAP, cap as i64);
 }
 
+/// Clona profundamente un Texto: nuevo descriptor + nueva copia de los bytes.
+///
+/// Necesario para `vector_obtener<Texto>`: el vector guarda el puntero al
+/// descriptor del elemento; devolver ese mismo puntero viola el ownership `el`
+/// del destino (drop automático + liberación manual → double-free).
+///
+/// # Safety
+/// - `desc` debe ser 0 o un puntero válido a un descriptor de Texto (24 bytes).
+#[no_mangle]
+pub unsafe extern "C" fn falcato_texto_clonar(desc: i64) -> i64 {
+    if desc == 0 {
+        return 0;
+    }
+    let src_ptr = leer_campo(desc, OFFSET_PTR) as *const u8;
+    let len = leer_campo(desc, OFFSET_LEN).max(0) as usize;
+
+    let nuevo_desc = malloc(24) as i64;
+    if nuevo_desc == 0 {
+        return 0;
+    }
+    let cap = len + 1;
+    let nuevo_ptr = malloc(cap);
+    if nuevo_ptr.is_null() {
+        free(nuevo_desc as *mut c_void);
+        return 0;
+    }
+    if len > 0 && !src_ptr.is_null() {
+        memcpy(nuevo_ptr, src_ptr as *const c_void, len);
+    }
+    *(nuevo_ptr as *mut u8).add(len) = 0;
+
+    escribir_campo(nuevo_desc, OFFSET_PTR, nuevo_ptr as i64);
+    escribir_campo(nuevo_desc, OFFSET_LEN, len as i64);
+    escribir_campo(nuevo_desc, OFFSET_CAP, cap as i64);
+    nuevo_desc
+}
+
 /// Agrega un fragmento de texto al final del texto base con realloc eficiente.
 /// Si la capacidad no es suficiente, realloc al doble o al tamaño necesario.
 ///

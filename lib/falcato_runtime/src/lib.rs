@@ -33,6 +33,7 @@ mod http;
 mod json;
 mod diccionario;
 mod visual;
+mod print_shim;
 mod panic_handler;
 mod memoria_debug;
 mod perfil;

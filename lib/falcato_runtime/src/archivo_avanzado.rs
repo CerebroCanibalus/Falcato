@@ -436,8 +436,23 @@ mod imp {
         fn closedir(dirp: *mut c_void) -> i32;
     }
 
-    // struct dirent tiene d_name en offset 19 (Linux) o variable (macOS)
-    // Usamos un offset seguro
+    // `struct dirent` NO es igual en Linux y Darwin:
+    // - Linux:  d_ino, d_off, d_reclen, d_type, d_name  → d_name en offset 19
+    // - macOS:  d_ino, d_seekoff, d_reclen, d_namlen, d_type, d_name → offset 21
+    // Leer el layout de Linux en macOS desplaza d_name 2 bytes: strlen devuelve 0
+    // (nombres vacíos) o basura.
+    #[cfg(target_os = "macos")]
+    #[repr(C)]
+    struct Dirent {
+        d_ino: u64,
+        d_seekoff: u64,
+        d_reclen: u16,
+        d_namlen: u16,
+        d_type: u8,
+        d_name: [u8; 1024],
+    }
+
+    #[cfg(not(target_os = "macos"))]
     #[repr(C)]
     struct Dirent {
         d_ino: u64,
@@ -447,10 +462,21 @@ mod imp {
         d_name: [u8; 256],
     }
 
+    // Flags de open(2) distintos entre Linux y Darwin (macOS: O_CREAT=0x200,
+    // O_TRUNC=0x400, O_APPEND=0x8).
     const O_WRONLY: i32 = 1;
-    const O_CREAT: i32 = 64;
-    const O_TRUNC: i32 = 512;
-    const O_APPEND: i32 = 1024;
+    #[cfg(target_os = "macos")]
+    const O_CREAT: i32 = 0o200;
+    #[cfg(not(target_os = "macos"))]
+    const O_CREAT: i32 = 0o100;
+    #[cfg(target_os = "macos")]
+    const O_TRUNC: i32 = 0o400;
+    #[cfg(not(target_os = "macos"))]
+    const O_TRUNC: i32 = 0o1000;
+    #[cfg(target_os = "macos")]
+    const O_APPEND: i32 = 0o10;
+    #[cfg(not(target_os = "macos"))]
+    const O_APPEND: i32 = 0o2000;
 
     #[no_mangle]
     pub unsafe extern "C" fn falcato_archivo_agregar(ruta_desc: i64, texto_desc: i64) {
