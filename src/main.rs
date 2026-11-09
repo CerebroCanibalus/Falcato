@@ -516,11 +516,25 @@ fn compilar(
     let primer_archivo = &archivos[0];
     let binario = output.map(String::from)
         .unwrap_or_else(|| {
-            Path::new(primer_archivo)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| format!("{}.exe", s))
-                .unwrap_or_else(|| "a.exe".to_string())
+            if cfg!(windows) {
+                // Windows: comportamiento histórico — `<nombre>.exe` en la
+                // carpeta actual (no tocar: scripts y CI de MSVC dependen de eso).
+                Path::new(primer_archivo)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| format!("{}.exe", s))
+                    .unwrap_or_else(|| "a.exe".to_string())
+            } else {
+                // POSIX: junto al fuente y sin extensión — Mach-O/ELF no llevan
+                // `.exe`; el `.o`/binario quedan al lado del `.fc` de origen.
+                let ruta = Path::new(primer_archivo);
+                match ruta.extension() {
+                    Some(ext) if ext.eq_ignore_ascii_case("fc") => ruta.with_extension(""),
+                    _ => ruta.to_path_buf(),
+                }
+                .to_string_lossy()
+                .into_owned()
+            }
         });
 
     let rutas_obj: Vec<&str> = objetos.iter().map(|(_, ruta)| ruta.as_str()).collect();
@@ -599,11 +613,24 @@ fn compilar_individual(
 
     let binario = output.map(String::from)
         .unwrap_or_else(|| {
-            Path::new(archivo)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| format!("{}.exe", s))
-                .unwrap_or_else(|| "a.exe".to_string())
+            if cfg!(windows) {
+                // Windows: comportamiento histórico — `<nombre>.exe` en la
+                // carpeta actual (los scripts y el CI de MSVC esperan eso).
+                Path::new(archivo)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| format!("{}.exe", s))
+                    .unwrap_or_else(|| "a.exe".to_string())
+            } else {
+                // POSIX: junto al fuente y sin extensión (Mach-O/ELF).
+                let ruta = Path::new(archivo);
+                match ruta.extension() {
+                    Some(ext) if ext.eq_ignore_ascii_case("fc") => ruta.with_extension(""),
+                    _ => ruta.to_path_buf(),
+                }
+                .to_string_lossy()
+                .into_owned()
+            }
         });
 
     link_objeto(&obj_ruta, &binario, target, false)?;
@@ -626,7 +653,12 @@ fn compilar_y_ejecutar(archivos: &[String], args: &[String], nivel_memoria: u8) 
     }
 
     let primer = &archivos[0];
-    let binario = format!("{}.exe", primer.strip_suffix(".fc").unwrap_or(primer));
+    // POSIX: junto al fuente y sin extensión (Mach-O/ELF). Windows: `.exe` como siempre.
+    let binario = if cfg!(windows) {
+        format!("{}.exe", primer.strip_suffix(".fc").unwrap_or(primer))
+    } else {
+        primer.strip_suffix(".fc").unwrap_or(primer).to_string()
+    };
     
     compilar(archivos, Some(&binario), None, false, false, false, nivel_memoria)?;
 
@@ -1059,7 +1091,13 @@ fn ejecutar_pruebas(archivos: &[String], _json: bool) -> Result<(), String> {
     let obj_ruta = format!("{}.o", archivo.strip_suffix(".fc").unwrap_or(archivo));
     codegen.escribir_objeto(&obj_ruta)?;
 
-    let binario = format!("{}_test.exe", archivo.strip_suffix(".fc").unwrap_or(archivo));
+    // `_test` junto al fuente; `.exe` sólo en Windows (Mach-O/ELF no lo usan).
+    let stem_prueba = archivo.strip_suffix(".fc").unwrap_or(archivo);
+    let binario = if cfg!(windows) {
+        format!("{}_test.exe", stem_prueba)
+    } else {
+        format!("{}_test", stem_prueba)
+    };
     link_objeto(&obj_ruta, &binario, None, false)?;
 
     println!("[Falcato] Binario de pruebas generado: {}", binario);

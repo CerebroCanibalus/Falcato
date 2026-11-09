@@ -345,7 +345,11 @@ impl BuiltinRegistry {
             &[types::I64], Some(types::I32));
 
         // Timers & process
-        r.insert("sleep", "usleep", &[types::I32], Some(types::I32));
+        // `dormir(ms)` → `falcato_dormir_ms` (runtime): `nanosleep` con la
+        // conversión ms→ns. Antes apuntaba a `usleep`, que espera MICROsegundos
+        // (y rechaza ≥ 1 s con EINVAL): `dormir(1000)` dormía 1 ms en vez de 1 s.
+        // Windows sigue con `Sleep(ms)`, que ya usa milisegundos.
+        r.insert("sleep", "falcato_dormir_ms", &[types::I32], None);
         r.insert("exit_process", "_exit", &[types::I32], None);
         r.insert("proceso_crear", "falcato_proceso_crear", &[types::I64], Some(types::I64));
         r.insert("proceso_esperar", "falcato_proceso_esperar", &[types::I64], Some(types::I32));
@@ -532,12 +536,9 @@ impl BuiltinRegistry {
     pub fn macos() -> Self {
         let mut r = Self::linux(); // macOS es casi igual a Linux
 
-        // CR-6 fix: usar usleep como Linux (nanosleep requiere struct timespec
-        // y 2 args, pero el codegen llama con 1 arg I32 — usleep funciona en
-        // macOS aunque deprecado, y tiene la misma firma que Linux).
-        // r.insert("sleep", "nanosleep",
-        //     &[types::I64, types::I64], Some(types::I32));
-        // usleep ya viene de Self::linux() con firma (I32) → I32 — OK.
+        // CR-6: el `sleep` POSIX viene de Self::linux() y ahora apunta a
+        // `falcato_dormir_ms` (runtime, nanosleep con ms→ns), que reemplazó a
+        // `usleep` (µs, y EINVAL a partir de 1 s). No hace falta parchearlo acá.
 
         // TLS: macOS usa Network.framework (shim ObjC en la runtime), así que
         // los builtins tls_* SÍ están soportados y se conservan del registry Linux.
@@ -768,7 +769,7 @@ mod tests {
         assert!(reg.lookup("create_thread").is_some());
         assert!(!reg.lookup("wsa_startup").is_some()); // No WSA en Linux
         assert!(!reg.lookup("timestamp").is_some());   // clock_gettime via trait
-        assert_eq!(reg.lookup("sleep").unwrap().name, "usleep");
+        assert_eq!(reg.lookup("sleep").unwrap().name, "falcato_dormir_ms");
     }
 
     #[test]
@@ -786,6 +787,6 @@ mod tests {
         assert_eq!(win.lookup("sleep").unwrap().name, "Sleep");
 
         let lin = BuiltinRegistry::for_target("x86_64-unknown-linux-gnu");
-        assert_eq!(lin.lookup("sleep").unwrap().name, "usleep");
+        assert_eq!(lin.lookup("sleep").unwrap().name, "falcato_dormir_ms");
     }
 }

@@ -18,6 +18,9 @@ mod proceso;
 mod terminal;
 mod entrada;
 mod tiempo;
+// `dormir(ms)` en POSIX: `nanosleep` con conversión ms→ns (Windows usa Sleep).
+#[cfg(not(target_os = "windows"))]
+mod dormir;
 mod dht;
 mod argumentos;
 mod convertir;

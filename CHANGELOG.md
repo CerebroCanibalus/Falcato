@@ -1,5 +1,16 @@
 # Changelog de Falcato
 
+## [0.8.0-beta.2] - 2026-11-09
+
+### 🔧 ARREGLOS
+
+- **`dormir(ms)` dormía 1000 veces menos en macOS y Linux**: el registro POSIX apuntaba a `usleep`, que espera microsegundos, así que `dormir(1000)` terminaba en ~1 ms en vez de 1 s (`usleep` además rechaza esperas de 1 s o más con `EINVAL`). Nuevo `falcato_dormir_ms` en la runtime (`nanosleep` con conversión ms→ns y reintento en `EINTR`); el registro POSIX y las implementaciones del trait pasan milisegundos, igual que `Sleep` en Windows. Medido en M1: `dormir(1000)` = 1,005 s · `dormir(250)` = 255 ms. Windows sin cambios.
+- **Salida por defecto en POSIX: junto al fuente y sin `.exe`**: `falcato compila x.fc` dejaba `x.exe` en el directorio actual (incluso en macOS) y `corre`/`prueba` usaban sufijo `.exe`. Ahora en POSIX el binario queda en `<carpeta>/<nombre>` y las pruebas en `<nombre>_test`; Windows conserva `<nombre>.exe`. Con `--salida` no cambia nada.
+
+### 🧪 VERIFICACIÓN
+
+- `cargo test`: 101 OK (47 + 54). `falcato prueba`: unitests OK. Corpus: 75/84 compilan (9 esperados) y los 75 binarios ejecutan sin señales. TLS `example.com:443`: 56 escritos / 928 leídos. Argumentos tipados OK.
+
 ## [0.7.6] - 2026-08-22
 
 ### 🔧 ARREGLOS
