@@ -80,6 +80,14 @@ impl PlatformLinker {
             libs: vec![
                 "-lpthread".to_string(),
                 "-lm".to_string(),
+                // TLS nativo: el shim ObjC usa Network.framework y el runtime
+                // Objective-C (ARC). Foundation arrastra libobjc.
+                "-framework".to_string(),
+                "Foundation".to_string(),
+                "-framework".to_string(),
+                "Network".to_string(),
+                "-framework".to_string(),
+                "Security".to_string(),
             ],
             entry: "_main".to_string(), // macOS entry (manejado por clang)
             extra_objs: vec![],

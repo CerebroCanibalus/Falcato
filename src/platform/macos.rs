@@ -44,12 +44,9 @@ impl PlatformRuntime for MacOsRuntime {
     }
 
     fn sleep(&self, ctx: &mut CodegenCtx, builder: &mut FunctionBuilder, ms_val: Value) {
-        // En macOS, nanosleep es preferible a usleep
-        // struct timespec { time_t tv_sec; long tv_nsec; }
-        // Por ahora, usamos usleep como Linux
-        let mil = builder.ins().iconst(types::I32, 1000);
-        let us = builder.ins().imul(ms_val, mil);
-        ctx.call_void("sleep", builder, &[us]);
+        // `falcato_dormir_ms(ms)` (runtime): nanosleep con conversión ms→ns.
+        // Se pasa el valor en milisegundos, igual que `Sleep` en Windows.
+        ctx.call_void("sleep", builder, &[ms_val]);
     }
 
     fn timestamp(&self, ctx: &mut CodegenCtx, builder: &mut FunctionBuilder) -> Value {

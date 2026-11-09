@@ -232,7 +232,7 @@ mod imp {
             &mut readfds as *mut FdSet as *mut c_void,
             ptr::null_mut(),
             ptr::null_mut(),
-            timeout.as_mut_ptr() as *mut c_void,
+            (&mut timeout as *mut Timeval) as *mut c_void,
         );
         
         if result > 0 && readfds.fd_count > 0 {
@@ -256,6 +256,23 @@ mod imp {
     const SOCK_STREAM: i32 = 1;
     const IPPROTO_TCP: i32 = 6;
 
+    // `struct addrinfo` NO es igual en glibc y Darwin: macOS coloca
+    // ai_canonname ANTES de ai_addr. Con el layout de Linux, `ai_addr` lee el
+    // puntero al nombre del host → connect() con dirección basura → SIGSEGV.
+    #[cfg(target_os = "macos")]
+    #[repr(C)]
+    struct AddrInfo {
+        ai_flags: i32,
+        ai_family: i32,
+        ai_socktype: i32,
+        ai_protocol: i32,
+        ai_addrlen: u32,
+        ai_canonname: *mut c_char,
+        ai_addr: *mut sockaddr,
+        ai_next: *mut AddrInfo,
+    }
+
+    #[cfg(not(target_os = "macos"))]
     #[repr(C)]
     struct AddrInfo {
         ai_flags: i32,
@@ -266,6 +283,21 @@ mod imp {
         ai_addr: *mut sockaddr,
         ai_canonname: *mut c_char,
         ai_next: *mut AddrInfo,
+    }
+
+    // struct timeval: Linux usa dos i64; Darwin usa i64 + i32 (padding a 16).
+    #[cfg(target_os = "macos")]
+    #[repr(C)]
+    struct Timeval {
+        tv_sec: i64,
+        tv_usec: i32,
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[repr(C)]
+    struct Timeval {
+        tv_sec: i64,
+        tv_usec: i64,
     }
 
     #[repr(C)]
@@ -309,8 +341,20 @@ mod imp {
     }
 
     const SOL_SOCKET: i32 = 1;
+    // Valores de SO_RCVTIMEO/SO_SNDTIMEO distintos en Darwin (0x1006/0x1005).
+    #[cfg(target_os = "macos")]
+    const SO_RCVTIMEO: i32 = 0x1006;
+    #[cfg(not(target_os = "macos"))]
     const SO_RCVTIMEO: i32 = 20;
+    #[cfg(target_os = "macos")]
+    const SO_SNDTIMEO: i32 = 0x1005;
+    #[cfg(not(target_os = "macos"))]
     const SO_SNDTIMEO: i32 = 21;
+    #[cfg(target_os = "macos")]
+    #[allow(dead_code)]
+    const FIONREAD: u64 = 0x4004667f;
+    #[cfg(not(target_os = "macos"))]
+    #[allow(dead_code)]
     const FIONREAD: u64 = 0x541b; // Linux
 
     // fd_set para POSIX (1024 bits = 1024 fds max)
@@ -403,12 +447,14 @@ mod imp {
             return;
         }
         let s = sock as i32;
-        // struct timeval { tv_sec, tv_usec }
-        let sec = ms / 1000;
-        let usec = (ms % 1000) * 1000;
-        let mut timeout: [i32; 2] = [sec, usec];
-        let timeout_ptr = timeout.as_mut_ptr() as *const u8;
-        let timeout_len = std::mem::size_of::<[i32; 2]>() as u32;
+        // struct timeval { tv_sec, tv_usec } — layout distinto Linux/Darwin;
+        // el kernel espera el tamaño real de timeval (16 bytes).
+        let mut timeout = Timeval {
+            tv_sec: (ms / 1000) as i64,
+            tv_usec: ((ms % 1000) * 1000) as _,
+        };
+        let timeout_ptr = (&mut timeout as *mut Timeval) as *const u8;
+        let timeout_len = std::mem::size_of::<Timeval>() as u32;
         setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, timeout_ptr, timeout_len);
         setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, timeout_ptr, timeout_len);
     }
@@ -429,15 +475,15 @@ mod imp {
             readfds.fds_bits[idx] = 1 << bit;
         }
         
-        // struct timeval { tv_sec, tv_usec }
-        let mut timeout: [i64; 2] = [0, 100_000]; // 0 sec, 100000 usec = 100ms
+        // struct timeval { tv_sec, tv_usec } — 100 ms
+        let mut timeout = Timeval { tv_sec: 0, tv_usec: 100_000 };
         
         let result = select(
             s + 1,
             &mut readfds as *mut FdSet as *mut c_void,
             ptr::null_mut(),
             ptr::null_mut(),
-            timeout.as_mut_ptr() as *mut c_void,
+            (&mut timeout as *mut Timeval) as *mut c_void,
         );
         
         if result > 0 {

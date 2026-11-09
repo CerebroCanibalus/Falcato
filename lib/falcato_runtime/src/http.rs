@@ -11,9 +11,45 @@ extern "C" {
     fn memcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
     fn send(socket: i64, buf: *const c_void, len: i32, flags: i32) -> i32;
     fn recv(socket: i64, buf: *mut c_void, len: i32, flags: i32) -> i32;
+    // Winsock cierra con closesocket; POSIX con close (macOS/Linux no tienen
+    // el símbolo closesocket → undefined symbol al enlazar).
+    #[cfg(target_os = "windows")]
     fn closesocket(socket: i64) -> i32;
+    #[cfg(not(target_os = "windows"))]
+    fn close(fd: i64) -> i32;
     // TCP builtins del runtime
+    // Espera un C string NUL-terminado (NO un descriptor de Texto).
     fn falcato_tcp_conectar(host: i64, puerto: i32) -> i64;
+}
+
+/// Cierra un socket usando el nombre portable de cada plataforma.
+#[inline]
+unsafe fn cerrar_socket(fd: i64) {
+    #[cfg(target_os = "windows")]
+    {
+        closesocket(fd);
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        close(fd);
+    }
+}
+
+/// Conecta usando una copia NUL-terminada del host: `falcato_tcp_conectar`
+/// espera un C string, no el descriptor {ptr,len,cap} de Texto (pasar el
+/// descriptor hacía que getaddrinfo leyera basura → conexión siempre fallida).
+unsafe fn conectar_host(host_ptr: *const u8, host_len: usize, puerto: i32) -> i64 {
+    let c_host = malloc(host_len + 1) as *mut u8;
+    if c_host.is_null() {
+        return -1;
+    }
+    if host_len > 0 {
+        memcpy(c_host as *mut c_void, host_ptr as *const c_void, host_len);
+    }
+    *c_host.add(host_len) = 0;
+    let fd = falcato_tcp_conectar(c_host as i64, puerto);
+    free(c_host as *mut c_void);
+    fd
 }
 
 // Offsets del descriptor de Texto
@@ -88,7 +124,7 @@ pub unsafe extern "C" fn falcato_http_get(
     let path_len = leer_campo(desc_path, OFFSET_LEN) as usize;
 
     // Conectar TCP
-    let fd = falcato_tcp_conectar(desc_host, puerto);
+    let fd = conectar_host(host_ptr, host_len, puerto);
     if fd < 0 {
         return -1;
     }
@@ -104,7 +140,7 @@ pub unsafe extern "C" fn falcato_http_get(
     // Enviar request
     let sent = send(fd, request.as_ptr() as *const c_void, request.len() as i32, 0);
     if sent < 0 {
-        closesocket(fd);
+        cerrar_socket(fd);
         return -1;
     }
 
@@ -112,7 +148,7 @@ pub unsafe extern "C" fn falcato_http_get(
     let buf_len = 1024 * 1024; // 1MB máximo
     let buf = malloc(buf_len);
     if buf.is_null() {
-        closesocket(fd);
+        cerrar_socket(fd);
         return -1;
     }
 
@@ -173,7 +209,7 @@ pub unsafe extern "C" fn falcato_http_get(
         }
     }
 
-    closesocket(fd);
+    cerrar_socket(fd);
 
     if total <= 0 {
         free(buf);
@@ -226,7 +262,7 @@ pub unsafe extern "C" fn falcato_http_post(
         (core::ptr::null(), 0)
     };
 
-    let fd = falcato_tcp_conectar(desc_host, puerto);
+    let fd = conectar_host(host_ptr, host_len, puerto);
     if fd < 0 {
         return -1;
     }
@@ -246,14 +282,14 @@ pub unsafe extern "C" fn falcato_http_post(
 
     let sent = send(fd, request.as_ptr() as *const c_void, request.len() as i32, 0);
     if sent < 0 {
-        closesocket(fd);
+        cerrar_socket(fd);
         return -1;
     }
 
     let buf_len = 1024 * 1024;
     let buf = malloc(buf_len);
     if buf.is_null() {
-        closesocket(fd);
+        cerrar_socket(fd);
         return -1;
     }
 
@@ -265,7 +301,7 @@ pub unsafe extern "C" fn falcato_http_post(
         total += recibido as usize;
     }
 
-    closesocket(fd);
+    cerrar_socket(fd);
 
     if total <= 0 {
         free(buf);

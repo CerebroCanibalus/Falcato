@@ -264,6 +264,7 @@ mod imp {
     const STDOUT_FILENO: i32 = 1;
 
     #[repr(C)]
+    #[derive(Clone, Copy)]
     struct Termios {
         c_iflag: u32,
         c_oflag: u32,

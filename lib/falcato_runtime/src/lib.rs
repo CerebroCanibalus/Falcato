@@ -18,6 +18,9 @@ mod proceso;
 mod terminal;
 mod entrada;
 mod tiempo;
+// `dormir(ms)` en POSIX: `nanosleep` con conversión ms→ns (Windows usa Sleep).
+#[cfg(not(target_os = "windows"))]
+mod dormir;
 mod dht;
 mod argumentos;
 mod convertir;
@@ -25,11 +28,13 @@ mod tcp_cliente;
 mod texto_dinamico;
 mod conversion_numerica;
 mod archivo_avanzado;
+// TLS: Schannel (Windows), OpenSSL (Linux), Network.framework vía shim ObjC (macOS).
 mod tls;
 mod http;
 mod json;
 mod diccionario;
 mod visual;
+mod print_shim;
 mod panic_handler;
 mod memoria_debug;
 mod perfil;

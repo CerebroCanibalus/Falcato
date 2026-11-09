@@ -64,11 +64,11 @@ impl PlatformRuntime for LinuxRuntime {
     // ============================================================
 
     fn sleep(&self, ctx: &mut CodegenCtx, builder: &mut FunctionBuilder, ms_val: Value) {
-        // usleep(useconds_t) — useconds_t es u32. ms*1000 = us.
-        // Por ahora: usleep(ms * 1000)
-        let mil = builder.ins().iconst(types::I32, 1000);
-        let us = builder.ins().imul(ms_val, mil);
-        ctx.call_void("sleep", builder, &[us]);
+        // `falcato_dormir_ms(ms)` (runtime): nanosleep con conversión ms→ns.
+        // El registro POSIX ahora usa milisegundos, igual que `Sleep` en
+        // Windows; la multiplicación por 1000 se fue a la runtime (usleep
+        // recibía µs y no admite esperas ≥ 1 s).
+        ctx.call_void("sleep", builder, &[ms_val]);
     }
 
     fn timestamp(&self, ctx: &mut CodegenCtx, builder: &mut FunctionBuilder) -> Value {

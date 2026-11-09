@@ -328,21 +328,34 @@ pub fn preprocesar(programa: &mut Programa) -> Result<(), String> {
 
     // Para cada campo: si __arg == __etiqueta_i { asignar y marcar visto }
     for (i, campo) in struct_decl.campos.iter().enumerate() {
-        let mut body: Vec<Sentencia> = Vec::new();
-        body.push(declarar(
-            Articulo::El,
-            "__val",
+        let mut cuerpo_campo: Vec<Sentencia> = Vec::new();
+        // SIN variable temporal `__val`: el campo queda dueño directo de la
+        // copia que devuelve vector_obtener. Con `el __val` el drop automático
+        // liberaba la copia al final del bloque y el campo quedaba colgando
+        // (use-after-free → SIGSEGV al imprimir el struct en macOS).
+        let val_expr = llamada_tipada(
+            "vector_obtener",
             Tipo::Texto,
-            llamada_tipada("vector_obtener", Tipo::Texto, vec![id("__argv"), suma(id("__i"), Expresion::Literal(Literal::Entero(1, Span::vacio())))]),
-        ));
-        // Convertir según tipo
-        let valor_conv = expr_conversion(&campo.tipo, id("__val"));
-        body.push(asignar(&nombre_var(i), valor_conv));
+            vec![
+                id("__argv"),
+                suma(id("__i"), Expresion::Literal(Literal::Entero(1, Span::vacio()))),
+            ],
+        );
+        let valor_conv = expr_conversion(&campo.tipo, val_expr);
+        cuerpo_campo.push(asignar(&nombre_var(i), valor_conv));
         // Marcar visto si es requerido
         if let Some((_, f)) = bandera.iter().find(|(bi, _)| *bi == i) {
-            body.push(asignar(f, Expresion::Literal(Literal::Booleano(true, Span::vacio()))));
+            cuerpo_campo.push(asignar(f, Expresion::Literal(Literal::Booleano(true, Span::vacio()))));
         }
-        body.push(asignar("__i", suma(id("__i"), Expresion::Literal(Literal::Entero(1, Span::vacio())))));
+        cuerpo_campo.push(asignar("__i", suma(id("__i"), Expresion::Literal(Literal::Entero(1, Span::vacio())))));
+
+        // Sólo consumir el valor si existe: `--flag` como último argumento no
+        // debe leer fuera de rango (vector_obtener devuelve 0 → descriptor nulo).
+        let hay_valor = menor(
+            suma(id("__i"), Expresion::Literal(Literal::Entero(1, Span::vacio()))),
+            id("__n"),
+        );
+        let body = vec![si(hay_valor, cuerpo_campo)];
         cuerpo_loop.push(si(
             igual(llamada("texto_comparar", vec![id("__arg"), id(&nombre_etiqueta(i))]), Expresion::Literal(Literal::Entero(0, Span::vacio()))),
             body,

@@ -175,6 +175,7 @@ name = "falcato_runtime"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "cc",
  "ed25519-dalek",
  "rand",
 ]

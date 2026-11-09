@@ -163,7 +163,9 @@ mod posix_handler {
         unsafe {
             // Flush stdout
             fsync(1);
-            let msg = match sig {
+            // Tipo explícito: los literales tienen longitudes distintas y cada
+            // brazo del match sería un array de tamaño diferente (E0308).
+            let msg: &[u8] = match sig {
                 SIGSEGV => b"\n[FALCATO PANIC] SIGSEGV (11) - segfault / puntero nulo / heap corruption\n  Funcion: desconocida (sin simbolos)\n",
                 SIGABRT => b"\n[FALCATO PANIC] SIGABRT (6) - abort / double-free detectado por allocator\n  Funcion: desconocida\n",
                 SIGILL => b"\n[FALCATO PANIC] SIGILL (4) - instruccion ilegal / heap corruption\n",
@@ -186,10 +188,12 @@ mod posix_handler {
         });
     }
 
-    // Auto-instalar via .init_array (sin crate ctor)
+    // Auto-instalar via .init_array (ELF) / __mod_init_func (Mach-O).
+    // En Mach-O la sección requiere "segmento,sección": __DATA,__mod_init_func.
     #[used]
     #[allow(non_upper_case_globals)]
-    #[link_section = ".init_array"]
+    #[cfg_attr(target_os = "macos", link_section = "__DATA,__mod_init_func")]
+    #[cfg_attr(not(target_os = "macos"), link_section = ".init_array")]
     static ctor_posix: unsafe extern "C" fn() = {
         unsafe extern "C" fn ctor() {
             instalar();

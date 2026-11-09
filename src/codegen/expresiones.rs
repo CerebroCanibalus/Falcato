@@ -1469,6 +1469,23 @@ impl Codegen {
         builder: &mut FunctionBuilder,
         variables: &HashMap<String, (cranelift_codegen::ir::StackSlot, Tipo, crate::ast::Articulo)>,
     ) -> Result<cranelift_codegen::ir::Value, ()> {
+        // Day-0: builtin sin implementación en el target → error de compilación
+        // con span (nunca link error ni crash silencioso).
+        if let Some(motivo) = self.registry.motivo_no_soportado(&llamada.funcion) {
+            let motivo = motivo.to_string();
+            self.errores.agregar(
+                ErrorCompilador::nuevo(
+                    CategoriaError::Tipo,
+                    90,
+                    llamada.span.clone(),
+                    format!("El builtin '{}' no está disponible en la plataforma destino: {}",
+                            llamada.funcion, motivo),
+                ).con_sugerencia(
+                    "El código portable debe evitar esta funcionalidad o compilarlo                      con --destino a una plataforma que la implemente.",
+                ),
+            );
+            return Err(());
+        }
         match llamada.funcion.as_str() {
             "imprimir" => self.builtin_imprimir(builder, variables, &llamada.argumentos, false),
             "imprimir_linea" | "decir" => self.builtin_imprimir(builder, variables, &llamada.argumentos, true),

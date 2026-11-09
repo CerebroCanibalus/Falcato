@@ -1451,10 +1451,7 @@ impl Codegen {
                     let init_call = builder.ins().call(init_ref, &args);
                     let fut_ptr = builder.inst_results(init_call)[0];
 
-                    // Poll loop: while __poll(fut_ptr) == 0 { Sleep(1); }
-                    let sleep_id = self.asegurar_funcion_c("Sleep", &[types::I32], None);
-                    let sleep_ref = self.module.declare_func_in_func(sleep_id, builder.func);
-
+                    // Poll loop: while __poll(fut_ptr) == 0 { sleep(1); }
                     let bloque_check = builder.create_block();
                     let bloque_sleep = builder.create_block();
                     let bloque_done = builder.create_block();
@@ -1469,10 +1466,10 @@ impl Codegen {
                     let es_pending = builder.ins().icmp(cranelift_codegen::ir::condcodes::IntCC::Equal, poll_result, cero64);
                     builder.ins().brif(es_pending, bloque_sleep, &[], bloque_done, &[]);
 
-                    // Sleep(1) + jump back
+                    // sleep(1) + jump back
                     builder.switch_to_block(bloque_sleep);
                     let uno32 = builder.ins().iconst(types::I32, 1);
-                    builder.ins().call(sleep_ref, &[uno32]);
+                    self.platform_call_void("sleep", &mut builder, &[uno32]);
                     builder.ins().jump(bloque_check, &[]);
                     builder.seal_block(bloque_sleep);
 

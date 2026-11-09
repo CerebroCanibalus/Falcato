@@ -516,11 +516,25 @@ fn compilar(
     let primer_archivo = &archivos[0];
     let binario = output.map(String::from)
         .unwrap_or_else(|| {
-            Path::new(primer_archivo)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| format!("{}.exe", s))
-                .unwrap_or_else(|| "a.exe".to_string())
+            if cfg!(windows) {
+                // Windows: comportamiento histórico — `<nombre>.exe` en la
+                // carpeta actual (no tocar: scripts y CI de MSVC dependen de eso).
+                Path::new(primer_archivo)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| format!("{}.exe", s))
+                    .unwrap_or_else(|| "a.exe".to_string())
+            } else {
+                // POSIX: junto al fuente y sin extensión — Mach-O/ELF no llevan
+                // `.exe`; el `.o`/binario quedan al lado del `.fc` de origen.
+                let ruta = Path::new(primer_archivo);
+                match ruta.extension() {
+                    Some(ext) if ext.eq_ignore_ascii_case("fc") => ruta.with_extension(""),
+                    _ => ruta.to_path_buf(),
+                }
+                .to_string_lossy()
+                .into_owned()
+            }
         });
 
     let rutas_obj: Vec<&str> = objetos.iter().map(|(_, ruta)| ruta.as_str()).collect();
@@ -599,11 +613,24 @@ fn compilar_individual(
 
     let binario = output.map(String::from)
         .unwrap_or_else(|| {
-            Path::new(archivo)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| format!("{}.exe", s))
-                .unwrap_or_else(|| "a.exe".to_string())
+            if cfg!(windows) {
+                // Windows: comportamiento histórico — `<nombre>.exe` en la
+                // carpeta actual (los scripts y el CI de MSVC esperan eso).
+                Path::new(archivo)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(|s| format!("{}.exe", s))
+                    .unwrap_or_else(|| "a.exe".to_string())
+            } else {
+                // POSIX: junto al fuente y sin extensión (Mach-O/ELF).
+                let ruta = Path::new(archivo);
+                match ruta.extension() {
+                    Some(ext) if ext.eq_ignore_ascii_case("fc") => ruta.with_extension(""),
+                    _ => ruta.to_path_buf(),
+                }
+                .to_string_lossy()
+                .into_owned()
+            }
         });
 
     link_objeto(&obj_ruta, &binario, target, false)?;
@@ -626,13 +653,18 @@ fn compilar_y_ejecutar(archivos: &[String], args: &[String], nivel_memoria: u8) 
     }
 
     let primer = &archivos[0];
-    let binario = format!("{}.exe", primer.strip_suffix(".fc").unwrap_or(primer));
+    // POSIX: junto al fuente y sin extensión (Mach-O/ELF). Windows: `.exe` como siempre.
+    let binario = if cfg!(windows) {
+        format!("{}.exe", primer.strip_suffix(".fc").unwrap_or(primer))
+    } else {
+        primer.strip_suffix(".fc").unwrap_or(primer).to_string()
+    };
     
     compilar(archivos, Some(&binario), None, false, false, false, nivel_memoria)?;
 
     println!("[Falcato] Ejecutando '{}'...", binario);
     
-    let mut cmd = Command::new(&binario);
+    let mut cmd = Command::new(ruta_ejecutable(&binario));
     cmd.args(args);
     
     let status = cmd.status()
@@ -1059,13 +1091,19 @@ fn ejecutar_pruebas(archivos: &[String], _json: bool) -> Result<(), String> {
     let obj_ruta = format!("{}.o", archivo.strip_suffix(".fc").unwrap_or(archivo));
     codegen.escribir_objeto(&obj_ruta)?;
 
-    let binario = format!("{}_test.exe", archivo.strip_suffix(".fc").unwrap_or(archivo));
+    // `_test` junto al fuente; `.exe` sólo en Windows (Mach-O/ELF no lo usan).
+    let stem_prueba = archivo.strip_suffix(".fc").unwrap_or(archivo);
+    let binario = if cfg!(windows) {
+        format!("{}_test.exe", stem_prueba)
+    } else {
+        format!("{}_test", stem_prueba)
+    };
     link_objeto(&obj_ruta, &binario, None, false)?;
 
     println!("[Falcato] Binario de pruebas generado: {}", binario);
     println!();
 
-    let status = Command::new(&binario)
+    let status = Command::new(ruta_ejecutable(&binario))
         .status()
         .map_err(|e| format!("No se pudo ejecutar '{}': {}", binario, e))?;
 
@@ -1213,13 +1251,68 @@ fn buscar_link_msvc() -> Option<String> {
     None
 }
 
+/// Triple del host actual (default de `--destino` cuando no se pasa explícito).
+fn triple_del_host() -> String {
+    match std::env::consts::OS {
+        "windows" => "x86_64-pc-windows-msvc".to_string(),
+        "macos" => match std::env::consts::ARCH {
+            "aarch64" => "aarch64-apple-darwin".to_string(),
+            _ => "x86_64-apple-darwin".to_string(),
+        },
+        _ => match std::env::consts::ARCH {
+            "aarch64" => "aarch64-unknown-linux-gnu".to_string(),
+            _ => "x86_64-unknown-linux-gnu".to_string(),
+        },
+    }
+}
+
+/// Resuelve la ruta de la runtime staticlib (`lib/falcato_runtime/target/...`).
+///
+/// La ruta del linker es relativa a la raíz del repo, pero el usuario compila
+/// desde SU proyecto (`falcato corre hola.fc` desde cualquier carpeta). Se
+/// prueban: ruta absoluta → CWD → candidatos relativos al ejecutable (subiendo
+/// hasta 5 niveles desde `target/release/falcato`).
+fn resolver_ruta_runtime(relativa: &str) -> Option<std::path::PathBuf> {
+    let p = std::path::Path::new(relativa);
+    if p.is_absolute() {
+        return p.exists().then(|| p.to_path_buf());
+    }
+    if p.exists() {
+        return Some(p.to_path_buf());
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(|d| d.to_path_buf());
+        for _ in 0..5 {
+            let Some(base) = dir.take() else { break };
+            let candidato = base.join(relativa);
+            if candidato.exists() {
+                return Some(candidato);
+            }
+            dir = base.parent().map(|d| d.to_path_buf());
+        }
+    }
+    None
+}
+
+/// En POSIX, ejecutar un binario por nombre relativo busca en PATH, no en el
+/// CWD (a diferencia de Windows). Añade "./" cuando haga falta.
+fn ruta_ejecutable(binario: &str) -> String {
+    let p = std::path::Path::new(binario);
+    if p.is_absolute() || binario.contains('/') || cfg!(windows) {
+        binario.to_string()
+    } else {
+        format!("./{}", binario)
+    }
+}
+
 fn link_objetos(
     objetos: &[&str],
     binario: &str,
     target: Option<&str>,
     _release: bool,
 ) -> Result<(), String> {
-    let target = target.unwrap_or("x86_64-pc-windows-msvc");
+    // Default: triple nativo (el CLI dice "default: nativo" — antes era Windows siempre)
+    let target = target.map(String::from).unwrap_or_else(triple_del_host);
 
     if target.contains("windows") {
         // Buscar link.exe de MSVC de forma robusta:
@@ -1240,9 +1333,10 @@ fn link_objetos(
             cmd.arg(trampolin);
         }
         // Runtime library (falcato_runtime staticlib)
-        let runtime_lib = std::path::Path::new("lib/falcato_runtime/target/release/falcato_runtime.lib");
-        if runtime_lib.exists() {
-            cmd.arg(runtime_lib);
+        match resolver_ruta_runtime("lib/falcato_runtime/target/release/falcato_runtime.lib") {
+            Some(runtime_lib) => { cmd.arg(runtime_lib); }
+            None => return Err("No se encontró la runtime staticlib \
+(falcato_runtime.lib). Compila la runtime: cd lib/falcato_runtime && cargo build --release".to_string()),
         }
         cmd.arg(format!("/OUT:{}", binario))
             .arg("/SUBSYSTEM:CONSOLE")
@@ -1282,7 +1376,7 @@ fn link_objetos(
     } else {
         // Linux/macOS: usar PlatformLinker (clang/gcc + runtime + libs)
         use crate::platform::linker::PlatformLinker;
-        let linker = PlatformLinker::for_target(target);
+        let linker = PlatformLinker::for_target(&target);
 
         let mut cmd = Command::new(&linker.cmd);
         for obj in objetos {
@@ -1297,9 +1391,10 @@ fn link_objetos(
         }
         // Runtime library (libfalcato_runtime.a)
         if let Some(ref rt) = linker.runtime_lib {
-            let p = std::path::Path::new(rt);
-            if p.exists() {
-                cmd.arg(rt);
+            match resolver_ruta_runtime(rt) {
+                Some(path) => { cmd.arg(path); }
+                None => return Err(format!("No se encontró la runtime staticlib '{}'. \
+Compila la runtime: cd lib/falcato_runtime && cargo build --release", rt)),
             }
         }
         // Librerías del sistema
